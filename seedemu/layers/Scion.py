@@ -74,10 +74,12 @@ class _LinkConfig(NamedTuple):
             public = f"{self.a.ip}:{self.a.port}"
             remote = f"{self.b.ip}:{self.b.port}"
             remote_as = f"{self.b.isd}-{self.b.asn}"
+            remote_ifid = self.b.ifid
         elif asn == self.b.asn:
             public = f"{self.b.ip}:{self.b.port}"
             remote = f"{self.a.ip}:{self.a.port}"
             remote_as = f"{self.a.isd}-{self.a.asn}"
+            remote_ifid = self.a.ifid
 
         if self.rel == LinkType.Transit:
             if asn == self.a.asn:
@@ -86,11 +88,12 @@ class _LinkConfig(NamedTuple):
                 link_to = "parent"
         elif self.rel == LinkType.Core:
             link_to = "core"
+        elif self.rel == LinkType.Peer:
+            link_to = "peer"
         else:
-            # TODO: handle peer links
-            pass
+            assert False, "invalid scion link type"
 
-        return {
+        result = {
             "underlay": {
                 "public": public,
                 "remote": remote,
@@ -99,6 +102,12 @@ class _LinkConfig(NamedTuple):
             "link_to": link_to,
             "mtu": self.net.getMtu(),
         }
+
+        # not sure what happens if we include this for non-Peer LinkTypes
+        if self.rel == LinkType.Peer:
+            result["remote_interface_id"] = remote_ifid
+
+        return result
 
 
 class _IsolationDomain(NamedTuple):
@@ -384,7 +393,7 @@ class Scion(Layer):
                 if type == 'rnode':
                     rnode: Router = obj
                     if rnode.hasAttribute("scion"):
-                        self._install_scion(rnode)
+                        self._build_scion(rnode)
                         self._provision_router(rnode, tempdir)
                 # Install and configure SCION on an end host
                 elif type == 'hnode':
@@ -535,6 +544,27 @@ class Scion(Layer):
         node.addBuildCommand("apt-get update && apt-get install -y scionlab")
         node.addSoftware("apt-transport-https")
         node.addSoftware("ca-certificates")
+
+    def _build_scion(self, node: Node):
+        self._install_scion(node)
+        node.addSoftware("git")
+        node.addSoftware("g++")
+        build = """#!/bin/bash
+curl -L https://go.dev/dl/go1.18.10.linux-amd64.tar.gz | tar xvzf -
+git clone https://github.com/benthor/scion
+pushd scion
+git checkout peertest
+../go/bin/go build -o /usr/bin/scion ./scion/cmd/scion
+../go/bin/go build -o /usr/bin/sciond ./daemon/cmd/daemon
+../go/bin/go build -o /usr/bin/scion-border-router ./router/cmd/router
+../go/bin/go build -o /usr/bin/scion-control-service ./control/cmd/control
+../go/bin/go build -o /usr/bin/scion-dispatcher ./dispatcher/cmd/dispatcher
+popd
+"""
+        for line in build.splitlines():
+            node.addBuildCommand(f'echo "{line}" >> /build.sh')
+        node.addBuildCommand("chmod +x /build.sh")
+        node.addBuildCommand("/build.sh")
 
     def _provision_router(self, rnode: Router, tempdir: str):
         asn = rnode.getAsn()
