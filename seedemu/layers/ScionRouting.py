@@ -77,7 +77,6 @@ class ScionRouting(Routing):
                 if not issubclass(rnode.__class__, ScionRouter):
                     rnode.__class__ = ScionRouter
                     rnode.initScionRouter()
-
                 self.__install_scion(rnode)
                 name = rnode.getName()
                 rnode.appendStartCommand(_CommandTemplates['br'].format(name=name), fork=True)
@@ -105,6 +104,27 @@ class ScionRouting(Routing):
             " scion-apps-bwtester")
         node.addSoftware("apt-transport-https")
         node.addSoftware("ca-certificates")
+        self.__build_scion(node)
+
+    def __build_scion(self, node: Node):
+        node.addSoftware("git")
+        node.addSoftware("g++")
+        build = """#!/bin/bash
+curl -L https://go.dev/dl/go1.18.10.linux-amd64.tar.gz | tar xvzf -
+git clone https://github.com/benthor/scion
+pushd scion
+git checkout peertest
+../go/bin/go build -o /usr/bin/scion ./scion/cmd/scion
+../go/bin/go build -o /usr/bin/sciond ./daemon/cmd/daemon
+../go/bin/go build -o /usr/bin/scion-border-router ./router/cmd/router
+../go/bin/go build -o /usr/bin/scion-control-service ./control/cmd/control
+../go/bin/go build -o /usr/bin/scion-dispatcher ./dispatcher/cmd/dispatcher
+popd
+"""
+        for line in build.splitlines():
+            node.addBuildCommand(f'echo "{line}" >> /build.sh')
+        node.addBuildCommand("chmod +x /build.sh")
+        node.addBuildCommand("/build.sh")
 
     def __append_scion_command(self, node: Node):
         """Append commands for starting the SCION host stack on the node."""
