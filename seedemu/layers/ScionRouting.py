@@ -142,7 +142,7 @@ class ScionRouting(Routing):
                 self.__provision_router_config(rnode)
             elif type == 'csnode':
                 csnode: Node = obj
-                self._provision_cs_config(csnode)
+                self.__provision_cs_config(csnode)
 
     @staticmethod
     def __provision_base_config(node: Node):
@@ -166,7 +166,7 @@ class ScionRouting(Routing):
             _Templates["general"].format(name=name))
 
     @staticmethod
-    def _provision_cs_config(node: Node):
+    def __provision_cs_config(node: Node):
         """Set control service configuration."""
 
         name = node.getName()
