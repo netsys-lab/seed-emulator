@@ -44,7 +44,9 @@ scion = Scion()
 # SCION ISDs
 base.createIsolationDomain(1)
 
-# Internet Exchange
+# Internet Exchanges
+# We use "Internet Exchanges" as internal networks of the subdivided ASes in
+# order to reduce the number of networks Docker has to create.
 base.createInternetExchange(5)  # Tier-1 ISP
 base.createInternetExchange(7)  # Tier-1 ISP
 base.createInternetExchange(10) # Large IXP
@@ -208,7 +210,6 @@ for asn in range(184, 192):
 scion.addIxLink(18, (1, 180), (1, 181), ScLinkType.Transit)
 scion.addIxLink(18, (1, 180), (1, 182), ScLinkType.Transit)
 scion.addIxLink(18, (1, 180), (1, 183), ScLinkType.Transit)
-scion.addIxLink(18, (1, 181), (1, 182), ScLinkType.Transit)
 scion.addIxLink(18, (1, 181), (1, 184), ScLinkType.Transit)
 scion.addIxLink(18, (1, 181), (1, 185), ScLinkType.Transit)
 scion.addIxLink(18, (1, 182), (1, 184), ScLinkType.Transit)
@@ -219,14 +220,13 @@ scion.addIxLink(18, (1, 183), (1, 186), ScLinkType.Transit)
 scion.addIxLink(18, (1, 184), (1, 187), ScLinkType.Transit)
 scion.addIxLink(18, (1, 184), (1, 188), ScLinkType.Transit)
 scion.addIxLink(18, (1, 184), (1, 189), ScLinkType.Transit)
+scion.addIxLink(18, (1, 185), (1, 187), ScLinkType.Transit)
 scion.addIxLink(18, (1, 185), (1, 188), ScLinkType.Transit)
-scion.addIxLink(18, (1, 185), (1, 189), ScLinkType.Transit)
 scion.addIxLink(18, (1, 185), (1, 190), ScLinkType.Transit)
+scion.addIxLink(18, (1, 185), (1, 191), ScLinkType.Transit)
 scion.addIxLink(18, (1, 186), (1, 189), ScLinkType.Transit)
 scion.addIxLink(18, (1, 186), (1, 190), ScLinkType.Transit)
 scion.addIxLink(18, (1, 186), (1, 191), ScLinkType.Transit)
-scion.addIxLink(18, (1, 188), (1, 187), ScLinkType.Transit)
-scion.addIxLink(18, (1, 190), (1, 191), ScLinkType.Transit)
 scion.addXcLink((1, 60), (1, 180), ScLinkType.Core)
 scion.addXcLink((1, 51), (1, 181), ScLinkType.Transit)
 scion.addIxLink(10, (1, 108), (1, 181), ScLinkType.Transit)
@@ -287,5 +287,5 @@ emu.addLayer(scion)
 emu.render()
 
 # Compilation
-emu.compile(Docker(), './output')
-emu.compile(Graphviz(), "./output/graphs")
+emu.compile(Docker(), './scion')
+emu.compile(Graphviz(), "./scion/graphs")
