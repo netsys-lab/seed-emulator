@@ -61,10 +61,12 @@ br.crossConnect(180, 'br0', xc_nets.next_addr('50-180'))
 br.crossConnect(200, 'br0', xc_nets.next_addr('50-200'))
 _, br = create_as(1, 60, is_core=True) # Tier-1 ISP
 br.crossConnect(50, 'br0', xc_nets.next_addr('50-60'))
+br.crossConnect(70, 'br0', xc_nets.next_addr('60-70'))
 br.crossConnect(152, 'br0', xc_nets.next_addr('60-152'))
 br.crossConnect(180, 'br0', xc_nets.next_addr('60-180'))
 _, br = create_as(1, 70, is_core=True) # Tier-1 ISP
 br.crossConnect(50, 'br0', xc_nets.next_addr('50-70'))
+br.crossConnect(60, 'br0', xc_nets.next_addr('60-70'))
 br.crossConnect(160, 'br0', xc_nets.next_addr('70-160'))
 br.crossConnect(161, 'br0', xc_nets.next_addr('70-161'))
 br.crossConnect(162, 'br0', xc_nets.next_addr('70-162'))
@@ -109,8 +111,9 @@ br.crossConnect(70, 'br0', xc_nets.next_addr('70-163'))
 br.crossConnect(200, 'br0', xc_nets.next_addr('163-200'))
 
 # BGP
-ebgp.addCrossConnectPeering(70, 50, PeerRel.Unfiltered)
-ebgp.addCrossConnectPeering(50, 60, PeerRel.Unfiltered)
+ebgp.addCrossConnectPeering(70, 50, PeerRel.Peer)
+ebgp.addCrossConnectPeering(50, 60, PeerRel.Peer)
+ebgp.addCrossConnectPeering(60, 70, PeerRel.Peer)
 ebgp.addCrossConnectPeering(70, 170, PeerRel.Provider)
 ebgp.addCrossConnectPeering(70, 160, PeerRel.Provider)
 ebgp.addCrossConnectPeering(70, 161, PeerRel.Provider)
@@ -138,6 +141,7 @@ for peer in peers_ix10:
 # SCION links
 scion.addXcLink((1, 70), (1, 50), ScLinkType.Core)
 scion.addXcLink((1, 50), (1, 60), ScLinkType.Core)
+scion.addXcLink((1, 60), (1, 70), ScLinkType.Core)
 scion.addXcLink((1, 70), (1, 170), ScLinkType.Transit)
 scion.addXcLink((1, 70), (1, 160), ScLinkType.Transit)
 scion.addXcLink((1, 70), (1, 161), ScLinkType.Transit)
