@@ -31,6 +31,39 @@ connection = "/cache/{name}.path.db"
 _Templates["beacon"] = """\
 [beacon_db]
 connection = "/cache/{name}.beacon.db"
+[beaconing]
+origination_interval  = "30s"
+propagation_interval  = "30s"
+registration_interval = "30s"
+[beaconing.policies]
+propagation       = "/etc/scion/beacon_policy.yaml"
+core_registration = "/etc/scion/beacon_policy.yaml"
+up_registration   = "/etc/scion/beacon_policy.yaml"
+down_registration = "/etc/scion/beacon_policy.yaml"
+"""
+
+_Templates["core-beacon-policy"] = """\
+#BestSetSize: 20
+#CandidateSetSize: 100
+#MaxExpTime: 63
+Filter:
+  MaxHopsLength: 2
+#  AsBlackList: []
+#  IsdBlackList: []
+  AllowIsdLoop: false
+#Type: ""
+"""
+
+_Templates["beacon-policy"] = """\
+#BestSetSize: 20
+#CandidateSetSize: 100
+#MaxExpTime: 63
+#Filter:
+#  MaxHopsLength: 10
+#  AsBlackList: []
+#  IsdBlackList: []
+#  AllowIsdLoop: false
+#Type: ""
 """
 
 _Templates["dispatcher"] = """\
@@ -142,7 +175,7 @@ class ScionRouting(Routing):
                 self.__provision_router_config(rnode)
             elif type == 'csnode':
                 csnode: Node = obj
-                self.__provision_cs_config(csnode)
+                self.__provision_cs_config(csnode, isds[0][1])
 
     @staticmethod
     def __provision_base_config(node: Node):
@@ -166,7 +199,7 @@ class ScionRouting(Routing):
             _Templates["general"].format(name=name))
 
     @staticmethod
-    def __provision_cs_config(node: Node):
+    def __provision_cs_config(node: Node, is_core: bool):
         """Set control service configuration."""
 
         name = node.getName()
@@ -175,3 +208,9 @@ class ScionRouting(Routing):
             _Templates["trust"].format(name=name) +
             _Templates["beacon"].format(name=name) +
             _Templates["path"].format(name=name))
+        if is_core:
+            node.setFile(os.path.join("/etc/scion/beacon_policy.yaml"),
+                _Templates["core-beacon-policy"])
+        else:
+            node.setFile(os.path.join("/etc/scion/beacon_policy.yaml"),
+                _Templates["beacon-policy"])

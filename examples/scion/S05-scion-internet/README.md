@@ -11,7 +11,7 @@ large content provider.
 
 ![BGP Internet Topology](./images/bgp_topology.png)
 
-Lines with arrow heads indicate paid transit connections, dashed lines are used
+Lines with arrowheads indicate paid transit connections, dashed lines are used
 for settlement-free peering. The three IXes are not ASes themselves, the are
 transparent on the network layer. All IX participants are connected to a route
 server in each IX enabling full multilateral peering.
@@ -39,7 +39,7 @@ topology:
 ![SCION Internet Topology](./images/scion_topology.png)
 
 SCION core ASes have double outlines, the other ASes are non-core ASes. Thick
-lines represent core links, links with arrow heads are transit links. There are
+lines represent core links, links with arrowheads are transit links. There are
 no peering links. The topology consists of Tier-1 ASes, IXPs, a large content
 provider and access networks of different sizes.
 
