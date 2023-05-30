@@ -47,7 +47,7 @@ _Templates["core-beacon-policy"] = """\
 #CandidateSetSize: 100
 #MaxExpTime: 63
 Filter:
-  MaxHopsLength: 2
+  MaxHopsLength: 4
 #  AsBlackList: []
 #  IsdBlackList: []
   AllowIsdLoop: false
