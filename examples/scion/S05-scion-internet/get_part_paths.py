@@ -86,7 +86,7 @@ def get_valid_paths(src, destinations, ases):
             valid_paths_from_src[dest] = {}
             continue
         data = json.loads(output)
-        valid = list(filter(check_path, data['paths']))
+        valid = list(filter(check_path, data.get('paths', [])))
         if not histogram:
             valid_paths_from_src[dest] = [path_to_simple_list(path) for path in valid]
         else:

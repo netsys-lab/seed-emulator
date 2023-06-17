@@ -6,16 +6,41 @@ from seedemu.core import Emulator
 from seedemu.layers import ScionBase, ScionRouting, ScionIsd, Scion
 from seedemu.layers.Scion import LinkType as ScLinkType
 
+import os
+from os.path import join, abspath, relpath
 
-def create_as(isd, asn, is_core=False, issuer=None):
+LAT=10
+BW=10000000
+DROP=0
+
+def importDir(node, dirname="root", destdir="/"):
+    start = abspath(dirname)
+    for root, dirs, files in os.walk(start):
+        for fname in files:
+            source = join(root, fname)
+            destination = join(destdir, relpath(root, start), fname)
+            node.importFile(source, destination)
+            if os.access(source, os.X_OK):
+                node.appendStartCommand("chmod +x %s" % (destination,))
+                # XXX(benthor) not sure if this is a good pattern or
+                # whether we should have an /etc/autostart directory
+                # or something
+                if fname == "autostart.sh":
+                    # also not sure whether to fork here or not
+                    node.appendStartCommand(destination, fork=True)
+
+
+def create_as(isd, asn, is_core=False, issuer=None, latency=0, bandwidth=0, packetDrop=0):
     as_ = base.createAutonomousSystem(asn)
     scion_isd.addIsdAs(isd, asn, is_core)
     if not is_core:
         scion_isd.setCertIssuer((isd, asn), issuer)
-    as_.createNetwork('net0')
-    as_.createControlService('cs1').joinNetwork('net0')
+    as_.createNetwork('net0').setDefaultLinkProperties(LAT, BW, DROP)
+    cs = as_.createControlService('cs1')
+    cs.joinNetwork('net0')
     br = as_.createRouter('br0')
     br.joinNetwork('net0')
+    importDir(cs, "root", "/")
     return as_, br
 
 
@@ -47,14 +72,14 @@ base.createIsolationDomain(1)
 # Internet Exchanges
 # We use "Internet Exchanges" as internal networks of the subdivided ASes in
 # order to reduce the number of networks Docker has to create.
-base.createInternetExchange(5)  # Tier-1 ISP
-base.createInternetExchange(7)  # Tier-1 ISP
-base.createInternetExchange(10) # Large IXP
-base.createInternetExchange(11) # Large IXP
-base.createInternetExchange(12) # Small IXP
-base.createInternetExchange(17) # Small access network
-base.createInternetExchange(18) # Large access network
-base.createInternetExchange(20) # Large content provider
+base.createInternetExchange(5).getPeeringLan().setDefaultLinkProperties(LAT, BW, DROP)  # Tier-1 ISP
+base.createInternetExchange(7).getPeeringLan().setDefaultLinkProperties(LAT, BW, DROP)  # Tier-1 ISP
+base.createInternetExchange(10).getPeeringLan().setDefaultLinkProperties(LAT, BW, DROP) # Large IXP
+base.createInternetExchange(11).getPeeringLan().setDefaultLinkProperties(LAT, BW, DROP) # Large IXP
+base.createInternetExchange(12).getPeeringLan().setDefaultLinkProperties(LAT, BW, DROP) # Small IXP
+base.createInternetExchange(17).getPeeringLan().setDefaultLinkProperties(LAT, BW, DROP) # Small access network
+base.createInternetExchange(18).getPeeringLan().setDefaultLinkProperties(LAT, BW, DROP) # Large access network
+base.createInternetExchange(20).getPeeringLan().setDefaultLinkProperties(LAT, BW, DROP) # Large content provider
 
 # Tier-1 ISP as50-53
 br = create_as(1, 50, is_core=True)[1].joinNetwork('ix5')
