@@ -14,6 +14,7 @@ def generate_scripts(topo):
     dashboard_asn = topo["dashboard_asn"]
     dashboard_url= f"http://10.{dashboard_asn}.0.71:8050"
     path_selection_url = f"http://10.{sender_asn}.0.71:8010/paths/1_2"
+    get_paths_url = f"http://10.{sender_asn}.0.71:8010/get_paths"
 
 
     bash_script = '''#!/bin/bash
@@ -112,7 +113,8 @@ def generate_scripts(topo):
 
     docker exec -it {} /bin/zsh -c "ping 10.72.0.1 -c 1"
     echo "path selection url: {}"
-    '''.format(sender_cont, sender_cont, receiver_cont, receiver_cont, receiver_cont, path_selection_url)
+    echo "get paths url: {}"
+    '''.format(sender_cont, sender_cont, receiver_cont, receiver_cont, receiver_cont, path_selection_url, get_paths_url)
 
     # Write the bash script to a file
     with open('helper_scripts/start_dmtp.sh', 'w') as f:
