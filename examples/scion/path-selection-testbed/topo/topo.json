@@ -1,0 +1,112 @@
+{
+    "ISDs" : [1],
+    "ASes" : [
+        {
+            "asn" : 101,
+            "isd" : 1,
+            "label" : "101",
+            "is_core_as" : true
+            
+        },
+        {
+            "asn" : 102,
+            "isd" : 1,
+            "label" : "102",
+            "is_core_as" : true
+            
+        },
+        {
+            "asn" : 103,
+            "isd" : 1,
+            "label" : "103",
+            "is_core_as" : false,            
+            "cert_issuer": 101
+        },
+        {
+            "asn" : 104,
+            "isd" : 1,
+            "label" : "103",
+            "is_core_as" : false,
+            "cert_issuer": 101
+        },
+        {
+            "asn" : 105,
+            "isd" : 1,
+            "label" : "105",
+            "is_core_as" : false,
+            "cert_issuer": 101
+        },
+        {
+            "asn" : 106,
+            "isd" : 1,
+            "label" : "106",
+            "is_core_as" : false,            
+            "cert_issuer": 101
+        }
+    ],
+    "links" : [
+        {
+            "id" : 200,
+            "is_core_link" : true,
+            "source_asn" : 101,
+            "dest_asn" : 102
+        },
+        {
+            "id" : 201,
+            "is_core_link" : false,
+            "source_asn" : 101,
+            "dest_asn" : 104
+        },
+        {
+            "id" : 202,
+            "is_core_link" : false,
+            "source_asn" : 102,
+            "dest_asn" : 103
+        },
+        {
+            "id" : 203,
+            "is_core_link" : false,
+            "source_asn" : 102,
+            "dest_asn" : 104
+        },
+        {
+            "id" : 204,
+            "is_core_link" : false,
+            "source_asn" : 101,
+            "dest_asn" : 103
+        },
+        {
+            "id" : 205,
+            "is_core_link" : false,
+            "source_asn" : 104,
+            "dest_asn" : 103
+        },
+        {
+            "id" : 206,
+            "is_core_link" : false,
+            "source_asn" : 104,
+            "dest_asn" : 105
+        },
+        {
+            "id" : 207,
+            "is_core_link" : false,
+            "source_asn" : 101,
+            "dest_asn" : 106
+        },
+        {
+            "id" : 208,
+            "is_core_link" : false,
+            "source_asn" : 103,
+            "dest_asn" : 106
+        },
+        {
+            "id" : 209,
+            "is_core_link" : false,
+            "source_asn" : 102,
+            "dest_asn" : 105
+        }
+    ],
+    "dashboard_asn" : 101,
+    "sender_asn" : 105,
+    "receiver_asn" : 106
+}

@@ -10,7 +10,7 @@ def init_tc ():
         # Clear all rules
         subprocess.run(["tc", "qdisc", "del", "dev", interface, "root"])
         # Init bandwidth, latency and loss
-        subprocess.run(["tc", "qdisc", "add", "dev", interface, "root", "netem", "rate", "100mbit", "delay", "2ms", "loss", "0%"])
+        subprocess.run(["tc", "qdisc", "add", "dev", interface, "root", "netem", "rate", "100mbit", "delay", "1ms", "loss", "0%"])
 
 def control_bandwidth_and_latency(interface):
     # Using 'tc' to control bandwidth and latency
@@ -99,9 +99,9 @@ while True:
     for interface in prev_bytes_sent.keys():
         bytes_sent = get_network_bytes_sent(interface)
         bytes_recv = get_network_bytes_recv(interface)
-        bps_sent = (bytes_sent - prev_bytes_sent[interface])*2
-        bps_recv = (bytes_recv - prev_bytes_recv[interface])*2
+        bps_sent = (bytes_sent - prev_bytes_sent[interface])
+        bps_recv = (bytes_recv - prev_bytes_recv[interface])
         client.publish(f"node/{node_name}/bandwidth/{interface}", bps_sent+bps_recv)
         prev_bytes_sent[interface] = bytes_sent
         prev_bytes_recv[interface] = bytes_recv
-    time.sleep(0.5)
+    time.sleep(1)
