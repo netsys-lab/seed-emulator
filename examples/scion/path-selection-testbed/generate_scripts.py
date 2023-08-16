@@ -55,7 +55,7 @@ def generate_scripts(topo):
 
     bash_script = '''#!/bin/bash
 
-    docker exec -it as{}}h-h1-10.{}.0.71 /bin/zsh
+    docker exec -it as{}h-h1-10.{}.0.71 /bin/zsh
     '''.format(sender_asn, sender_asn)
     with open('helper_scripts/access_sender.sh', 'w') as f:
         f.write(bash_script)
@@ -63,7 +63,7 @@ def generate_scripts(topo):
 
     bash_script = '''#!/bin/bash
 
-    docker exec -it as{}}h-h1-10.{}.0.71 /bin/zsh
+    docker exec -it as{}h-h1-10.{}.0.71 /bin/zsh
     '''.format(receiver_asn, receiver_asn)
     with open('helper_scripts/access_receiver.sh', 'w') as f:
         f.write(bash_script)
