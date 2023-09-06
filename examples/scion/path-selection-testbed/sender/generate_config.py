@@ -16,15 +16,8 @@ def get_isd(asn, topo):
             return as_['isd']
     return None
 
-def main():
-    # Replace with the actual command that outputs JSON
-    topo = json.load(open("/topo/topo.json"))
-    receiver_asn = topo['receiver_asn']
-    receiver_isd = get_isd(receiver_asn, topo)
-    sender_asn = topo['sender_asn']
-    sender_isd = get_isd(sender_asn, topo)
-    
-    command = 'scion showpaths {}-{} -j -m 100'.format(receiver_isd, receiver_asn)
+def get_paths(dst_isd, dst_asn):
+    command = 'scion showpaths {}-{} -j -m 100'.format(dst_isd, dst_asn)
     output, error, return_code = execute_command(command)
 
     if return_code == 0:
@@ -33,10 +26,42 @@ def main():
             print("Loaded JSON to dict")
         except json.JSONDecodeError:
             print("Failed to decode JSON:", output)
+            return None
     else:
         print("Failed to execute command. Error:", error)
-        exit(1)
+        return None
+    return result_dict
 
+def get_paths_from_host(dst_isd, dst_asn, container_name):
+    command = 'docker exec {} /bin/zsh -c "scion showpaths {}-{} -j -m 100"'.format(container_name, dst_isd, dst_asn)
+    output, error, return_code = execute_command(command)
+
+    if return_code == 0:
+        try:
+            result_dict = json.loads(output)
+            print("Loaded JSON to dict")
+        except json.JSONDecodeError:
+            print("Failed to decode JSON:", output)
+            return None
+    else:
+        print("Failed to execute command. Error:", error)
+        return None
+    return result_dict
+
+
+def main():
+    # Replace with the actual command that outputs JSON
+    topo = json.load(open("/topo/topo.json"))
+    receiver_asn = topo['receiver_asn']
+    receiver_isd = get_isd(receiver_asn, topo)
+    sender_asn = topo['sender_asn']
+    sender_isd = get_isd(sender_asn, topo)
+    
+    
+    result_dict = get_paths(receiver_isd, receiver_asn)
+    if result_dict is None:
+        print("Failed to get paths")
+        exit(1)
     paths = result_dict["paths"]
     pathFilters = []
     for path in paths:

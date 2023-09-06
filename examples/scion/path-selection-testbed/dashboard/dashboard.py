@@ -37,6 +37,13 @@ topo = json.load(open('/topo/topo.json'))
 sender_ip = '10.{}.0.71'.format(topo['sender_asn'])
 receiver_ip = '10.{}.0.71'.format(topo['receiver_asn'])
 
+try:
+    with open('/topo/paths.json', 'r') as f:
+        paths_data = json.load(f)
+except:
+    paths_data = None
+
+
 def exec_command(command):
     process = subprocess.run(command, stdout=subprocess.PIPE, shell=True, text=True)
     output = process.stdout.strip()
@@ -54,6 +61,7 @@ else:
     print("Broker IP: ", broker_ip)
     
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.LUX])
+server = app.server
 
 stream1_time = []
 stream1_latency = []
@@ -91,7 +99,7 @@ for link in topo['links']:
 links = {}
 for link in topo['links']:
     links['ix{}'.format(link['id'])] = {
-        'bw': 50, 'latency': 2, 'loss': 0.0, 
+        'bw': 50, 'latency': 5, 'loss': 0.0, 
         'jitter': 0, 
         'ases': [link['source_asn'], link['dest_asn']]
     }
@@ -609,6 +617,29 @@ def update_stream2_jitter(val):
         }
         
     }
+
+@server.route('/get_paths', methods=['GET'])
+def get_paths_detailed():
+    for id, path in paths_data.items():
+        _links = path['links']
+        bw = 100000000
+        latency = 0
+        jitter = 0.0
+        loss = 0.0
+        for link in _links:
+            _bw = links[link]['bw']
+            if _bw < bw:
+                bw = _bw
+            
+            latency = latency + links[link]['latency']
+            jitter = jitter + links[link]['jitter']
+            loss = loss + links[link]['loss']
+        path['bandwidth'] = bw
+        path['latency'] = latency
+        path['jitter'] = jitter
+        path['loss'] = loss
+        paths_data[id] = path
+    return paths_data
 
 def on_mqtt_message(client, userdata, msg):
     global network

@@ -1,10 +1,39 @@
 import json
+import os 
 
 def get_isd(asn, topo):
     for as_ in topo['ASes']:
         if as_['asn'] == asn:
             return as_['isd']
     return None
+
+def create_directory(directory_name):
+    # Check if the directory exists
+    if not os.path.exists(directory_name):
+        # Create the directory
+        try:
+            os.makedirs(directory_name)
+            print(f"Directory '{directory_name}' created.")
+        except OSError as error:
+            print(f"Creation of the directory '{directory_name}' failed. Error: {error}")
+    else:
+        print(f"Directory '{directory_name}' already exists.")
+
+def make_files_executable(directory_path):
+    try:
+        # List files in the given directory
+        files = [f for f in os.listdir(directory_path) if os.path.isfile(os.path.join(directory_path, f))]
+        
+        # Loop over each file and change permissions to make it executable
+        for file in files:
+            file_path = os.path.join(directory_path, file)
+            # Add execute permissions for the owner, group, and others: 0o755
+            os.chmod(file_path, 0o755)
+            print(f"Made {file_path} executable.")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
 
 def generate_scripts(topo):
     sender_asn = topo["sender_asn"]
@@ -16,6 +45,7 @@ def generate_scripts(topo):
     path_selection_url = f"http://10.{sender_asn}.0.71:8010/paths/1_2"
     get_paths_url = f"http://10.{sender_asn}.0.71:8010/get_paths"
 
+    create_directory("helper_scripts")
 
     bash_script = '''#!/bin/bash
 
@@ -121,3 +151,4 @@ def generate_scripts(topo):
         f.write(bash_script)
 
     print("Bash script generated: start_dmtp.sh")
+    make_files_executable("helper_scripts")
