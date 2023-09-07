@@ -27,8 +27,8 @@ def make_files_executable(directory_path):
         # Loop over each file and change permissions to make it executable
         for file in files:
             file_path = os.path.join(directory_path, file)
-            # Add execute permissions for the owner, group, and others: 0o755
-            os.chmod(file_path, 0o755)
+            # Add execute and read write permissions for the owner, group, and others
+            os.chmod(file_path, 0o777)
             print(f"Made {file_path} executable.")
 
     except Exception as e:
@@ -194,3 +194,5 @@ def generate_scripts(topo):
 
     print("Bash script generated: start_gateway.sh")
     make_files_executable("helper_scripts")
+    make_files_executable("sender")
+    make_files_executable("receiver")
