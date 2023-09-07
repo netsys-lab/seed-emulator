@@ -56,7 +56,7 @@ if __name__ == "__main__":
     sender_asn = topo['sender_asn']
     sender_isd = get_isd(sender_asn, topo)
 
-    paths = get_paths_from_host(receiver_isd, receiver_asn, "as{}h-cs0-10.{}.0.72".format(sender_asn, sender_asn))
+    paths = get_paths_from_host(receiver_isd, receiver_asn, "as{}h-h1-10.{}.0.71".format(sender_asn, sender_asn))
     if paths is None:
         print("Failed to get paths")
         exit(1)

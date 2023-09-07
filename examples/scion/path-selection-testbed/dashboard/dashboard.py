@@ -634,10 +634,10 @@ def get_paths_detailed():
             latency = latency + links[link]['latency']
             jitter = jitter + links[link]['jitter']
             loss = loss + links[link]['loss']
-        path['bandwidth'] = bw
-        path['latency'] = latency
-        path['jitter'] = jitter
-        path['loss'] = loss
+        path['bandwidth_mbps'] = bw
+        path['latency_ms'] = latency
+        path['jitter_ms'] = jitter
+        path['loss_percent'] = loss
         paths_data[id] = path
     return paths_data
 

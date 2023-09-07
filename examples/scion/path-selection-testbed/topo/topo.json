@@ -25,7 +25,7 @@
         {
             "asn" : 104,
             "isd" : 1,
-            "label" : "103",
+            "label" : "104",
             "is_core_as" : false,
             "cert_issuer": 101
         },

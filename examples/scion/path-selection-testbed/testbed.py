@@ -76,7 +76,7 @@ for as__ in topo['ASes']:
         h1.addSoftware("python3")
         h1.addSoftware("python3-pip")
         h1.addBuildCommand('pip3 install paho-mqtt')
-        h1.addBuildCommand('pip3 install pyyaml')
+        h1.addBuildCommand('pip3 install pyyaml flask numpy')
         h1.addSharedFolder("/sender", "../sender")
         h1.addSharedFolder("/topo", "../topo")
     if asn == receiver_asn:
@@ -85,7 +85,7 @@ for as__ in topo['ASes']:
         h1.addSoftware("python3")
         h1.addSoftware("python3-pip")
         h1.addBuildCommand('pip3 install paho-mqtt')
-        h1.addBuildCommand('pip3 install pyyaml')
+        h1.addBuildCommand('pip3 install pyyaml flask numpy')
         h1.addSharedFolder("/receiver", "../receiver")
         h1.addSharedFolder("/topo", "../topo")
 
