@@ -145,7 +145,7 @@ def generate_scripts(topo):
     
     echo -e "\\033[1mGateway API\\033[0m"
     echo -e "\\033[1mPath selection: GET {}\\033[0m"
-    echo -e "Example: curl -X GET \\"{}/0_1\\" selects paths 0 and 1\\n"
+    echo -e "Example: curl -X GET \\"{}0_1\\" selects paths 0 and 1\\n"
     echo -e "\\033[1mGet Paths: GET {}\\033[0m\\n"
     '''.format(sender_cont, sender_cont, receiver_cont, receiver_cont, receiver_cont, path_selection_url, path_selection_url, get_detailed_paths_url)
 
