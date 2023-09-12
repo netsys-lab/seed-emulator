@@ -167,7 +167,7 @@ def generate_scripts(topo):
     echo -e "  - duration (int, optional): The duration for which to send packets, in seconds."
     echo -e "  - size (int, optional): The size of data to send, in bytes.\\n"
     echo -e "Example Request:"
-    echo -e "  curl -X POST \\"http://10.{sender_asn}.0.71:5000/send\\" -d '{{\\"rate\\": 10, \\"duration\\": 3}}'\\n"
+    echo -e "  curl -X POST \\"http://10.{sender_asn}.0.71:5000/send\\" -H 'Content-Type: application/json' -d '{{\\"rate\\": 10, \\"duration\\": 3}}'\\n"
     echo -e "Response:"
     echo -e "  {{\\n    \\"status\\": \\"started\\",\\n    \\"rate\\": 10,\\n    \\"duration\\": 30\\n}}"
     echo -e "\\n\\033[1mGET http://10.{sender_asn}.0.71:5000/stats\\033[0m"

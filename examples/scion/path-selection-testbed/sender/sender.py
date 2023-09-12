@@ -20,11 +20,22 @@ def send_data():
     global sequence_number
     sequence_number = 0  # Reset sequence number
     data = request.json
-    size = data['size']
-    duration = data['duration']
-    rate = data['rate'] # in Mbps
+    if 'size' in data:
+        size = data['size']
+    else:
+        size = 0
+    if 'duration' in data:
+        duration = data['duration']
+    else:
+        duration = 0
+    if 'rate' in data:
+        rate = data['rate'] # in Mbps
+    else:
+        rate = 0
     if rate !=0:
         rate = (rate * 1000000)/8
+    if size == 0 and duration == 0:
+        return jsonify({'status': 'error', 'message': 'size or duration must be specified'})
     mtu = 1400
     header_size = 12  # 8 bytes for send_time and 4 bytes for sequence_number
     payload_size = mtu - header_size  # Calculate payload size considering header and MTU
