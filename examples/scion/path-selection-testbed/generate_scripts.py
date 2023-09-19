@@ -43,7 +43,7 @@ def generate_scripts(topo):
     dashboard_asn = topo["dashboard_asn"]
     dashboard_url= f"http://10.{dashboard_asn}.0.71:8050"
     get_detailed_paths_url = f"http://10.{dashboard_asn}.0.71:8050/get_paths"
-    path_selection_url = f"http://10.{sender_asn}.0.71:8010/paths/"
+    path_selection_url = f"http://10.{sender_asn}.0.71:8010/paths"
     get_paths_url = f"http://10.{sender_asn}.0.71:8010/get_paths"
 
     create_directory("helper_scripts")
@@ -144,8 +144,8 @@ def generate_scripts(topo):
     docker exec -it {} /bin/zsh -c "ping 10.72.0.1 -c 1"
     
     echo -e "\\033[1mGateway API\\033[0m"
-    echo -e "\\033[1mPath selection: GET {}\\033[0m"
-    echo -e "Example: curl -X GET \\"{}0_1\\" selects paths 0 and 1\\n"
+    echo -e "\\033[1mPath selection: POST {}\\033[0m"
+    echo -e "Example: curl -X POST \\"{}\\" -H 'Content-Type: application/json' -d '[{{\\"StreamID\\":1,\\"SelectedPaths\\":[{{\\"PathID\\":0,\\"Fraction\\":0.4}},{{\\"PathID\\":3,\\"Fraction\\":0.6}}],\\"RetransmitPath\\":1}},{{\\"StreamID\\":2,\\"SelectedPaths\\":[{{\\"PathID\\":4,\\"Fraction\\":0.7}},{{\\"PathID\\":5,\\"Fraction\\":0.15}},{{\\"PathID\\":6,\\"Fraction\\":0.15}}],\\"RetransmitPath\\":1}},{{\\"StreamID\\":3,\\"SelectedPaths\\":[{{\\"PathID\\":7,\\"Fraction\\":0.7}},{{\\"PathID\\":8,\\"Fraction\\":0.15}},{{\\"PathID\\":9,\\"Fraction\\":0.15}}],\\"RetransmitPath\\":1}}]'"
     echo -e "\\033[1mGet Paths: GET {}\\033[0m\\n"
     '''.format(sender_cont, sender_cont, receiver_cont, receiver_cont, receiver_cont, path_selection_url, path_selection_url, get_detailed_paths_url)
 
@@ -167,7 +167,7 @@ def generate_scripts(topo):
     echo -e "  - duration (int, optional): The duration for which to send packets, in seconds."
     echo -e "  - size (int, optional): The size of data to send, in bytes.\\n"
     echo -e "Example Request:"
-    echo -e "  curl -X POST \\"http://10.{sender_asn}.0.71:5000/send\\" -H 'Content-Type: application/json' -d '{{\\"rate\\": 10, \\"duration\\": 3}}'\\n"
+    echo -e "  curl -X POST \\"http://10.{sender_asn}.0.71:5000/send\\" -H 'Content-Type: application/json' -d '[{{\\"id\\": 1, \\"rate\\": 5, \\"duration\\": 5}}, {{\\"id\\": 2, \\"rate\\": 2, \\"duration\\": 5}}, {{\\"id\\": 3, \\"rate\\": 2, \\"duration\\": 5}}]'\\n"
     echo -e "Response:"
     echo -e "  {{\\n    \\"status\\": \\"started\\",\\n    \\"rate\\": 10,\\n    \\"duration\\": 30\\n}}"
     echo -e "\\n\\033[1mGET http://10.{sender_asn}.0.71:5000/stats\\033[0m"

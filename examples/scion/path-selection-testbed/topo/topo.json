@@ -108,5 +108,31 @@
     ],
     "dashboard_asn" : 101,
     "sender_asn" : 105,
-    "receiver_asn" : 106
+    "receiver_asn" : 106,
+    "streams": [
+        {
+            "id": 1,
+            "dstPort": 9000,
+            "deadline": 170,
+            "bandwidth": 5000000,
+            "codingRate": 0.1,
+            "retransmit": false
+        },
+        {
+            "id": 2,
+            "dstPort": 9002,
+            "deadline": 140,
+            "bandwidth": 3000000,
+            "codingRate": 0.1,
+            "retransmit": false
+        },
+        {
+            "id": 3,
+            "dstPort": 9004,
+            "deadline": 120,
+            "bandwidth": 1000000,
+            "codingRate": 0.1,
+            "retransmit": false
+        }
+    ]
 }

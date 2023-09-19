@@ -89,8 +89,7 @@ def main():
         'ipaddr': '10.72.0.1/24',
         'remote_ip': '10.72.0.2',
         'tunName': 'dmtpif',
-        'tunMTU': 1400,
-        'cameraDstPorts': [9000,9002,9004],
+        'tunMTU': 1300,
         'rtcpDstPort': 8890,
         'deadline': 100,
         'timeOffset': 0,
@@ -98,11 +97,13 @@ def main():
         'logLevelConsole': 'info',
         'logLevelFile': 'info',
         'adaptivebw': True,
-        'useIP': True,
+        'useIP': False,
         'serverIPAddr': '10.{}.0.71:4242'.format(sender_asn),
         'clientIPAddr': '10.{}.0.71:4242'.format(receiver_asn),
         'ifacename1': 'net',
         'ifacename2': 'net',
+        'streams': topo['streams'],
+        'setupMPQuic' : False
     }
 
     with open('config.yaml', 'w') as outfile:

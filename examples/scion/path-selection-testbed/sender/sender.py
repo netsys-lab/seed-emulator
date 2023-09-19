@@ -3,59 +3,41 @@ import socket
 import struct
 import time
 import threading
+import json
 
 app = Flask(__name__)
 
 sequence_number = 0  # Initialize sequence number
-stat = {}
+streams_data = {}
+mtu = 1300
 
 @app.route('/stats', methods=['GET'])
 def get_stats():
-    global stat
-    return jsonify(stat)
+    global streams_data
+    return jsonify(streams_data)
 
 
-@app.route('/send', methods=['POST'])
-def send_data():
-    global sequence_number
-    sequence_number = 0  # Reset sequence number
-    data = request.json
-    if 'size' in data:
-        size = data['size']
-    else:
-        size = 0
-    if 'duration' in data:
-        duration = data['duration']
-    else:
-        duration = 0
-    if 'rate' in data:
-        rate = data['rate'] # in Mbps
-    else:
-        rate = 0
-    if rate !=0:
+def udp_send(stream_id, duration, rate):
+        sequence_number = 0
+        
+        header_size = 12  # 8 bytes for send_time and 4 bytes for sequence_number
+        payload_size = mtu - header_size - 28 # Calculate payload size considering header and MTU
+        payload = b'0' * payload_size  # Create payload with zeros
+
         rate = (rate * 1000000)/8
-    if size == 0 and duration == 0:
-        return jsonify({'status': 'error', 'message': 'size or duration must be specified'})
-    mtu = 1400
-    header_size = 12  # 8 bytes for send_time and 4 bytes for sequence_number
-    payload_size = mtu - header_size  # Calculate payload size considering header and MTU
-    payload = b'0' * payload_size  # Create payload with zeros
-    def udp_send():
-        global sequence_number
-
+        send_port = streams_data[stream_id]['dstPort']
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         start_time = time.perf_counter()
         bytes_sent = 0
         next_send_time = time.perf_counter()
         send_interval = mtu / rate if rate > 0 else 0
 
+        print("Sending packets to port", send_port)
+
+
         while True:
             current_time = time.perf_counter()  
             elapsed_time = current_time - start_time
-
-            # Stop sending if size is reached
-            if size != 0 and bytes_sent > size:
-                break
 
             if duration != 0 and elapsed_time >= duration:
                 break
@@ -66,7 +48,7 @@ def send_data():
             # Prepend sequence number and send time to data packet
             header = struct.pack('dI', current_time, sequence_number)
             packet = header + payload
-            client_socket.sendto(packet, ("10.72.0.2", 9000))
+            client_socket.sendto(packet, ("10.72.0.2", send_port))
             bytes_sent += len(packet)    
             sequence_number += 1  # Increment sequence number for each packet
             next_send_time += send_interval
@@ -77,20 +59,64 @@ def send_data():
                 if time_to_wait > 0.05:
                     time.sleep(time_to_wait)
 
+        client_socket.close()
 
-        print("Finished sending")
-        print("Bytes sent: {}".format(bytes_sent))
-        print("Elapsed time: {}".format(elapsed_time))
+        elapsed_time = time.perf_counter() - start_time
         goodput = bytes_sent*8 / elapsed_time / 1000000
-        print("Goodput_mbps: {}".format(goodput))
-        stat['goodput_mbps'] = goodput
-        stat['bytes_sent'] = bytes_sent
-        stat['elapsed_time'] = elapsed_time
+        streams_data[stream_id]['goodput_mbps'] = goodput
+        streams_data[stream_id]['bytes_sent'] = bytes_sent
+        streams_data[stream_id]['elapsed_time'] = elapsed_time
+        streams_data[stream_id]['seq'] = sequence_number
 
-    # Start UDP sending in a new thread
-    threading.Thread(target=udp_send).start()
+        print(stream_id, streams_data[stream_id])
+
+        
+
+
+        
+
+
+@app.route('/send', methods=['POST'])
+def send_data():
+    data = request.json
+    for stream in data:
+        stream_id = stream['id']
+        if stream_id not in streams_data:
+            return jsonify({'status': 'error', 'message': 'stream id {} not found'.format(stream_id)})
+        if 'duration' in stream:
+            duration = stream['duration']
+        else:
+            duration = 5
+        if 'rate' in stream:
+            rate = stream['rate']
+        else:
+            rate = streams_data[stream_id]['bandwidth']
+        
+        streams_data[stream_id]['rate'] = rate
+        streams_data[stream_id]['duration'] = duration
+        streams_data[stream_id]['seq'] = 0
+        streams_data[stream_id]['goodput_mbps'] = 0
+        streams_data[stream_id]['bytes_sent'] = 0
+        streams_data[stream_id]['elapsed_time'] = 0
+
+        threading.Thread(target=udp_send, args=(stream_id, duration, rate)).start()
 
     return jsonify({'status': 'sending'})
 
 if __name__ == '__main__':
+    topo = json.load(open("/topo/topo.json"))
+    for stream in topo['streams']:
+        streams_data[stream['id']] = {}
+        streams_data[stream['id']]['goodput_mbps'] = 0
+        streams_data[stream['id']]['bytes_sent'] = 0
+        streams_data[stream['id']]['elapsed_time'] = 0
+        streams_data[stream['id']]['rate'] = 0
+        streams_data[stream['id']]['duration'] = 0
+        streams_data[stream['id']]['dstPort'] = stream['dstPort']
+        streams_data[stream['id']]['deadline'] = stream['deadline']
+        streams_data[stream['id']]['bandwidth'] = stream['bandwidth']
+        
+        streams_data[stream['id']]['seq'] = 0
+
+    
     app.run(host='0.0.0.0', port=5000)
