@@ -228,7 +228,7 @@ class Node(Printable, Registrable, Configurable, Vertex):
     __persistent_storages: List[str]
 
     __name_servers: List[str]
-    __props: Dict[str, str]
+    __props: Dict[str, object]
 
     def __init__(self, name: str, role: NodeRole, asn: int, scope: str = None):
         """!
@@ -618,10 +618,10 @@ class Node(Printable, Registrable, Configurable, Vertex):
     def getProps(self) -> dict:
         return self.__props
     
-    def hasProp(self, name) -> dict:
+    def hasProp(self, name) -> bool:
         return name in self.__props
     
-    def getProp(self, name) -> dict:
+    def getProp(self, name):
         return self.__props[name]
 
     def getFile(self, path: str) -> File:

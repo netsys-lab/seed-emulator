@@ -41,14 +41,18 @@ id = "dispatcher"
 _Templates["sigjson"] = """\
 {{
     "ASes": {{
+{ases}
+    }},
+    "ConfigVersion": 9001
+}}
+"""
+
+_Templates["sigjson_remote"] = """\
         "{asn}": {{
             "Nets": [
                 "{network}"
             ]
         }}
-    }},
-    "ConfigVersion": 9001
-}}
 """
 
 _Templates["sigtoml"] = """\
@@ -128,7 +132,7 @@ class ScionRouting(Routing):
     def __append_sig_command(self, node: Node):
         """Append commands for starting the SCION SIG on the node."""
         name = node.getName()
-        attr = node.getProp("sig-config")
+        attr = node.getProp("sig-local")
         node.appendStartCommand(f"ip address add {attr['localIp']} dev lo")
         node.appendStartCommand(_CommandTemplates["sig"].format(name=name), fork=True)
 
@@ -192,15 +196,19 @@ class ScionRouting(Routing):
 
         # { 'name': name, 'localNetwork': localNetwork, 'localIp': localIp, 'remoteNetwork': remoteNetwork, 'remoteAsn': remoteAsn }
         attr = node.getProp("sig-config")
-        print(attr)
+        local_attr = node.getProp("sig-local")
 
         # node.addBuildCommand("mkdir -p /cache")
+        ases = []
+        for val in attr:
+            ases.append(_Templates["sigjson_remote"].format(asn=val['remoteAsn'], network=val['remoteNetwork']))
 
+        ases_str = ',\n'.join(ases)
         node.setFile("/etc/scion/sig.json",
-            _Templates["sigjson"].format(asn=attr['remoteAsn'], network=attr['remoteNetwork'] ))
+            _Templates["sigjson"].format(ases=ases_str))
         
         node.setFile("/etc/scion/sig.toml",
-            _Templates["sigtoml"].format(localIp=attr['localIp'] ))
+            _Templates["sigtoml"].format(localIp=local_attr['localIp'] ))
 
         # node.setFile("/etc/scion/dispatcher.toml", _Templates["dispatcher"])
 

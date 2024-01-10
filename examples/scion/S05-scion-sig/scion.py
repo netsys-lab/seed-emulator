@@ -57,6 +57,18 @@ scion.addIxLink(100, (1, 151), (1, 152), ScLinkType.Core)
 scion.addIxLink(100, (1, 152), (1, 150), ScLinkType.Core)
 scion.addXcLink((1, 150), (1, 153), ScLinkType.Transit)
 
+# Configure IP Gateways
+as150.createSig("sig-1", "172.16.11.0/24", "172.16.11.1")
+as152.createSig("sig-1", "172.16.13.0/24", "172.16.13.1",)
+as153.createSig("sig-1", "172.16.12.0/24", "172.16.12.1",)
+
+# Connect IP Gateways
+as150.connectSig("sig-1", "172.16.12.0/24", "1-153")
+as150.connectSig("sig-1", "172.16.13.0/24", "1-152")
+
+as152.connectSig("sig-1", "172.16.11.0/24", "1-150")
+as153.connectSig("sig-1", "172.16.11.0/24", "1-150")
+
 # Rendering
 emu.addLayer(base)
 emu.addLayer(routing)
