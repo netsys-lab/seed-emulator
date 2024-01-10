@@ -47,6 +47,13 @@ scion_isd.addIsdAs(1, 153, is_core=False)
 scion_isd.setCertIssuer((1, 153), issuer=150)
 as153.createNetwork('net0')
 as153.createControlService('cs1').joinNetwork('net0')
+
+as150.createSig("cs1", "sig-1")
+as150.connectSig("cs1", "sig-1", "172.16.11.0/24", "172.16.11.1", "172.16.12.0/24", "1-153")
+
+as153.createSig("cs1", "sig-1")
+as153.connectSig("cs1", "sig-1", "172.16.12.0/24", "172.16.12.1", "172.16.11.0/24", "1-150")
+
 as153_router = as153.createRouter('br0')
 as153_router.joinNetwork('net0')
 as153_router.crossConnect(150, 'br0', '10.50.0.3/29')

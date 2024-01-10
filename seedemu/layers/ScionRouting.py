@@ -38,6 +38,33 @@ _Templates["dispatcher"] = """\
 id = "dispatcher"
 """
 
+_Templates["sigjson"] = """\
+{{
+    "ASes": {{
+        "{asn}": {{
+            "Nets": [
+                "{network}"
+            ]
+        }}
+    }},
+    "ConfigVersion": 9001
+}}
+"""
+
+_Templates["sigtoml"] = """\
+[gateway]
+traffic_policy_file = "/etc/scion/sig.json"
+
+[metrics]
+prometheus = "127.0.0.1:30456"
+
+[log.console]
+level = "info"
+
+[tunnel]
+src_ipv4 = "{localIp}"
+"""
+
 _CommandTemplates: Dict[str, str] = {}
 
 _CommandTemplates["br"] = "scion-border-router --config /etc/scion/{name}.toml >> /var/log/scion-border-router.log 2>&1"
@@ -48,6 +75,8 @@ scion-control-service --config /etc/scion/{name}.toml >> /var/log/scion-control-
 """
 
 _CommandTemplates["disp"] = "scion-dispatcher --config /etc/scion/dispatcher.toml >> /var/log/scion-dispatcher.log 2>&1"
+
+_CommandTemplates["sig"] = "scion-ip-gateway --config /etc/scion/sig.toml >> /var/log/scion-sig.log 2>&1"
 
 _CommandTemplates["sciond"] = "sciond --config /etc/scion/sciond.toml >> /var/log/sciond.log 2>&1"
 
@@ -88,11 +117,20 @@ class ScionRouting(Routing):
                 self.__append_scion_command(csnode)
                 name = csnode.getName()
                 csnode.appendStartCommand(_CommandTemplates['cs'].format(name=name), fork=True)
+                if csnode.hasProp("sig-config"):
+                    self.__append_sig_command(csnode)
 
             elif type == 'hnode':
                 hnode: Node = obj
                 self.__install_scion(hnode)
                 self.__append_scion_command(hnode)
+
+    def __append_sig_command(self, node: Node):
+        """Append commands for starting the SCION SIG on the node."""
+        name = node.getName()
+        attr = node.getProp("sig-config")
+        node.appendStartCommand(f"ip address add {attr['localIp']} dev lo")
+        node.appendStartCommand(_CommandTemplates["sig"].format(name=name), fork=True)
 
     def __install_scion(self, node: Node):
         """Install SCION packages on the node."""
@@ -101,7 +139,7 @@ class ScionRouting(Routing):
             ' > /etc/apt/sources.list.d/scionlab.list')
         node.addBuildCommand(
             "apt-get update && apt-get install -y"
-            " scion-border-router scion-control-service scion-daemon scion-dispatcher scion-tools"
+            " scion-border-router scion-control-service scion-daemon scion-dispatcher scion-tools scion-sig"
             " scion-apps-bwtester")
         node.addSoftware("apt-transport-https")
         node.addSoftware("ca-certificates")
@@ -110,6 +148,7 @@ class ScionRouting(Routing):
         """Append commands for starting the SCION host stack on the node."""
         node.appendStartCommand(_CommandTemplates["disp"], fork=True)
         node.appendStartCommand(_CommandTemplates["sciond"], fork=True)
+        
 
     def render(self, emulator: Emulator):
         """!
@@ -143,6 +182,27 @@ class ScionRouting(Routing):
             elif type == 'csnode':
                 csnode: Node = obj
                 self._provision_cs_config(csnode)
+                print(csnode.hasProp("sig-config"))
+                if csnode.hasProp("sig-config"):
+                    self.__provision_sig_config(csnode)
+
+    @staticmethod
+    def __provision_sig_config(node: Node):
+        """Set configuration for SIG."""
+
+        # { 'name': name, 'localNetwork': localNetwork, 'localIp': localIp, 'remoteNetwork': remoteNetwork, 'remoteAsn': remoteAsn }
+        attr = node.getProp("sig-config")
+        print(attr)
+
+        # node.addBuildCommand("mkdir -p /cache")
+
+        node.setFile("/etc/scion/sig.json",
+            _Templates["sigjson"].format(asn=attr['remoteAsn'], network=attr['remoteNetwork'] ))
+        
+        node.setFile("/etc/scion/sig.toml",
+            _Templates["sigtoml"].format(localIp=attr['localIp'] ))
+
+        # node.setFile("/etc/scion/dispatcher.toml", _Templates["dispatcher"])
 
     @staticmethod
     def __provision_base_config(node: Node):
@@ -168,7 +228,7 @@ class ScionRouting(Routing):
     @staticmethod
     def _provision_cs_config(node: Node):
         """Set control service configuration."""
-
+        # print(node)
         name = node.getName()
         node.setFile(os.path.join("/etc/scion/", name + ".toml"),
             _Templates["general"].format(name=name) +

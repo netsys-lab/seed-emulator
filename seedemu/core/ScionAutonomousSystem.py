@@ -32,6 +32,7 @@ class ScionAutonomousSystem(AutonomousSystem):
     __attributes: Dict[int, Set]         # Set of AS attributes per ISD
     __mtu: Optional[int]                 # Minimum MTU in the AS's internal networks
     __control_services: Dict[str, Node]
+    __sigs: Dict[str, Dict[str, str]]
     __next_ifid: int                     # Next IFID assigned to a link
 
     def __init__(self, asn: int, subnetTemplate: str = "10.{}.0.0/16"):
@@ -40,6 +41,7 @@ class ScionAutonomousSystem(AutonomousSystem):
         """
         super().__init__(asn, subnetTemplate)
         self.__control_services = {}
+        self.__sigs = {}
         self.__keys = None
         self.__attributes = defaultdict(set)
         self.__mtu = None
@@ -126,6 +128,10 @@ class ScionAutonomousSystem(AutonomousSystem):
                 cs_addr = f"{ifaces[0].getAddress()}:30252"
                 control_services[name] = { 'addr': cs_addr }
 
+        sigs = {}
+        for name, addrs in self.__sigs.items(): 
+            sigs[name] = addrs
+
         # Border routers
         border_routers = {}
         for router in self.getRouters():
@@ -144,7 +150,27 @@ class ScionAutonomousSystem(AutonomousSystem):
             'discovery_service': control_services,
             'border_routers': border_routers,
             'colibri_service': {},
+            'sigs': sigs,
         }
+    
+    def createSig(self, cs, name: str) -> ScionAutonomousSystem:
+        """!
+        @brief Create a SIG node.
+
+        @param name Name of the SIG node.
+        @param addr Address of the SIG node.
+        @returns self
+        """
+
+        self.__sigs[name] = { 'ctrl_addr': f"10.{self.getAsn()}.0.71:30256", 'data_addr': f"10.{self.getAsn()}.0.71:30056" }
+        self.getControlService(cs).setProp("sig", name)
+        return self
+    
+    def connectSig(self, cs, name, localNetwork, localIp, remoteNetwork, remoteAsn) -> ScionAutonomousSystem:
+        self.getControlService(cs).setProp("sig-config", { 'name': name, 'localNetwork': localNetwork, 'localIp': localIp, 'remoteNetwork': remoteNetwork, 'remoteAsn': remoteAsn })
+        print("Setting attribute to ", { 'name': name, 'localNetwork': localNetwork, 'localIp': localIp, 'remoteNetwork': remoteNetwork, 'remoteAsn': remoteAsn })
+        print(self.getControlService(cs).getProp("sig-config"))
+        return self
 
     def createControlService(self, name: str) -> Node:
         """!

@@ -228,6 +228,7 @@ class Node(Printable, Registrable, Configurable, Vertex):
     __persistent_storages: List[str]
 
     __name_servers: List[str]
+    __props: Dict[str, str]
 
     def __init__(self, name: str, role: NodeRole, asn: int, scope: str = None):
         """!
@@ -267,6 +268,8 @@ class Node(Printable, Registrable, Configurable, Vertex):
         #     self.__softwares.add(soft)
 
         self.__name_servers = []
+        # self._attrs = {}
+        self.__props = {}
 
     def configure(self, emulator: Emulator):
         """!
@@ -601,6 +604,25 @@ class Node(Printable, Registrable, Configurable, Vertex):
 
     def getLabel(self) -> dict:
         return self.__label
+    
+    def setProp(self, key:str, value) -> Node:
+        """!
+        @brief Add Label to a current node
+
+        @returns self, for chaining API calls.
+        """
+
+        self.__props[key] = value
+        return self
+
+    def getProps(self) -> dict:
+        return self.__props
+    
+    def hasProp(self, name) -> dict:
+        return name in self.__props
+    
+    def getProp(self, name) -> dict:
+        return self.__props[name]
 
     def getFile(self, path: str) -> File:
         """!
@@ -847,6 +869,12 @@ class Node(Printable, Registrable, Configurable, Vertex):
         for (c, f) in node.getStartCommands(): self.appendStartCommand(c, f)
         for c in node.getBuildCommands(): self.addBuildCommand(c)
         for s in node.getSoftware(): self.addSoftware(s)
+        
+        for (k, v) in node.getProps().items(): self.setProp(k, v)
+
+        #if node.hasAttribute("sig-config"):
+        #    # self.setAttribute("sig", node.getAttribute("sig"))
+        #    self.setAttribute("sig-config", node.getAttribute("sig-config"))
 
         for file in node.getFiles():
             (path, content) = file.get()
