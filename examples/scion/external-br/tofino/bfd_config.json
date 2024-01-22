@@ -1,0 +1,32 @@
+{
+    "localISD": 1,
+    "localAS": "153",
+    "localDestinations": [
+    ],
+    "localInterfaces": [],
+    "remoteDestinations": [
+        {
+            "egressInterface": "1",
+            "egressPortId": 9,
+            "dstIP": "10.50.0.2",
+            "dstMAC": "02:42:0a:32:00:02",
+            "dstPort": "50000",
+            "dstISD": "1",
+            "dstAS": "150"
+        }
+    ],
+    "localSource": [
+        {
+            "egressPortId": 8,
+            "srcIP": "10.153.0.2",
+            "srcMAC": "02:42:1a:b2:cd:94",
+            "srcPort": 30042
+        },
+        {
+            "egressPortId": 9,
+            "srcIP": "10.50.0.3",
+            "srcMAC": "02:42:13:7d:24:db",
+            "srcPort": 50000
+        }
+    ]
+}

@@ -129,7 +129,7 @@ class ScionRouting(Routing):
                 asn = obj.getAsn()
                 as_: ScionAutonomousSystem = base_layer.getAutonomousSystem(asn)
                 isds = isd_layer.getAsIsds(asn)
-                assert len(isds) == 1, f"AS {asn} must be a member of exactly one ISD"
+                assert len(isds) == 1, f"AS {hex(asn)} must be a member of exactly one ISD"
 
                 # Install AS topology file
                 as_topology = as_.getTopology(isds[0][0])

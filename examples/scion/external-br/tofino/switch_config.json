@@ -1,0 +1,69 @@
+{
+    "localISD": 1,
+    "localAS": "153",
+    "interfaces": [
+        {
+            "portId": 8,
+            "interface": 0
+        },
+        {
+            "portId": 6,
+            "interface": 0
+        },
+        {
+            "portId": 9,
+            "interface": "1"
+        }
+    ],
+    "externalInterfaces": [
+        {
+            "interface": "1",
+            "portId": 9
+        }
+    ],
+    "externalAccelerators": [
+        {
+            "portId": 10,
+            "dstMAC": "00:00:00:00:00:01",
+            "srcMAC": "00:00:00:00:00:02",
+            "intSupport": 0
+        }
+    ],
+    "localBorderRouters": [],
+    "localDestinations": [
+        {
+            "dl": 0,
+            "dt": 0,
+            "host": "10.153.0.1",
+            "netmask": "255.255.255.0",
+            "egressPortId": 8,
+            "dstMAC": "02:42:1a:b2:cd:94",
+            "dstPort": 30252
+        }
+    ],
+    "localDestinationsService": [],
+    "forwardLocal": [],
+    "forwardRemote": [
+        {
+            "egressInterface": "1",
+            "egressPortId": 9,
+            "dstIP": "10.50.0.2",
+            "dstMAC": "02:42:0a:32:00:02",
+            "dstPort": "50000"
+        }
+    ],
+    "localSource": [
+        {
+            "egressPortId": 8,
+            "srcIP": "10.153.0.2",
+            "srcMAC": "02:42:1a:b2:cd:94",
+            "srcPort": 30042
+        },
+        {
+            "egressPortId": 9,
+            "srcIP": "10.50.0.3",
+            "srcMAC": "02:42:13:7d:24:db",
+            "srcPort": 50000
+        }
+    ]
+}

@@ -16,16 +16,15 @@ scion = Scion()
 base.createIsolationDomain(1)
 
 # Internet Exchange
-base.createInternetExchange(100)
+base.createInternetExchange(100, prefix = "192.100.0.0/16")
 
 # AS-150
-as150 = base.createAutonomousSystem(150)
-scion_isd.addIsdAs(1, 150, is_core=True)
-as150.createNetwork('net0')
-cs150 = as150.createControlService('cs1').joinNetwork('net0')
-cs150.addSoftware('systemctl')
+as150 = base.createAutonomousSystem(0xffaa00001101)
+scion_isd.addIsdAs(1, 0xffaa00001101, is_core=True)
+as150.createNetwork('net0', "10.150.1.0/24")
+as150.createControlService('cs1').joinNetwork('net0')
 as150_router = as150.createRouter('br0')
-as150_router.joinNetwork('net0').joinNetwork('ix100')
+as150_router.joinNetwork('net0').joinNetwork('ix100', address="192.100.0.150")
 as150_router.crossConnect(153, 'br0', '10.50.0.2/29')
 
 # AS-151
@@ -45,18 +44,18 @@ as152.createRouter('br0').joinNetwork('net0').joinNetwork('ix100')
 # AS-153
 as153 = base.createAutonomousSystem(153)
 scion_isd.addIsdAs(1, 153, is_core=False)
-scion_isd.setCertIssuer((1, 153), issuer=150)
+scion_isd.setCertIssuer((1, 153), issuer=0xffaa00001101)
 as153.createNetwork('net0')
 as153.createControlService('cs1').joinNetwork('net0')
 as153_router = as153.createRouter('br0')
 as153_router.joinNetwork('net0')
-as153_router.crossConnect(150, 'br0', '10.50.0.3/29')
+as153_router.crossConnect(0xffaa00001101, 'br0', '10.50.0.3/29')
 
 # Inter-AS routing
-scion.addIxLink(100, (1, 150), (1, 151), ScLinkType.Core)
+scion.addIxLink(100, (1, 0xffaa00001101), (1, 151), ScLinkType.Core)
 scion.addIxLink(100, (1, 151), (1, 152), ScLinkType.Core)
-scion.addIxLink(100, (1, 152), (1, 150), ScLinkType.Core)
-scion.addXcLink((1, 150), (1, 153), ScLinkType.Transit)
+scion.addIxLink(100, (1, 152), (1, 0xffaa00001101), ScLinkType.Core)
+scion.addXcLink((1, 0xffaa00001101), (1, 153), ScLinkType.Transit)
 
 # Rendering
 emu.addLayer(base)
