@@ -195,6 +195,18 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         self.__routers[name] = Node(name, NodeRole.Router, self.__asn)
 
         return self.__routers[name]
+    
+    def createRouter2(self, name, asn: str) -> Node:
+        """!
+        @brief Create a router node.
+
+        @param name name of the new node.
+        @returns Node.
+        """
+        assert name not in self.__routers, 'Router with name {} already exists.'.format(name)
+        self.__routers[name] = Node(name, NodeRole.Router, asn)
+
+        return self.__routers[name]
 
     def createRealWorldRouter(self, name: str, hideHops: bool = True, prefixes: List[str] = None) -> Node:
         """!

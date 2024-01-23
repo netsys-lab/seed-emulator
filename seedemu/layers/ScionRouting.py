@@ -50,7 +50,7 @@ _Templates["sigjson"] = """\
 _Templates["sigjson_remote"] = """\
         "{asn}": {{
             "Nets": [
-                "{network}"
+                {network}
             ]
         }}
 """
@@ -201,7 +201,8 @@ class ScionRouting(Routing):
         # node.addBuildCommand("mkdir -p /cache")
         ases = []
         for val in attr:
-            ases.append(_Templates["sigjson_remote"].format(asn=val['remoteAsn'], network=val['remoteNetwork']))
+            nets = ",\n".join([f'"{net}"' for net in val['remoteNetwork']])
+            ases.append(_Templates["sigjson_remote"].format(asn=val['remoteAsn'], network=nets))
 
         ases_str = ',\n'.join(ases)
         node.setFile("/etc/scion/sig.json",

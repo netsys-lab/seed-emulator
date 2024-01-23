@@ -39,6 +39,8 @@ EbgpFileTemplates["rnode_bird_peer"] = """
     neighbor {peerAddress} as {peerAsn};
 """
 
+
+
 class PeerRelationship(Enum):
     """!
     @brief Relationship between peers.
@@ -422,6 +424,13 @@ class Ebgp(Layer, Graphable):
             self._log("adding IX peering: {} as {} <-({})-> {} as {}".format(a_ixif.getAddress(), a, rel, b_ixif.getAddress(), b))
 
             self.__createPeer(a_ixnode, b_ixnode, a_ixif.getAddress(), b_ixif.getAddress(), rel)
+
+        # Configure static routes
+            # TODO: This is hard coded
+        #rnodes: List[Router] = reg.getByType('150', 'rnode')
+        #for (rnode) in rnodes:
+        #    rnode.applyStaticRoutes()
+
 
     def render(self, emulator: Emulator) -> None:
         pass

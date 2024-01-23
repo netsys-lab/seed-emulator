@@ -229,6 +229,7 @@ class Node(Printable, Registrable, Configurable, Vertex):
 
     __name_servers: List[str]
     __props: Dict[str, object]
+    __static_routes: List[str]
 
     def __init__(self, name: str, role: NodeRole, asn: int, scope: str = None):
         """!
@@ -263,6 +264,7 @@ class Node(Printable, Registrable, Configurable, Vertex):
 
         self.__shared_folders = {}
         self.__persistent_storages = []
+        self.__static_routes = []
 
         # for soft in DEFAULT_SOFTWARE:
         #     self.__softwares.add(soft)
@@ -369,6 +371,18 @@ class Node(Printable, Registrable, Configurable, Vertex):
         @returns self, for chaining API calls.
         """
         self.__ports.append((host, node, proto))
+
+    def addStaticRoute(self, net: str, via: str) -> Node:
+        """!
+        @brief Add port forwarding.
+
+        @param host port of the host.
+        @param node port of the node.
+        @param proto protocol.
+
+        @returns self, for chaining API calls.
+        """
+        self.__static_routes.append(f"route {net} via {via}  {{ bgp_large_community.add(LOCAL_COMM); }};")
 
     def addPortForwarding(self, host: int, node: int, proto:str = 'tcp') -> Node:
         """!
@@ -838,6 +852,24 @@ class Node(Printable, Registrable, Configurable, Vertex):
 
         return self
 
+    def applyStaticRoutes(self, routes) -> Router:
+        """!
+        @brief Add a new protocol to BIRD on the given node.
+
+        @param protocol protocol type. (e.g., bgp, ospf)
+        @param name protocol name.
+        @param body protocol body.
+
+        @returns self, for chaining API calls.
+        """
+
+        print(routes)
+        self.appendFile("/etc/bird/bird.conf", RouterFileTemplates["rnode_bird_static"].format(
+            routes = routes,
+        ))
+
+        return self
+
     def getPersistentStorages(self) -> List[str]:
         """!
         @brief Get persistent storage folders on the node.
@@ -940,6 +972,15 @@ protocol pipe {{
 }}
 """
 
+RouterFileTemplates["rnode_bird_static"] = """
+protocol static staticroutes {{
+    ipv4 {{
+        table t_bgp;
+    }};
+    {routes}
+}}
+"""
+
 RouterFileTemplates['rw_configure_script'] = '''\
 #!/bin/bash
 gw="`ip rou show default | cut -d' ' -f3`"
@@ -989,6 +1030,7 @@ class Router(Node):
         ))
 
         return self
+
 
     def addTablePipe(self, src: str, dst: str = 'master4', importFilter: str = 'none', exportFilter: str = 'all', ignoreExist: bool = True) -> Router:
         """!
@@ -1139,6 +1181,7 @@ class ScionRouter(Router):
 
     __interfaces: Dict[int, Dict]  # IFID to interface
     __next_port: int               # Next free UDP port
+    # _Router__static_routes: List[str]     # Static routes
 
     def __init__(self):
         super().__init__()
@@ -1147,6 +1190,7 @@ class ScionRouter(Router):
     def initScionRouter(self):
         self.__interfaces = {}
         self.__next_port = 50000
+        # self._Router__static_routes = []
 
     def addScionInterface(self, ifid: int, iface: Dict) -> None:
         """!
