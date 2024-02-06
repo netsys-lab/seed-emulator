@@ -164,12 +164,14 @@ class ScionAutonomousSystem(AutonomousSystem):
 
         self.__sigs[name] = { 'ctrl_addr': f"10.{self.getAsn()}.0.71:30256", 'data_addr': f"10.{self.getAsn()}.0.71:30056" }
         self.getControlService("cs1").setProp("sig-local", { 'localNetwork': localNetwork, 'localIp': localIp})
+        print("CreateSig", { 'localNetwork': localNetwork, 'localIp': localIp})
         return self
     
     def connectSig(self, name, remoteNetwork, remoteAsn) -> ScionAutonomousSystem:
         if not self.getControlService("cs1").hasProp("sig-config"):
             self.getControlService("cs1").setProp("sig-config", [])
 
+        print("SIg config ", remoteNetwork, remoteAsn)
         sig_config = self.getControlService("cs1").getProp("sig-config")
         sig_config.append({ 'name': name, 'remoteNetwork': remoteNetwork, 'remoteAsn': remoteAsn })
         self.getControlService("cs1").setProp("sig-config", sig_config)

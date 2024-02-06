@@ -130,6 +130,7 @@ class ScionRouting(Routing):
                 self.__append_scion_command(hnode)
 
     def __append_sig_command(self, node: Node):
+        print("APPEND SIG START")
         """Append commands for starting the SCION SIG on the node."""
         name = node.getName()
         attr = node.getProp("sig-local")
@@ -185,15 +186,17 @@ class ScionRouting(Routing):
                 self.__provision_router_config(rnode)
             elif type == 'csnode':
                 csnode: Node = obj
+                print("GOT CS NODE")
                 self._provision_cs_config(csnode)
                 print(csnode.hasProp("sig-config"))
                 if csnode.hasProp("sig-config"):
                     self.__provision_sig_config(csnode)
+                    self.__append_sig_command(csnode)
 
     @staticmethod
     def __provision_sig_config(node: Node):
         """Set configuration for SIG."""
-
+        print("provision SIG config")
         # { 'name': name, 'localNetwork': localNetwork, 'localIp': localIp, 'remoteNetwork': remoteNetwork, 'remoteAsn': remoteAsn }
         attr = node.getProp("sig-config")
         local_attr = node.getProp("sig-local")
