@@ -22,6 +22,7 @@ base.createInternetExchange(100)
 base.createInternetExchange(101)
 base.createInternetExchange(102)
 base.createInternetExchange(103)
+base.createInternetExchange(104)
 
 
 # AS-151
@@ -42,7 +43,13 @@ scion_isd.addIsdAs(1, 155, is_core=True)
 as155.createNetwork('net0')
 as155.createRouter('br0').joinNetwork('net0').joinNetwork('ix103')
 
-# AS-152 rechts oben
+# AS-157
+as157 = base.createAutonomousSystem(157)
+scion_isd.addIsdAs(1, 157, is_core=True)
+as157.createNetwork('net0')
+as157.createRouter('br0').joinNetwork('net0').joinNetwork('ix104')
+
+# AS-152 
 as152 = base.createAutonomousSystem(152)
 scion_isd.addIsdAs(1, 152, is_core=True)
 as152.createNetwork('net0')
@@ -51,7 +58,7 @@ as152.createRouter('br0').joinNetwork('net0').joinNetwork('ix100')
 as152_router2 = as152.createRouter('br1')
 as152_router2.joinNetwork('net0').joinNetwork('ix102')
 
-# AS-152 rechts oben
+# AS-154
 as154 = base.createAutonomousSystem(154)
 scion_isd.addIsdAs(1, 154, is_core=True)
 as154.createNetwork('net0')
@@ -60,7 +67,7 @@ as154.createRouter('br0').joinNetwork('net0').joinNetwork('ix100')
 as154_router2 = as154.createRouter('br1')
 as154_router2.joinNetwork('net0').joinNetwork('ix103')
 
-# AS-150 links oben
+# AS-150 
 as150 = base.createAutonomousSystem(150)
 scion_isd.addIsdAs(1, 150, is_core=True)
 as150.createNetwork('net0')
@@ -70,14 +77,36 @@ as150_router.joinNetwork('net0').joinNetwork('ix100')
 as150_router2 = as150.createRouter('br1')
 as150_router2.joinNetwork('net0').joinNetwork('ix101')
 
+# AS-150 links oben
+as156 = base.createAutonomousSystem(156)
+scion_isd.addIsdAs(1, 156, is_core=True)
+as156.createNetwork('net0')
+cs1 = as156.createControlService('cs1').joinNetwork('net0')
+as156_router = as156.createRouter('br0')
+as156_router.joinNetwork('net0').joinNetwork('ix100')
+as156_router2 = as156.createRouter('br1')
+as156_router2.joinNetwork('net0').joinNetwork('ix104')
+
+# AS-160 rechts oben
+as160 = base.createAutonomousSystem(160)
+scion_isd.addIsdAs(1, 160, is_core=True)
+as160.createNetwork('net0')
+cs1 = as160.createControlService('cs1').joinNetwork('net0')
+as160.createRouter('br0').joinNetwork('net0').joinNetwork('ix100')
+
 # Inter-AS routing
 scion.addIxLink(100, (1, 150), (1, 152), ScLinkType.Core)
 scion.addIxLink(100, (1, 150), (1, 154), ScLinkType.Core)
+scion.addIxLink(100, (1, 150), (1, 160), ScLinkType.Core)
 scion.addIxLink(100, (1, 152), (1, 154), ScLinkType.Core)
+scion.addIxLink(100, (1, 152), (1, 160), ScLinkType.Core)
+scion.addIxLink(100, (1, 154), (1, 160), ScLinkType.Core)
+scion.addIxLink(100, (1, 156), (1, 160), ScLinkType.Core)
 
 ebgp.addPrivatePeering(101, 150, 151, abRelationship=PeerRelationship.Peer)
 ebgp.addPrivatePeering(102, 152, 153, abRelationship=PeerRelationship.Peer)
 ebgp.addPrivatePeering(103, 154, 155, abRelationship=PeerRelationship.Peer)
+ebgp.addPrivatePeering(104, 156, 157, abRelationship=PeerRelationship.Peer)
 
 # TODO: Support for multiple Sbas instances, announce proper ASN to neighbour BGP routers
 sbas.setAsn(160)
@@ -87,6 +116,7 @@ sbas.setAsn(160)
 sbas.addPop(150)
 sbas.addPop(152)
 sbas.addPop(154)
+sbas.addPop(156)
 
 # Add customer, this also reuses the IX links and 
 # networks etc from AS configuration
@@ -94,6 +124,7 @@ sbas.addPop(154)
 sbas.addCustomer(150, 151, 101)
 sbas.addCustomer(152, 153, 102)
 sbas.addCustomer(154, 155, 103)
+sbas.addCustomer(156, 157, 104)
 
 # Rendering
 emu.addLayer(base)
