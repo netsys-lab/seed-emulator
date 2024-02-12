@@ -16,7 +16,12 @@ There is a great explanation and guide on sbas on [github](https://github.com/sc
 
 
 ## General structure
-Here you can find a picture of the configured topology. It consists of 4 SBAS PoP's and 4 customers. Inside the secure AS only SCION connectivity is configured, so there are no BGP sessions between the ASes. For these links, it does not matter if they are over an IX or cross connects. However, the links between SBAS customers and PoP's need to be always done over IXes. You can see that you need to pass the IX number in the `sbas.addCustomer` call.
+Here you can find a picture of the configured topology. It consists of 4 SBAS PoP's and 4 customers.
+![sbas-seed-1 (2)](https://github.com/netsys-lab/seed-emulator/assets/32448709/9f6a83dd-ec07-4b8d-b137-e405d2c7236c)
+
+
+
+Inside the secure AS only SCION connectivity is configured, so there are no BGP sessions between the ASes. For these links, it does not matter if they are over an IX or cross connects. However, the links between SBAS customers and PoP's need to be always done over IXes. You can see that you need to pass the IX number in the `sbas.addCustomer` call.
 
 At the moment the Secure AS works the following way: Each PoP has a SCION IP Gateway (SIG) configured on the CS node, all of these SIG's are connected to each other. They announce their own nets, and also those of all customers. The BorderRouter instances to the customers announce then all routes to all other customers over SBAS.
 
