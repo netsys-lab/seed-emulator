@@ -100,20 +100,25 @@ class ScionSbas(Layer, Graphable):
                     # customers = [c for p, c in self.__customers.items() if p["customer"] == pop]
                     for p, c in self.__customers.items():
                         if p == pop:
-                            print("POP", pop, c["customer"], c["ix"])
                             customers.append(pop)
-                            customers.append(c["customer"])
-                            customers.append(c["ix"])
+                            for index, customer in enumerate(c["customers"]):
+                                 customers.append(c["customers"][index])
+                                 customers.append(c["ixes"][index])
+                            
+                            # customers.append(pop)
+                            #customers.append(c["customer"])
+                            #customers.append(c["ix"])
 
                     as_.connectSig(f"sig-1", [f"10.{c}.0.0/24" for c in customers], f"1-{pop}")
                     
-                for pop, customer in self.__customers.items():
+                for pop, c in self.__customers.items():
                     if pop == asn:
                         # Add routes for own customers to be sent through whatever router?!
                         # TODO: Double check what happens if there are multiple customers in the same IX
                         # TODO: Support routers with different IXes
-                        node.appendStartCommand(f"ip route add 10.{customer['ix']}.0.0/24 via 10.{asn}.0.253")       
-                        node.appendStartCommand(f"ip route add 10.{customer['customer']}.0.0/24 via 10.{asn}.0.253")
+                        for index, customer in enumerate(c["customers"]):
+                            node.appendStartCommand(f"ip route add 10.{c['ixes'][index]}.0.0/24 via 10.{asn}.0.253")       
+                            node.appendStartCommand(f"ip route add 10.{c['customers'][index]}.0.0/24 via 10.{asn}.0.253")
               
             # pops = [150, 152]
             # customers = {150: 151, 152: 153}
@@ -132,10 +137,11 @@ class ScionSbas(Layer, Graphable):
 
                 print("WOKRING ON ROUTER NODE ", asn)
                 customer_routes = []
-                for pop, customer in self.__customers.items():
+                for pop, c in self.__customers.items():
                     if pop != asn:
-                        customer_routes.append(route_tmpl.format(to=customer['customer'], via=asn))
-                        customer_routes.append(route_tmpl.format(to=pop, via=asn))
+                        for index, customer in enumerate(c["customers"]):
+                            customer_routes.append(route_tmpl.format(to=c['customers'][index], via=asn))
+                            customer_routes.append(route_tmpl.format(to=pop, via=asn))
                 
                 tmpl = bgp_tmpl.format(routes="\n".join(customer_routes))
                 node.appendStartCommand('echo "{}" >> /etc/bird/bird.conf'.format(tmpl))
@@ -167,10 +173,13 @@ class ScionSbas(Layer, Graphable):
         """
         cur_pop = self.__customers.get(pop)
         if cur_pop is None:
-            cur_pop = {}
+            cur_pop = {
+                "customers": [],
+                "ixes": [],
+            }
         
-        cur_pop["customer"] = customer
-        cur_pop["ix"] = ix
+        cur_pop["customers"].append(customer)
+        cur_pop["ixes"].append(ix)
 
         self.__customers[pop] = cur_pop
 
