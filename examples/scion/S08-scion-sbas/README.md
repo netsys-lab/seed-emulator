@@ -5,7 +5,7 @@ This example shows how to create an SBAS instance in the SEED emulator, and conn
 **Status Quo limitations**:
 - At the moment only a single SBAS instance per emulation is supported.
 - Only SEED's default addressing scheme is supported, this won't work when you specify own IP ranges.
-- Also only a single customer per PoP is supported, and customers can only be added to the second border router of an AS (it relies on .254 address).
+- Customers can only be added to the second border router of an AS (it relies on .254 address).
 - The proper SBAS ASN (set via `sbas.setAsn`) is not announced yet to the customers. Anyway, connectivity works, so this status can be tested.
 - The order of layers in the bottom of the `sbas.py` must not be changed yet. There are some dependencies that break when changing the order.
 
