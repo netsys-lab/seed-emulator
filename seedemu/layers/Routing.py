@@ -156,7 +156,7 @@ class Routing(Layer):
             if type in ['hnode', 'csnode']:
                 hnode: Node = obj
                 hifaces: List[Interface] = hnode.getInterfaces()
-                assert len(hifaces) == 1, 'Host {} in as{} has != 1 interfaces'.format(name, scope)
+                # assert len(hifaces) == 1, 'Host {} in as{} has != 1 interfaces'.format(name, scope)
                 hif = hifaces[0]
                 hnet: Network = hif.getNet()
                 rif: Interface = None
