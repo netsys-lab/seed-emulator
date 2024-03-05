@@ -19,7 +19,10 @@ ospf = Ospf()
 bgpAsnToSCION = {
     10: "71-2:0:35", # BRIDGES Core
     11: "71-20965", # Geant Core
-    12: "71-20966", # Geant Core
+    12: "71-2:0:3e", # KISTI Core AMS
+    13: "71-2:0:3d", # KISTI Core SG
+    14: "71-2:0:3b", # KISTI Core DJ
+    15: "71-2:0:3f", # KISTI Core CHG
 
     100: "71-2:0:48", # Equinix
     101: "71-225", # Uva
@@ -66,6 +69,46 @@ geantCore_router1.joinNetwork('net0').joinNetwork('ix150')
 scion.addIxLink(150, (71, 10), (71, 11), ScLinkType.Core)
 # scion.addIxLink(151, (71, 10), (71, 11), ScLinkType.Core)
 
+# KISTI Cores
+# 12: "71-2:0:3e", # KISTI Core AMS
+# 13: "71-2:0:3d", # KISTI Core SG
+# 14: "71-2:0:3b", # KISTI Core DJ
+# 15: "71-2:0:3f", # KISTI Core CHG
+kistiAmsCore = base.createAutonomousSystem(12)
+scion_isd.addIsdAs(71, 12, is_core=True)
+kistiAmsCore.createNetwork('net0')
+kistiAmsCore.createControlService('cs1').joinNetwork('net0')
+kistiAmsCore_router1 = kistiAmsCore.createRouter('br0')
+kistiAmsCore_router1.joinNetwork('net0').joinNetwork('ix150')
+
+kistiSgCore = base.createAutonomousSystem(13)
+scion_isd.addIsdAs(71, 13, is_core=True)
+kistiSgCore.createNetwork('net0')
+kistiSgCore.createControlService('cs1').joinNetwork('net0')
+kistiSgCore_router1 = kistiSgCore.createRouter('br0')
+kistiSgCore_router1.joinNetwork('net0').joinNetwork('ix150')
+
+kistiDjCore = base.createAutonomousSystem(14)
+scion_isd.addIsdAs(71, 14, is_core=True)
+kistiDjCore.createNetwork('net0')
+kistiDjCore.createControlService('cs1').joinNetwork('net0')
+kistiDjCore_router1 = kistiDjCore.createRouter('br0')
+kistiDjCore_router1.joinNetwork('net0').joinNetwork('ix150')
+
+kistiChgCore = base.createAutonomousSystem(15)
+scion_isd.addIsdAs(71, 15, is_core=True)
+kistiChgCore.createNetwork('net0')
+kistiChgCore.createControlService('cs1').joinNetwork('net0')
+kistiChgCore_router1 = kistiChgCore.createRouter('br0')
+kistiChgCore_router1.joinNetwork('net0').joinNetwork('ix150')
+
+# KISTI Links
+scion.addIxLink(150, (71, 11), (71, 12), ScLinkType.Core)
+scion.addIxLink(150, (71, 11), (71, 13), ScLinkType.Core)
+scion.addIxLink(150, (71, 14), (71, 12), ScLinkType.Core)
+scion.addIxLink(150, (71, 14), (71, 13), ScLinkType.Core)
+scion.addIxLink(150, (71, 14), (71, 15), ScLinkType.Core)
+
 # Equinix AS
 equinix = base.createAutonomousSystem(100)
 scion_isd.addIsdAs(71, 100)
@@ -95,6 +138,47 @@ princeton.createControlService('cs1').joinNetwork('net0')
 princeton_router1 = princeton.createRouter('br0')
 princeton_router1.joinNetwork('net0').joinNetwork('ix150')
 scion.addIxLink(150, (71, 10), (71, 102), ScLinkType.Transit)
+
+# Cybexer
+cybexer = base.createAutonomousSystem(103)
+scion_isd.addIsdAs(71, 103)
+scion_isd.setCertIssuer((71, 103), issuer=11)
+cybexer.createNetwork('net0')
+cybexer.createControlService('cs1').joinNetwork('net0')
+cybexer_router1 = cybexer.createRouter('br0')
+cybexer_router1.joinNetwork('net0').joinNetwork('ix150')
+scion.addIxLink(150, (71, 11), (71, 103), ScLinkType.Transit)
+
+
+# SIDN Labs
+sidn = base.createAutonomousSystem(104)
+scion_isd.addIsdAs(71, 104)
+scion_isd.setCertIssuer((71, 104), issuer=11)
+sidn.createNetwork('net0')
+sidn.createControlService('cs1').joinNetwork('net0')
+sidn_router1 = sidn.createRouter('br0')
+sidn_router1.joinNetwork('net0').joinNetwork('ix150')
+scion.addIxLink(150, (71, 11), (71, 104), ScLinkType.Transit)
+
+# Ovgu
+ovgu = base.createAutonomousSystem(105)
+scion_isd.addIsdAs(71, 105)
+scion_isd.setCertIssuer((71, 105), issuer=11)
+ovgu.createNetwork('net0')
+ovgu.createControlService('cs1').joinNetwork('net0')
+ovgu_router1 = ovgu.createRouter('br0')
+ovgu_router1.joinNetwork('net0').joinNetwork('ix150')
+scion.addIxLink(150, (71, 11), (71, 105), ScLinkType.Transit)
+
+# Demokritos
+demokritos = base.createAutonomousSystem(106)
+scion_isd.addIsdAs(71, 106)
+scion_isd.setCertIssuer((71, 106), issuer=11)
+demokritos.createNetwork('net0')
+demokritos.createControlService('cs1').joinNetwork('net0')
+demokritos_router1 = demokritos.createRouter('br0')
+demokritos_router1.joinNetwork('net0').joinNetwork('ix150')
+scion.addIxLink(150, (71, 11), (71, 106), ScLinkType.Transit)
 
 # Rendering
 emu.addLayer(base)
