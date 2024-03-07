@@ -1,8 +1,22 @@
-# SCION IP Gateway in SEED
+# MPTCP in SEED
 
-## Work in Progress
-Limitations at the moment:
-- Only one SIG per AS
-- Requires a CS called `cs1` in the AS before calling "createSig" or "connect"
-- SIG Runs on the CS node
-- Tested so far only from the CS node (the SIG ip is on dev lo, which needs to be changed probably)
+Adaptions to Dockerfile for host containers
+
+```Dockerfile 
+# Replace FROM $HASH with this
+FROM ubuntu:22.04
+ARG DEBIAN_FRONTEND=noninteractive
+COPY sources.list /etc/apt/sources.list
+
+RUN apt-get update && apt-get install -y --no-install-recommends apt-transport-https ca-certificates
+# Install software packages inside the container
+RUN apt-get update  \
+    && apt-get -y install  \
+    iputils-ping \
+    iproute2  \
+    net-tools \
+    dnsutils  \
+    mtr-tiny  \
+    nano      \
+    && apt-get clean
+```
