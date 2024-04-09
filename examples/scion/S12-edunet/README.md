@@ -1,6 +1,7 @@
 # SCION Education Network Topology
 
 ## Topology
+![education-isd-as-overview (5)](https://github.com/netsys-lab/seed-emulator/assets/32448709/5b551faa-ce1c-4a81-bb91-734972e892cd)
 
 
 ## Usage
