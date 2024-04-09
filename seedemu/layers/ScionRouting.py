@@ -146,6 +146,9 @@ class ScionRouting(Routing):
             "apt-get update && apt-get install -y"
             " scion-border-router scion-control-service scion-daemon scion-dispatcher scion-tools scion-sig"
             " scion-apps-bwtester")
+        # TODO: TC Installed
+        node.addSoftware("pip")
+        node.addBuildCommand("pip install tcconfig")
         node.addSoftware("apt-transport-https")
         node.addSoftware("ca-certificates")
 
