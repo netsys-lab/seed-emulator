@@ -84,7 +84,7 @@ prev_bytes_recv = {interface: get_network_bytes_recv(interface) for interface in
 
 init_tc()
 
-client = mqtt.Client()
+client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
 client.on_connect = on_connect
 client.on_message = on_message
 

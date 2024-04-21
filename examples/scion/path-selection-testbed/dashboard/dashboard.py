@@ -661,7 +661,7 @@ def on_mqtt_message(client, userdata, msg):
         stream2_loss.append(data['loss'])
         stream2_jitter.append(data['jitter']*1000)
 
-mqtt_client = mqtt.Client()
+client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
 mqtt_client.connect(broker_ip, 1883, 60)  
 
 mqtt_client.on_message = on_mqtt_message
