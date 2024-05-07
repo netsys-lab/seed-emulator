@@ -109,7 +109,8 @@ class ScionSbas(Layer, Graphable):
                             #customers.append(c["customer"])
                             #customers.append(c["ix"])
 
-                    as_.connectSig(f"sig-1", [f"10.{c}.0.0/24" for c in customers], f"1-{pop}")
+                    # TODO: Fix hard coded ISD here
+                    as_.connectSig(f"sig-1", [f"10.{c}.0.0/24" for c in customers], f"71-{pop}")
                     
                 for pop, c in self.__customers.items():
                     if pop == asn:

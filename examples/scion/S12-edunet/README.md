@@ -1,10 +1,15 @@
 # SCION Education Network Topology
 
+<<<<<<< HEAD
 ## Topology
 ![education-isd-as-overview (5)](https://github.com/netsys-lab/seed-emulator/assets/32448709/5b551faa-ce1c-4a81-bb91-734972e892cd)
+=======
+## Topologies
+>>>>>>> Update edunet topology
 
+### Edunet_Raw
+This topology contains just the SCION education network topology.
 
-## Usage
 SCION commands can be run from the CS nodes (`cs1`). There is a list of environment variables that store the ASes and the Host IPs to easily interact with other ASes:
 
 SCION Showpaths:
@@ -42,3 +47,20 @@ SIDN_HOST=71-104,10.104.0.71
 UVA=71-101
 UVA_HOST=71-101,10.101.0.71
 ```
+
+
+### Edunet_Raw_SBAS
+This topology adds SBAS PoPs to UVA, PRINCETON, EQUINIX and OVGU to the deployment of the education network. 
+
+To talk to customers over SBAS, use the respective environment variables:
+
+`ping $EQUINIX_CUSTOMER_HOST`
+
+```
+EQUINIX_CUSTOMER_HOST=10.200.0.71
+UVA_CUSTOMER_HOST=10.201.0.71
+PRINCETON_CUSTOMER_HOST=10.202.0.71
+OVGU_CUSTOMER_HOST=10.205.0.71
+```
+
+## Usage

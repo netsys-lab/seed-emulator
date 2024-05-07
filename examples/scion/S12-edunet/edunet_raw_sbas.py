@@ -2,7 +2,7 @@
 
 from seedemu.compiler import Docker
 from seedemu.core import Emulator, Node
-from seedemu.layers import ScionBase, ScionRouting, ScionIsd, Scion, Ebgp, Ibgp, Ospf, PeerRelationship
+from seedemu.layers import ScionBase, ScionRouting, ScionIsd, Scion, Ebgp, Ibgp, Ospf, PeerRelationship, ScionSbas
 from seedemu.layers.Scion import LinkType as ScLinkType
 
 # Initialize
@@ -14,6 +14,8 @@ scion = Scion()
 ebgp = Ebgp()
 ibgp = Ibgp()
 ospf = Ospf()
+sbas = ScionSbas()
+
 
 # ASN Mapping
 bgpAsnToSCION = {
@@ -67,6 +69,12 @@ def createEnvFromASNMapping(node: Node):
     node.addBuildCommand(f"echo 'OVGU_HOST=71-105,10.105.0.71' >> /root/.zshrc")
     node.addBuildCommand(f"echo 'DEMOKRITOS_HOST=71-106,10.106.0.71' >> /root/.zshrc")
 
+    node.addBuildCommand(f"echo 'EQUINIX_CUSTOMER_HOST=10.200.0.71' >> /root/.zshrc")
+    node.addBuildCommand(f"echo 'UVA_CUSTOMER_HOST=10.201.0.71' >> /root/.zshrc")
+    node.addBuildCommand(f"echo 'PRINCETON_CUSTOMER_HOST=10.202.0.71' >> /root/.zshrc")
+    node.addBuildCommand(f"echo 'OVGU_CUSTOMER_HOST=10.205.0.71' >> /root/.zshrc")
+
+
         
 # SCION ISDs
 base.createIsolationDomain(71)
@@ -77,6 +85,11 @@ base.createInternetExchange(151) # US-Internal
 base.createInternetExchange(152) # Europe Internal
 base.createInternetExchange(153) # Europe-KISTI
 base.createInternetExchange(154) # KISTI Internal
+
+base.createInternetExchange(180) # Equinix Customer
+base.createInternetExchange(181) # UVA Customer
+base.createInternetExchange(182) # Princeton Customer
+base.createInternetExchange(183) # Ovgu Customer
 
 # Bridges Core (currently only one node)
 bridgesCore = base.createAutonomousSystem(10)
@@ -172,6 +185,8 @@ createEnvFromASNMapping(cs1)
 equinix_router1 = equinix.createRouter('br0')
 equinix_router1.joinNetwork('net0').joinNetwork('ix151')
 equinix_router1.appendStartCommand("tcset ix151 --delay=30ms --overwrite")
+equinix_router2 = equinix.createRouter('br1')
+equinix_router2.joinNetwork('net0').joinNetwork('ix180')
 scion.addIxLink(151, (71, 10), (71, 100), ScLinkType.Transit)
 
 
@@ -185,6 +200,8 @@ createEnvFromASNMapping(cs1)
 uva_router1 = uva.createRouter('br0')
 uva_router1.joinNetwork('net0').joinNetwork('ix151')
 uva_router1.appendStartCommand("tcset ix151 --delay=20ms --overwrite")
+uva_router2 = uva.createRouter('br1')
+uva_router2.joinNetwork('net0').joinNetwork('ix181')
 scion.addIxLink(151, (71, 10), (71, 101), ScLinkType.Transit)
 
 # Princeton
@@ -197,6 +214,8 @@ createEnvFromASNMapping(cs1)
 princeton_router1 = princeton.createRouter('br0')
 princeton_router1.joinNetwork('net0').joinNetwork('ix151')
 princeton_router1.appendStartCommand("tcset ix151 --delay=29ms --overwrite")
+princeton_router2 = princeton.createRouter('br1')
+princeton_router2.joinNetwork('net0').joinNetwork('ix182')
 scion.addIxLink(151, (71, 10), (71, 102), ScLinkType.Transit)
 
 # Cybexer
@@ -234,6 +253,8 @@ createEnvFromASNMapping(cs1)
 ovgu_router1 = ovgu.createRouter('br0')
 ovgu_router1.joinNetwork('net0').joinNetwork('ix152')
 ovgu_router1.appendStartCommand("tcset ix152 --delay=16ms --overwrite")
+ovgu_router2 = ovgu.createRouter('br1')
+ovgu_router2.joinNetwork('net0').joinNetwork('ix183')
 scion.addIxLink(152, (71, 11), (71, 105), ScLinkType.Transit)
 
 # Demokritos
@@ -248,8 +269,53 @@ demokritos_router1.joinNetwork('net0').joinNetwork('ix152')
 demokritos_router1.appendStartCommand("tcset ix152 --delay=40ms --overwrite")
 scion.addIxLink(152, (71, 11), (71, 106), ScLinkType.Transit)
 
+# SBAS customers
+# AS-200: Equinix customer
+as200 = base.createAutonomousSystem(200)
+scion_isd.addIsdAs(1, 200, is_core=True)
+as200.createNetwork('net0')
+as200.createRouter('br0').joinNetwork('net0').joinNetwork('ix180')
+
+# AS-201: UVA Customer
+as201 = base.createAutonomousSystem(201)
+scion_isd.addIsdAs(1, 201, is_core=True)
+as201.createNetwork('net0')
+as201.createRouter('br0').joinNetwork('net0').joinNetwork('ix181')
+
+# AS-202: Princeton Customer
+as202 = base.createAutonomousSystem(202)
+scion_isd.addIsdAs(1, 202, is_core=True)
+as202.createNetwork('net0')
+as202.createRouter('br0').joinNetwork('net0').joinNetwork('ix182')
+
+# AS-205: Princeton Customer
+as205 = base.createAutonomousSystem(205)
+scion_isd.addIsdAs(1, 205, is_core=True)
+as205.createNetwork('net0')
+as205.createRouter('br0').joinNetwork('net0').joinNetwork('ix183')
+
+sbas.addPop(100)
+sbas.addPop(101)
+sbas.addPop(102)
+sbas.addPop(105)
+# sbas.addPop(14)
+
+ebgp.addPrivatePeering(180, 100, 200, abRelationship=PeerRelationship.Peer)
+ebgp.addPrivatePeering(181, 101, 201, abRelationship=PeerRelationship.Peer)
+ebgp.addPrivatePeering(182, 102, 202, abRelationship=PeerRelationship.Peer)
+ebgp.addPrivatePeering(183, 105, 205, abRelationship=PeerRelationship.Peer)
+
+# Add customer, this also reuses the IX links and 
+# networks etc from AS configuration
+# First argument is the pop, second the customer and the last one the IX at which customer and pop connect
+sbas.addCustomer(100, 200, 180)
+sbas.addCustomer(101, 201, 181)
+sbas.addCustomer(102, 202, 182)
+sbas.addCustomer(105, 205, 183)
+
 # Rendering
 emu.addLayer(base)
+emu.addLayer(sbas)
 emu.addLayer(routing)
 emu.addLayer(ospf)
 emu.addLayer(scion_isd)
@@ -260,4 +326,4 @@ emu.addLayer(ebgp)
 emu.render()
 
 # Compilation
-emu.compile(Docker(), './output_edunet_raw')
+emu.compile(Docker(), './output_edunet_sbas')
