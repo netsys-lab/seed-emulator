@@ -24,7 +24,7 @@ def main():
     sender_asn = topo['sender_asn']
     sender_isd = get_isd(sender_asn, topo)
     
-    command = 'scion showpaths {}-{} -j -m 100'.format(sender_isd, sender_asn)
+    command = 'scion showpaths {}-{} --format json -m 100'.format(sender_isd, sender_asn)
     output, error, return_code = execute_command(command)
 
     if return_code == 0:

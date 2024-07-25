@@ -17,7 +17,7 @@ def get_isd(asn, topo):
     return None
 
 def get_paths(dst_isd, dst_asn):
-    command = 'scion showpaths {}-{} -j -m 100'.format(dst_isd, dst_asn)
+    command = 'scion showpaths {}-{} --format json -m 100'.format(dst_isd, dst_asn)
     output, error, return_code = execute_command(command)
 
     if return_code == 0:
@@ -33,7 +33,7 @@ def get_paths(dst_isd, dst_asn):
     return result_dict
 
 def get_paths_from_host(dst_isd, dst_asn, container_name):
-    command = 'docker exec {} /bin/zsh -c "scion showpaths {}-{} -j -m 100"'.format(container_name, dst_isd, dst_asn)
+    command = 'docker exec {} /bin/zsh -c "scion showpaths {}-{} --format json -m 100"'.format(container_name, dst_isd, dst_asn)
     output, error, return_code = execute_command(command)
 
     if return_code == 0:
