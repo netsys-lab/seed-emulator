@@ -26,10 +26,11 @@ def make_files_executable(directory_path):
         
         # Loop over each file and change permissions to make it executable
         for file in files:
-            file_path = os.path.join(directory_path, file)
-            # Add execute and read write permissions for the owner, group, and others
-            os.chmod(file_path, 0o777)
-            print(f"Made {file_path} executable.")
+            if file.endswith(".sh") or file == "dmtp":
+                file_path = os.path.join(directory_path, file)
+                # Add execute and read write permissions for the owner, group, and others
+                os.chmod(file_path, 0o777)
+                print(f"Made {file_path} executable.")
 
     except Exception as e:
         print(f"An error occurred: {e}")
