@@ -10,3 +10,5 @@ from .BgpLookingGlassService import BgpLookingGlassServer, BgpLookingGlassServic
 from .DHCPService import DHCPServer, DHCPService
 from .EthereumService import *
 from .ScionBwtestService import ScionBwtestService
+from .ScionKuboService import ScionKuboServer, ScionKuboService
+from .Libp2pBwtestService import Libp2pBwtestServer, Libp2pBwtestService

@@ -11,7 +11,7 @@ from seedemu.core import Emulator, Binding, Filter
 from seedemu.layers import (
     ScionBase, ScionRouting, ScionIsd, Scion, Ospf, Ibgp, Ebgp, PeerRelationship)
 from seedemu.layers.Scion import LinkType as ScLinkType
-from seedemu.services import ScionKuboService
+from seedemu.services import Libp2pBwtestService
 import json
 from generate_scripts import generate_scripts
 
@@ -24,7 +24,7 @@ scion_isd = ScionIsd()
 scion = Scion()
 ibgp = Ibgp()
 ebgp = Ebgp()
-scionkubo = ScionKuboService()
+bwtest = Libp2pBwtestService()
 
 # load topo.json to dict
 topo = json.load(open('topo/topo.json'))
@@ -40,12 +40,14 @@ for link in topo['links']:
 dashboard_asn = topo['dashboard_asn']
 #sender_asn = topo['sender_asn']
 #receiver_asn = topo['receiver_asn']
+
 # Create ASes
 for as__ in topo['ASes']:
     asn = as__['asn']
     isd = as__['isd']
     is_core = as__['is_core_as']
-    kubos = as__['kubos']
+    bwserver = as__.get('bwserver', False)
+    bwclient = as__.get('bwclient', False)
     as_ = base.createAutonomousSystem(asn)
     scion_isd.addIsdAs(isd, asn, is_core=is_core)
     if not is_core:
@@ -98,14 +100,29 @@ for as__ in topo['ASes']:
     #    h1.addSharedFolder("/receiver", "../receiver")
     #    h1.addSharedFolder("/topo", "../topo")
 
-    for i in range(kubos):
+    if bwserver:
+        bwserver_host = f'bwserver-{asn}'
+        bwserver_asn = asn
+        bwserver_addr = f'10.{asn}.0.30'
+
         as_ \
-            .createHost(f'kubo-{asn}-{i}') \
-            .joinNetwork('net0', address=f'10.{asn}.0.{30+i}')
-        kubo = scionkubo.install(f'kubo-{asn}-{i}')
-        kubo.setAddress(f'/scion/1-{asn}/ip4/10.{asn}.0.{30+i}/udp/12345/quic-v1')
-        emu.addBinding(Binding(f'kubo-{asn}-{i}',
-            filter=Filter(asn=asn, nodeName=f'kubo-{asn}-{i}')))
+            .createHost(bwserver_host) \
+            .joinNetwork('net0', address=bwserver_addr)
+        bwserver = bwtest.install(bwserver_host)
+        emu.addBinding(Binding(bwserver_host,
+            filter=Filter(asn=bwserver_asn, nodeName=bwserver_host)))
+        
+    if bwclient:
+        bwclient_host = f'bwclient-{asn}'
+        bwclient_asn = asn
+        bwclient_addr = f'10.{asn}.0.30'
+
+        as_ \
+            .createHost(bwclient_host) \
+            .joinNetwork('net0', address=bwclient_addr)
+        bwclient = bwtest.install(bwclient_host)
+        emu.addBinding(Binding(bwclient_host,
+            filter=Filter(asn=bwclient_asn, nodeName=bwclient_host)))
 
 # add scion and bgp links
 for link in topo['links']:
@@ -141,7 +158,7 @@ emu.addLayer(scion_isd)
 emu.addLayer(scion)
 emu.addLayer(ibgp)
 emu.addLayer(ebgp)
-emu.addLayer(scionkubo)
+emu.addLayer(bwtest)
 
 emu.render()
 
@@ -169,68 +186,26 @@ for name, ctr in ctrs.items():
         _, output = ctr.exec_run([
             'bash', '-c',
             f'tc qdisc del dev ix{200+i} root &&'
-            f'tc qdisc add dev ix{200+i} root netem rate 2mbit delay 0ms loss 0% &&'
+            f'tc qdisc add dev ix{200+i} root netem rate 1mbit delay 1ms loss 0% &&'
             f'echo configured ix{200+i}'
         ])
         print(output.decode('utf8').splitlines()[0])
 
-# Collect peer IDs
-peers = dict()
-for name, ctr in ctrs.items():
-    if 'kubo' not in name:
-        continue
+# Determine hosts to use
+bwserver_ctr = next((ctr for name, ctr in ctrs.items() if bwserver_host in name), None)
+bwclient_ctr = next((ctr for name, ctr in ctrs.items() if bwclient_host in name), None)
 
-    _, output = ctr.exec_run('/kubo/cmd/ipfs/ipfs id -f="<addrs>"')
-    addr = output.decode('utf8').splitlines()[0]
-    peers[name] = addr
-print(peers)
+# Start server
+nbytes, npaths = 1024000, 1
+_, output = bwserver_ctr.exec_run(['bash', '-c', f'/go-libp2p/p2p/transport/scionquic/cmd/server/main 1-{bwserver_asn} {bwserver_addr} 12345 {nbytes} > bwserver.txt'], detach=True)
 
-# Connect peers
-for name, ctr in ctrs.items():
-    if 'kubo' not in name:
-        continue
+# Wait till started
+_, output = bwserver_ctr.exec_run(['bash', '-c', 'tail -f bwserver.txt | sed "/Listening/ q"'])
+match = re.search(r'Listening\. Now run: .* (\/scion.*)', output.decode('utf8'), re.MULTILINE)
+print(match.group(1))
 
-    for peer_name, peer_addr in peers.items():
-        if name == peer_name:
-            continue
-
-        _, output = ctr.exec_run(f'/kubo/cmd/ipfs/ipfs swarm connect "{peer_addr}"')
-        print(output.decode('utf8').splitlines()[0])
-
-# Determine peers to use
-provider_name = next((name for name, _ in peers.items() if 'kubo-101-0' in name), None)
-assert provider_name is not None
-retriever_names = [name for name, _ in peers.items() if 'kubo-102-' in name]
-assert len(retriever_names) > 0
-
-# Add content
-retriever_cids = {}
-for retriever_name in retriever_names:
-    _, output = ctrs[provider_name].exec_run(['bash', '-c', 'dd if=/dev/urandom bs=1 count=10240000 | /kubo/cmd/ipfs/ipfs add'])
-    match = re.search(r'added ([^ ]+)', output.decode('utf8'), re.MULTILINE)
-    retriever_cids[retriever_name] = match.group(1)
-print(retriever_cids)
-
-# Retrieve content in parallel
-for retriever_name in retriever_names:
-    cid = retriever_cids[retriever_name]
-    #_, output = ctrs[retriever_name].exec_run(['bash', '-c', f'{{ time /kubo/cmd/ipfs/ipfs cat {cid} > /dev/null ; }} 2> time.txt'], detach=True)
-    _, output = ctrs[retriever_name].exec_run(['bash', '-c', f'{{ time /kubo/cmd/ipfs/ipfs refs -r {cid} > /dev/null ; }} 2> time.txt'], detach=True)
-
-# Block till finished
-for retriever_name in retriever_names:
-    _, output = ctrs[retriever_name].exec_run(['bash', '-c', 'tail -f time.txt | sed "/sys/ q"'])
-
-# Collect results
-times = {}
-for retriever_name in retriever_names:
-    _, output = ctrs[retriever_name].exec_run(['bash', '-c', 'grep -e "real" time.txt'])
-    times[retriever_name] = output.decode('utf8').splitlines()[0]
-print(times)
-
-_, output = ctrs[provider_name].exec_run('/kubo/cmd/ipfs/ipfs bitswap stat --verbose --human')
+# Start client
+_, output = bwclient_ctr.exec_run(f'/go-libp2p/p2p/transport/scionquic/cmd/client/main {match.group(1)} {nbytes} {npaths}')
 print(output.decode('utf8'))
-
-time.sleep(15)
 
 whales.compose.down()
