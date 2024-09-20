@@ -81,8 +81,8 @@ def main():
         pathFilters.append(path_seq)
 
     config = {
-        'scionaddress': '{}-{},[10.{}.0.71]:23000'.format(sender_isd, sender_asn, sender_asn),
-        'remotescionaddress': '{}-{},[10.{}.0.71]:23000'.format(receiver_isd, receiver_asn, receiver_asn),
+        'scionaddress': '{}-{},[10.{}.0.71]:31100'.format(sender_isd, sender_asn, sender_asn),
+        'remotescionaddress': '{}-{},[10.{}.0.71]:31100'.format(receiver_isd, receiver_asn, receiver_asn),
         'packetSize': 1410,
         'pathFilters': pathFilters,
         'mode': 'server',

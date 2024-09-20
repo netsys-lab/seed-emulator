@@ -39,7 +39,7 @@ def get_paths_from_host(dst_isd, dst_asn, container_name):
     if return_code == 0:
         try:
             result_dict = json.loads(output)
-            # print("Loaded JSON to dict")
+            print("Loaded JSON to dict")
         except json.JSONDecodeError:
             print("Failed to decode JSON:", output)
             return None

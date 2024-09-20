@@ -12,6 +12,7 @@ received_packets = 0
 one_way_delays = []
 receive_times = []
 sequence_numbers = []
+results = []
 
 @app.route('/stats', methods=['GET'])
 def get_stats():
@@ -43,8 +44,7 @@ def get_stats():
     sequence_numbers.clear()
 
     goodput = goodput * 8 / 1000000
-
-    return jsonify({
+    results.append({
         'goodput_mbps': goodput,
         'avg_delay_ms': avg_delay,
         'median_delay_ms': median_delay,
@@ -54,6 +54,8 @@ def get_stats():
         'received_bytes': _received_bytes,
         'duration': duration
     })
+
+    return jsonify(results)
 
 def udp_server(host, port):
     global received_bytes, received_packets, one_way_delays
