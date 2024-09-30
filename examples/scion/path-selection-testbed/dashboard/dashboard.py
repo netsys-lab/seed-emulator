@@ -79,10 +79,10 @@ network = []
 
 for as_ in topo["ASes"]:
     label = '{}-{}'.format(as_['isd'],as_['label'])
-    if as_['asn'] == sender_asn:
-        label = "Sender"
-    elif as_['asn'] == receiver_asn:
-        label = "Receiver"
+    #if as_['asn'] == sender_asn:
+    #    label = "Sender"
+    #elif as_['asn'] == receiver_asn:
+    #    label = "Receiver"
     data = {
         'data': {'id': as_['asn'], 'label': label}
     }
