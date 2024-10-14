@@ -12,6 +12,7 @@ import requests
 import subprocess
 
 
+
 min_bw = 5
 max_bw = 50
 bw_step = 1
@@ -618,6 +619,23 @@ def update_stream2_jitter(val):
         
     }
 
+@app.callback(
+    [Output(f"{link}-bw", 'value') for link in slider_links] +
+    [Output(f"{link}-latency", 'value') for link in slider_links] +
+    [Output(f"{link}-jitter", 'value') for link in slider_links] +
+    [Output(f"{link}-loss", 'value') for link in slider_links],
+    [Input('interval-component', 'n_intervals')]
+)
+def update_slider_values(n_intervals):
+    # Example of how values are fetched from the 'links' dictionary
+    bw_values = [links[link]['bw'] for link in slider_links]
+    latency_values = [links[link]['latency'] for link in slider_links]
+    jitter_values = [links[link]['jitter'] for link in slider_links]
+    loss_values = [links[link]['loss'] for link in slider_links]
+    
+    return bw_values + latency_values + jitter_values + loss_values
+
+
 @server.route('/get_paths', methods=['GET'])
 def get_paths_detailed():
     for id, path in paths_data.items():
@@ -640,6 +658,40 @@ def get_paths_detailed():
         path['loss_percent'] = loss
         paths_data[id] = path
     return paths_data
+
+@server.route('/set_link', methods=['POST'])
+def set_link():
+    from flask import request
+    data = request.get_json()    
+    link = data['link']
+    if link not in links.keys():
+        return 'Link not found', 404
+    if 'bw' in data:
+        bw = data['bw']
+        links[link]['bw'] = bw
+    if 'latency' in data:
+        latency = data['latency']
+        links[link]['latency'] = latency
+    if 'jitter' in data:
+        jitter = data['jitter']
+        links[link]['jitter'] = jitter
+    if 'loss' in data:
+        loss = data['loss']
+        links[link]['loss'] = loss
+    links[link]['bw'] = bw
+    links[link]['latency'] = latency
+    links[link]['jitter'] = jitter
+    links[link]['loss'] = loss
+    
+    # update sliders
+    for as_ in links[link]['ases']:
+        mqtt_client.publish(f"AS{as_}/control/{link}/bandwidth", f"{bw}Mbit")
+        mqtt_client.publish(f"AS{as_}/control/{link}/latency", f"{latency}ms")
+        mqtt_client.publish(f"AS{as_}/control/{link}/jitter", f"{jitter}ms")
+        mqtt_client.publish(f"AS{as_}/control/{link}/loss", f"{loss}%")
+    return 'OK'
+
+    
 
 def on_mqtt_message(client, userdata, msg):
     global network

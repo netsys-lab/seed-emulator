@@ -1,96 +1,131 @@
+# udp_sender.py
+
 from flask import Flask, request, jsonify
+import threading
+import time
 import socket
 import struct
-import time
-import threading
 
 app = Flask(__name__)
 
-sequence_number = 0  # Initialize sequence number
-stat = {}
-
-@app.route('/stats', methods=['GET'])
-def get_stats():
-    global stat
-    return jsonify(stat)
-
+test_running = False
+test_lock = threading.Lock()
+test_metrics = {}
 
 @app.route('/send', methods=['POST'])
-def send_data():
-    global sequence_number
-    sequence_number = 0  # Reset sequence number
-    data = request.json
-    if 'size' in data:
-        size = data['size']
-    else:
-        size = 0
-    if 'duration' in data:
-        duration = data['duration']
-    else:
-        duration = 0
-    if 'rate' in data:
-        rate = data['rate'] # in Mbps
-    else:
-        rate = 0
-    if rate !=0:
-        rate = (rate * 1000000)/8
-    if size == 0 and duration == 0:
-        return jsonify({'status': 'error', 'message': 'size or duration must be specified'})
-    mtu = 1400
-    header_size = 12  # 8 bytes for send_time and 4 bytes for sequence_number
-    payload_size = mtu - header_size  # Calculate payload size considering header and MTU
-    payload = b'0' * payload_size  # Create payload with zeros
-    def udp_send():
-        global sequence_number
+def start_test():
+    global test_running, test_metrics
+    with test_lock:
+        if test_running:
+            return jsonify({'error': 'Test already running'}), 400
+        else:
+            data = request.get_json()
+            duration = float(data.get('duration'))
+            data_rate = float(data.get('rate'))
+            packet_size = int(data.get('size'))
+            if not packet_size:
+                packet_size = 1024
 
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        start_time = time.perf_counter()
-        bytes_sent = 0
-        next_send_time = time.perf_counter()
-        send_interval = mtu / rate if rate > 0 else 0
+            test_running = True
+            test_metrics = {}
+            UDP_IP = "10.72.0.2"
+            UDP_PORT = 9000
+            ACK_PORT = 5006  # Port to receive ACKs
 
-        while True:
-            current_time = time.perf_counter()  
-            elapsed_time = current_time - start_time
+            print(f"Starting test with duration {duration}, rate {data_rate}, size {packet_size}")
 
-            # Stop sending if size is reached
-            if size != 0 and bytes_sent > size:
-                break
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            ack_sock.bind(("10.72.0.1", ACK_PORT))
+            ack_sock.settimeout(1.0)  # Set timeout for ACK socket
 
-            if duration != 0 and elapsed_time >= duration:
-                break
+            sequence_number = 0
+            send_times = {}
+            ack_received = set()
+            rtts = []
 
-            if rate > 0 and current_time < next_send_time:
-                continue
+            total_bytes_sent = 0
 
-            # Prepend sequence number and send time to data packet
-            header = struct.pack('dI', current_time, sequence_number)
-            packet = header + payload
-            client_socket.sendto(packet, ("10.72.0.2", 9000))
-            bytes_sent += len(packet)    
-            sequence_number += 1  # Increment sequence number for each packet
-            next_send_time += send_interval
+            inter_packet_interval = (packet_size * 8) / (data_rate * 1e6)  # seconds per packet
 
-            if rate > 0:
-                packet_proc_time = time.perf_counter() - current_time
-                time_to_wait = (len(packet) / rate) - packet_proc_time                
-                if time_to_wait > 0.05:
-                    time.sleep(time_to_wait)
+            start_time = time.perf_counter()
+            next_send_time = start_time
+            end_time = start_time + duration
 
 
-        print("Finished sending")
-        print("Bytes sent: {}".format(bytes_sent))
-        print("Elapsed time: {}".format(elapsed_time))
-        goodput = bytes_sent*8 / elapsed_time / 1000000
-        print("Goodput_mbps: {}".format(goodput))
-        stat['goodput_mbps'] = goodput
-        stat['bytes_sent'] = bytes_sent
-        stat['elapsed_time'] = elapsed_time
 
-    # Start UDP sending in a new thread
-    threading.Thread(target=udp_send).start()
+            def ack_listener(end_time=end_time):
+                while time.perf_counter() < end_time+0.3:
+                    print(time.perf_counter(), end_time, len(ack_received), sequence_number)
+                    try:
+                        data, addr = ack_sock.recvfrom(65535)
+                        if len(data) < 4:
+                            continue
+                        ack_seq_num = struct.unpack('!I', data[:4])[0]
+                        if ack_seq_num in ack_received:
+                            continue
+                        ack_received.add(ack_seq_num)
+                        send_time = send_times.get(ack_seq_num)
+                        if send_time:
+                            rtt = time.time() - send_time
+                            rtts.append(rtt)
+                    except socket.timeout:
+                        continue
 
-    return jsonify({'status': 'sending'})
+            ack_thread = threading.Thread(target=ack_listener)
+            ack_thread.start()
+
+            print("Starting packet sending")
+
+            while time.perf_counter() < end_time:
+                current_time = time.perf_counter()
+
+                if current_time >= next_send_time:
+                    # Prepare packet
+                    seq_num_bytes = struct.pack('!I', sequence_number)
+                    payload = seq_num_bytes + b'\x00' * (packet_size - 4)
+                    # Send packet
+                    sock.sendto(payload, (UDP_IP, UDP_PORT))
+                    send_times[sequence_number] = time.time()
+                    total_bytes_sent += packet_size
+                    sequence_number += 1
+                    # Schedule next packet
+                    next_send_time += inter_packet_interval
+
+                else:
+                    sleep_time = next_send_time - current_time
+                    if sleep_time > 0.01:
+                        time.sleep(sleep_time - 0.005)
+                    else:
+                        # Busy-wait
+                        while time.perf_counter() < next_send_time:
+                            pass
+            print("Finished sending packets")
+            elapsed_time = time.perf_counter() - start_time
+            ack_thread.join()
+
+            
+            goodput_sent = (total_bytes_sent * 8) / (elapsed_time * 1e6)  # Mbps    
+
+            total_bytes_received = len(ack_received) * packet_size
+            goodput_received = (total_bytes_received * 8) / (elapsed_time * 1e6)  # Mbps
+
+            packet_loss = (sequence_number - len(ack_received)) / sequence_number
+
+            average_delay = sum(rtts) / len(rtts) if rtts else None
+
+            test_metrics = {
+                'total_bytes_sent': total_bytes_sent,
+                'goodput_sent_mbps': goodput_sent,
+                'goodput_received_mbps': goodput_received,
+                'elapsed_time': elapsed_time,
+                'total_bytes_received': total_bytes_received,
+                'packet_loss': packet_loss,
+                'average_delay': average_delay,
+            }
+
+            test_running = False
+            return jsonify(test_metrics)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

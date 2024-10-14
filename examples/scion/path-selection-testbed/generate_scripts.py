@@ -45,6 +45,7 @@ def generate_scripts(topo):
     dashboard_url= f"http://10.{dashboard_asn}.0.71:8050"
     get_detailed_paths_url = f"http://10.{dashboard_asn}.0.71:8050/get_paths"
     path_selection_url = f"http://10.{sender_asn}.0.71:8010/paths/"
+    path_selection_url2 = f"http://10.{receiver_asn}.0.71:8010/paths/"
     get_paths_url = f"http://10.{sender_asn}.0.71:8010/get_paths"
 
     create_directory("helper_scripts")
@@ -76,7 +77,17 @@ def generate_scripts(topo):
     docker exec -d as{}h-h1-10.{}.0.71 /bin/zsh -c "cd /dashboard && python3 dashboard.py > /dev/null 2>&1 &"
     echo "dashboard url: {}"
     echo "get detailed path information: {}"   
+
     '''.format(topo["dashboard_asn"], topo["dashboard_asn"], dashboard_url, get_detailed_paths_url)
+
+    bash_script += '''
+    echo -e "\\033[1mLink Properties\\033[0m"
+    echo -e "\\n\\033[1mSet Link Properties: POST http://10.{dashboard_asn}.0.71:8050/set_link\\033[0m"
+    echo -e "Example Request:"
+    echo -e "  curl -X POST \\"http://10.{dashboard_asn}.0.71:8050/set_link\\" -H 'Content-Type: application/json' -d '{{\\"link\\": "ix201", \\"bw\\": 30, \\"latency\\": 10, \\"loss\\": 5}}'\\n"
+    echo -e "Response: OK"
+    echo "----------------"
+    '''
 
     # Write the bash script to a file
     with open('helper_scripts/start_nodes.sh', 'w') as f:
@@ -145,10 +156,11 @@ def generate_scripts(topo):
     docker exec -it {} /bin/zsh -c "ping 10.72.0.1 -c 1"
     
     echo -e "\\033[1mGateway API\\033[0m"
-    echo -e "\\033[1mPath selection: GET {}\\033[0m"
+    echo -e "\\033[1mPath selection Sender: GET {}\\033[0m"
+    echo -e "\\033[1mPath selection Receiver: GET {}\\033[0m"
     echo -e "Example: curl -X GET \\"{}0_1\\" selects paths 0 and 1\\n"
     echo -e "\\033[1mGet Paths: GET {}\\033[0m\\n"
-    '''.format(sender_cont, sender_cont, receiver_cont, receiver_cont, receiver_cont, path_selection_url, path_selection_url, get_detailed_paths_url)
+    '''.format(sender_cont, sender_cont, receiver_cont, receiver_cont, receiver_cont, path_selection_url, path_selection_url2, path_selection_url, get_detailed_paths_url)
 
     # start sender and receiver apps
     bash_script += '''
@@ -165,27 +177,13 @@ def generate_scripts(topo):
     echo -e "Start sending packets to the receiver.\\n"
     echo -e "- Parameters:"
     echo -e "  - rate (float): The rate at which to send packets, in Mbps."
-    echo -e "  - duration (int, optional): The duration for which to send packets, in seconds."
+    echo -e "  - duration (float): The duration for which to send packets, in seconds."
     echo -e "  - size (int, optional): The size of data to send, in bytes.\\n"
     echo -e "Example Request:"
     echo -e "  curl -X POST \\"http://10.{sender_asn}.0.71:5000/send\\" -H 'Content-Type: application/json' -d '{{\\"rate\\": 10, \\"duration\\": 3}}'\\n"
     echo -e "Response:"
-    echo -e "  {{\\n    \\"status\\": \\"started\\",\\n    \\"rate\\": 10,\\n    \\"duration\\": 30\\n}}"
-    echo -e "\\n\\033[1mGET http://10.{sender_asn}.0.71:5000/stats\\033[0m"
-    echo "----------------"
-    echo -e "Get statistics about the sent packets.\\n"
-    echo -e "Example Request:"
-    echo -e "  curl -X GET \\"http://10.{sender_asn}.0.71:5000/stats\\"\\n"
-    echo -e "Response:"
-    echo -e "  {{\\n    \\"bytes_sent\\": 5000000,\\n    \\"elapsed_time\\": 1.2,\\n    \\"goodput_mbps\\": 31,\\n }}"
-    echo -e "\\n\\033[1mReceiver App API\\033[0m"
-    echo -e "\\n\\033[1mGET http://10.{receiver_asn}.0.71:5002/stats\\033[0m"
-    echo "----------------"
-    echo -e "Get statistics about the received packets.\\n"
-    echo -e "Example Request:"
-    echo -e "  curl -X GET \\"http://10.{receiver_asn}.0.71:5002/stats\\"\\n"
-    echo -e "Response:"
-    echo -e "  {{\\n    \\"goodput_mbps\\": 9.5,\\n    \\"avg_delay_ms\\": 10.5,\\n    \\"median_delay_ms\\": 9.0,\\n    \\"std_dev_delay_ms\\": 2.5,\\n    \\"packet_loss\\": 0.01,\\n    \\"received_packets\\": 300,\\n    \\"received_bytes\\": 3000,\\n    \\"duration\\": 30\\n  }}"
+    echo -e "  {{\\n    \\"average_delay\\": 0.21,\\n    \\"elapsed_time\\": 3,\\n    \\"goodput_received_mbps\\": 19.78,\\n    \\"goodput_sent_mbps\\": 19.99,\\n    \\"packet_loss\\": 0.01,\\n    \\"total_bytes_received\\": 7419904,\\n    \\"total_bytes_sent\\": 7500800\\n}}"
+    echo "----------------"   
     '''.format(sender_asn=sender_asn, receiver_asn=receiver_asn)
 
 
