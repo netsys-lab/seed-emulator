@@ -113,6 +113,9 @@ class ScionRouting(Routing):
         node.addSoftware("apt-transport-https")
         node.addSoftware("ca-certificates")
 
+        node.addSoftware("pip")
+        node.addBuildCommand("pip install tcconfig")
+
     def __append_scion_command(self, node: Node):
         """Append commands for starting the SCION host stack on the node."""
         node.appendStartCommand(_CommandTemplates["disp"], fork=True)
@@ -133,7 +136,7 @@ class ScionRouting(Routing):
         for ((scope, type, name), obj) in reg.getAll().items():
             if type in ['rnode', 'csnode', 'hnode']:
                 node: Node = obj
-                asn = obj.getAsn()                
+                asn = obj.getAsn()
                 as_: ScionAutonomousSystem = base_layer.getAutonomousSystem(asn)
                 isds = isd_layer.getAsIsds(asn)
                 assert len(isds) == 1, f"AS {asn} must be a member of exactly one ISD"
@@ -146,7 +149,7 @@ class ScionRouting(Routing):
 
             if type == 'rnode':
                 rnode: ScionRouter = obj
-                self.__provision_router_config(rnode)                
+                self.__provision_router_config(rnode)
             elif type == 'csnode':
                 csnode: Node = obj
                 self._provision_cs_config(csnode, as_)
@@ -165,27 +168,27 @@ class ScionRouting(Routing):
             _Templates["general"].format(name="sd1") +
             _Templates["trust_db"].format(name="sd1") +
             _Templates["path_db"].format(name="sd1"))
-    
+
     @staticmethod
     def __provision_dispatcher_config(node: Node, isd: int, as_: ScionAutonomousSystem):
         """Set dispatcher configuration on host and cs nodes."""
 
         isd_as = f"{isd}-{as_.getAsn()}"
-        
+
         ip = None
         ifaces = node.getInterfaces()
         if len(ifaces) < 1:
             raise ValueError(f"Node {node.getName()} has no interfaces")
-        net = ifaces[0].getNet()                    
+        net = ifaces[0].getNet()
         control_services = as_.getControlServices()
         for cs in control_services:
             cs_iface = as_.getControlService(cs).getInterfaces()[0]
             if cs_iface.getNet() == net:
                 ip = cs_iface.getAddress()
-                break        
+                break
         if ip is None:
             raise ValueError(f"Node {node.getName()} has no interface in the control service network")
-        
+
         node.setFile("/etc/scion/dispatcher.toml", _Templates["dispatcher"].format(isd_as=isd_as, ip=ip))
 
     @staticmethod
