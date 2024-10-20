@@ -244,21 +244,27 @@ scion.addIxLink(151,   (1, 19), (1, 14), ScLinkType.Transit)
 
 #
 
-as18 \
-    .createHost('kubo-18') \
-    .joinNetwork('net0', address='10.18.0.30')
-scionkubo \
-    .install('kubo-18') \
-    .setAddress('/scion/1-18/ip4/10.18.0.30/udp/12345/quic-v1')
-emu.addBinding(Binding('kubo-18', filter=Filter(asn=18, nodeName='kubo-18')))
+N = 8
 
-as19 \
-    .createHost(f'kubo-19') \
-    .joinNetwork('net0', address='10.19.0.30')
-scionkubo \
-    .install('kubo-19') \
-    .setAddress('/scion/1-19/ip4/10.19.0.30/udp/12345/quic-v1')
-emu.addBinding(Binding('kubo-19', filter=Filter(asn=19, nodeName='kubo-19')))
+for i in range(N):
+    as18 \
+        .createHost(f'kubo-18-{i}') \
+        .joinNetwork('net0', address=f'10.18.0.{30+i}')
+    scionkubo \
+        .install(f'kubo-18-{i}') \
+        .setAddress(f'/scion/1-18/ip4/10.18.0.{30+i}/udp/12345/quic-v1')
+    emu.addBinding(Binding(f'kubo-18-{i}',
+        filter=Filter(asn=18, nodeName=f'kubo-18-{i}')))
+
+for i in range(N):
+    as19 \
+        .createHost(f'kubo-19-{i}') \
+        .joinNetwork('net0', address=f'10.19.0.{30+i}')
+    scionkubo \
+        .install(f'kubo-19-{i}') \
+        .setAddress(f'/scion/1-19/ip4/10.19.0.{30+i}/udp/12345/quic-v1')
+    emu.addBinding(Binding(f'kubo-19-{i}',
+        filter=Filter(asn=19, nodeName=f'kubo-19-{i}')))
 
 #
 
@@ -328,31 +334,45 @@ for name, ctr in ctrs.items():
             f'/kubo/cmd/ipfs/ipfs swarm connect "{peer_addr}"')
         file.write(output.decode('utf8'))
 
-# Determine peers to use
-provider_name = 'as18h-kubo-18-10.18.0.30'
-retriever_names = ['as19h-kubo-19-10.19.0.30']
+# Pick pairs to transfer content between
+pairs = []
+# AS18 -> AS19
+pairs.extend([
+    (
+        f'as18h-kubo-18-{i}-10.18.0.{30+i}',
+        f'as19h-kubo-19-{i}-10.19.0.{30+i}'
+    )
+    for i in range(N//2)
+])
+# AS19 -> AS18
+pairs.extend([
+    (
+        f'as19h-kubo-19-{i}-10.19.0.{30+i}',
+        f'as18h-kubo-18-{i}-10.18.0.{30+i}'
+    )
+    for i in range(N//2, N)
+])
 
 # Add content
 retriever_cids = {}
-for retriever_name in retriever_names:
-    _, output = ctrs[provider_name].exec_run([
+for provider, retriever in pairs:
+    _, output = ctrs[provider].exec_run([
         'bash', '-c',
         f'dd if=/dev/urandom bs=1 count={args.content_size} | '
             '/kubo/cmd/ipfs/ipfs add'
     ])
     match = re.search(r'added ([^ ]+)', output.decode('utf8'), re.MULTILINE)
-    retriever_cids[retriever_name] = match.group(1)
+    retriever_cids[retriever] = match.group(1)
 file.write('content cids {}\n'.format(json.dumps(retriever_cids)))
 
 # Retrieve content in parallel
-for retriever_name in retriever_names:
-    cid = retriever_cids[retriever_name]
-    _, output = ctrs[retriever_name].exec_run([
+for _, retriever in pairs:
+    cid = retriever_cids[retriever]
+    _, output = ctrs[retriever].exec_run([
         'bash', '-c',
         f'{{ time /kubo/cmd/ipfs/ipfs refs -r {cid} > /dev/null ; }}'
             ' 2> time.txt'
     ], detach=True)
-
 
 def timeout_handler(sig, frame):
     raise Exception('timeout')
@@ -362,23 +382,20 @@ signal.alarm(5 * 60) # 5 minutes
 
 try:
     # Block till finished
-    for retriever_name in retriever_names:
-        _, output = ctrs[retriever_name].exec_run([
+    for _, retriever in pairs:
+        _, output = ctrs[retriever].exec_run([
             'bash', '-c', 'tail -f time.txt | sed "/sys/ q"'
         ])
 
     # Collect results
     times = {}
-    for retriever_name in retriever_names:
-        _, output = ctrs[retriever_name].exec_run([
+    for _, retriever in pairs:
+        _, output = ctrs[retriever].exec_run([
             'bash', '-c', 'grep -e "real" time.txt'
         ])
-        times[retriever_name] = output.decode('utf8').splitlines()[0]
+        times[retriever] = output.decode('utf8').splitlines()[0]
     file.write('transfer times {}\n'.format(json.dumps(times)))
 
-    _, output = ctrs[provider_name].exec_run(
-        '/kubo/cmd/ipfs/ipfs bitswap stat --verbose --human')
-    file.write(output.decode('utf8'))
 except Exception as e:
     file.write(f'exception {e}')
 
