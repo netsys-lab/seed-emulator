@@ -35,14 +35,15 @@ scionkubo = ScionKuboService()
 parser = argparse.ArgumentParser(__package__)
 parser.add_argument('--path-strategy', type=int, required=True)
 parser.add_argument('--content-size', type=int, required=True)
+parser.add_argument('--num-nodes', type=int, required=True)
 parser.add_argument('--output-file', type=pathlib.Path, required=True)
 args = parser.parse_args()
 
 # Open file to write results
 file = open(args.output_file, mode='w', encoding='utf-8')
 file.write(
-    'path_strategy={}, content_size={}\n'.format(
-        args.path_strategy, args.content_size)
+    'path_strategy={}, content_size={}, num_nodes={}\n'.format(
+        args.path_strategy, args.content_size, args.num_nodes)
 )
 
 #
@@ -64,8 +65,8 @@ router = as101.createRouter('br0')
 router.joinNetwork('net0').joinNetwork('ix150')
 router2 = as101.createRouter('br1')
 router2.joinNetwork('net0').joinNetwork('ix151')
-router.appendStartCommand('tcset ix150 --delay=20ms --rate 15000Kbps --overwrite')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 10000Kbps --overwrite')
+router.appendStartCommand('tcset ix150 --delay=20ms --rate 10000Kbps --overwrite')
+router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
 
 as102 = base.createAutonomousSystem(102)
 scion_isd.addIsdAs(1, 102, is_core=True)
@@ -75,8 +76,8 @@ router = as102.createRouter('br0')
 router.joinNetwork('net0').joinNetwork('ix150')
 router2 = as102.createRouter('br1')
 router2.joinNetwork('net0').joinNetwork('ix151')
-router.appendStartCommand('tcset ix150 --delay=20ms --rate 15000Kbps --overwrite')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 10000Kbps --overwrite')
+router.appendStartCommand('tcset ix150 --delay=20ms --rate 10000Kbps --overwrite')
+router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
 
 as103 = base.createAutonomousSystem(103)
 scion_isd.addIsdAs(1, 103, is_core=True)
@@ -86,8 +87,8 @@ router = as103.createRouter('br0')
 router.joinNetwork('net0').joinNetwork('ix150')
 router2 = as103.createRouter('br1')
 router2.joinNetwork('net0').joinNetwork('ix151')
-router.appendStartCommand('tcset ix150 --delay=20ms --rate 15000Kbps --overwrite')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 10000Kbps --overwrite')
+router.appendStartCommand('tcset ix150 --delay=20ms --rate 10000Kbps --overwrite')
+router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
 
 as104 = base.createAutonomousSystem(104)
 scion_isd.addIsdAs(1, 104, is_core=True)
@@ -97,8 +98,8 @@ router = as104.createRouter('br0')
 router.joinNetwork('net0').joinNetwork('ix150')
 router2 = as104.createRouter('br1')
 router2.joinNetwork('net0').joinNetwork('ix151')
-router.appendStartCommand('tcset ix150 --delay=20ms --rate 15000Kbps --overwrite')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 10000Kbps --overwrite')
+router.appendStartCommand('tcset ix150 --delay=20ms --rate 10000Kbps --overwrite')
+router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
 
 as105 = base.createAutonomousSystem(105)
 scion_isd.addIsdAs(1, 105, is_core=True)
@@ -108,8 +109,8 @@ router = as105.createRouter('br0')
 router.joinNetwork('net0').joinNetwork('ix150')
 router2 = as105.createRouter('br1')
 router2.joinNetwork('net0').joinNetwork('ix151')
-router.appendStartCommand('tcset ix150 --delay=20ms --rate 15000Kbps --overwrite')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 10000Kbps --overwrite')
+router.appendStartCommand('tcset ix150 --delay=20ms --rate 10000Kbps --overwrite')
+router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
 
 #
 
@@ -128,7 +129,7 @@ as11.createNetwork('net0')
 cs1 = as11.createControlService('cs1').joinNetwork('net0')
 router2 = as11.createRouter('br1')
 router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 10000Kbps --overwrite')
+router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
 
 as12 = base.createAutonomousSystem(12)
 scion_isd.addIsdAs(1, 12, is_core=False)
@@ -137,7 +138,7 @@ as12.createNetwork('net0')
 cs1 = as12.createControlService('cs1').joinNetwork('net0')
 router2 = as12.createRouter('br1')
 router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 10000Kbps --overwrite')
+router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
 
 as13 = base.createAutonomousSystem(13)
 scion_isd.addIsdAs(1, 13, is_core=False)
@@ -146,7 +147,7 @@ as13.createNetwork('net0')
 cs1 = as13.createControlService('cs1').joinNetwork('net0')
 router2 = as13.createRouter('br1')
 router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 10000Kbps --overwrite')
+router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
 
 as14 = base.createAutonomousSystem(14)
 scion_isd.addIsdAs(1, 14, is_core=False)
@@ -155,7 +156,7 @@ as14.createNetwork('net0')
 cs1 = as14.createControlService('cs1').joinNetwork('net0')
 router2 = as14.createRouter('br1')
 router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 10000Kbps --overwrite')
+router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
 
 as15 = base.createAutonomousSystem(15)
 scion_isd.addIsdAs(1, 15, is_core=False)
@@ -164,7 +165,7 @@ as15.createNetwork('net0')
 cs1 = as15.createControlService('cs1').joinNetwork('net0')
 router2 = as15.createRouter('br1')
 router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 10000Kbps --overwrite')
+router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
 
 as16 = base.createAutonomousSystem(16)
 scion_isd.addIsdAs(1, 16, is_core=False)
@@ -173,7 +174,7 @@ as16.createNetwork('net0')
 cs1 = as16.createControlService('cs1').joinNetwork('net0')
 router2 = as16.createRouter('br1')
 router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 10000Kbps --overwrite')
+router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
 
 as17 = base.createAutonomousSystem(17)
 scion_isd.addIsdAs(1, 17, is_core=False)
@@ -182,7 +183,7 @@ as17.createNetwork('net0')
 cs1 = as17.createControlService('cs1').joinNetwork('net0')
 router2 = as17.createRouter('br1')
 router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 10000Kbps --overwrite')
+router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
 
 as18 = base.createAutonomousSystem(18)
 scion_isd.addIsdAs(1, 18, is_core=False)
@@ -191,7 +192,7 @@ as18.createNetwork('net0')
 cs1 = as18.createControlService('cs1').joinNetwork('net0')
 router2 = as18.createRouter('br1')
 router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 10000Kbps --overwrite')
+router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
 
 as19 = base.createAutonomousSystem(19)
 scion_isd.addIsdAs(1, 19, is_core=False)
@@ -200,7 +201,7 @@ as19.createNetwork('net0')
 cs1 = as19.createControlService('cs1').joinNetwork('net0')
 router2 = as19.createRouter('br1')
 router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 10000Kbps --overwrite')
+router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
 
 as10 = base.createAutonomousSystem(10)
 scion_isd.addIsdAs(1, 10, is_core=False)
@@ -209,7 +210,7 @@ as10.createNetwork('net0')
 cs1 = as10.createControlService('cs1').joinNetwork('net0')
 router2 = as10.createRouter('br1')
 router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 10000Kbps --overwrite')
+router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
 
 #
 
@@ -244,7 +245,7 @@ scion.addIxLink(151,   (1, 19), (1, 14), ScLinkType.Transit)
 
 #
 
-N = 8
+N = args.num_nodes
 
 for i in range(N):
     as18 \
@@ -395,6 +396,10 @@ try:
         ])
         times[retriever] = output.decode('utf8').splitlines()[0]
     file.write('transfer times {}\n'.format(json.dumps(times)))
+
+    _, output = ctrs[provider_name].exec_run(
+        '/kubo/cmd/ipfs/ipfs bitswap stat --verbose --human')
+    file.write(output.decode('utf8'))
 
 except Exception as e:
     file.write(f'exception {e}')
