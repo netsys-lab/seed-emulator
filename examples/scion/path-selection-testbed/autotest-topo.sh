@@ -7,7 +7,7 @@ do
         rm -rf output
         python testbed-topo.py \
             --path-strategy $strat \
-            --content-size 1024000 \
+            --content-size 51200000 \
             --num-nodes 1 \
             --output-file runs/$RANDOM.log
     done

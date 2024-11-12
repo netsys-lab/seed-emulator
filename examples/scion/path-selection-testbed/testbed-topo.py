@@ -397,9 +397,10 @@ try:
         times[retriever] = output.decode('utf8').splitlines()[0]
     file.write('transfer times {}\n'.format(json.dumps(times)))
 
-    _, output = ctrs[provider_name].exec_run(
-        '/kubo/cmd/ipfs/ipfs bitswap stat --verbose --human')
-    file.write(output.decode('utf8'))
+    for provider, _ in pairs:
+        _, output = ctrs[provider].exec_run(
+            '/kubo/cmd/ipfs/ipfs bitswap stat --verbose --human')
+        file.write(output.decode('utf8'))
 
 except Exception as e:
     file.write(f'exception {e}')
