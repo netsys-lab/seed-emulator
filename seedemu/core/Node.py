@@ -1129,6 +1129,7 @@ class ScionRouter(Router):
         """
         assert ifid not in self.__interfaces, f"interface {ifid} already exists"
         self.__interfaces[ifid] = iface
+        self.__interfaces[ifid]['bfd'] = { 'disable': True }
 
     def getScionInterface(self, ifid: int) -> Dict:
         """!
