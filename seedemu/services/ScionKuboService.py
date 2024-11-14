@@ -19,6 +19,7 @@ class ScionKuboServer(Server):
         node.appendStartCommand('/kubo/cmd/ipfs/ipfs init -p test')
         node.appendStartCommand('/kubo/cmd/ipfs/ipfs config --json Addresses.Swarm \'["{}"]\''.format(self.__address))
         node.appendStartCommand('/kubo/cmd/ipfs/ipfs config --json Swarm.Transports.Network \'{"QUIC": false, "SCIONQUIC": true}\'')
+        node.appendStartCommand('/kubo/cmd/ipfs/ipfs config --json Swarm.ResourceMgr.Enabled false')
         node.appendStartCommand('while true; do /kubo/cmd/ipfs/ipfs daemon --debug; done')
 
     def print(self, indent: int) -> str:
