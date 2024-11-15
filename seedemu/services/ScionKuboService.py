@@ -20,6 +20,10 @@ class ScionKuboServer(Server):
         node.appendStartCommand('/kubo/cmd/ipfs/ipfs config --json Addresses.Swarm \'["{}"]\''.format(self.__address))
         node.appendStartCommand('/kubo/cmd/ipfs/ipfs config --json Swarm.Transports.Network \'{"QUIC": false, "SCIONQUIC": true}\'')
         node.appendStartCommand('/kubo/cmd/ipfs/ipfs config --json Swarm.ResourceMgr.Enabled false')
+        node.appendStartCommand('/kubo/cmd/ipfs/ipfs config --json Internal.Bitswap.TaskWorkerCount 16')
+        node.appendStartCommand('/kubo/cmd/ipfs/ipfs config --json Internal.Bitswap.EngineTaskWorkerCount 16')
+        node.appendStartCommand('/kubo/cmd/ipfs/ipfs config --json Internal.Bitswap.EngineBlockstoreWorkerCount 256')
+        node.appendStartCommand('/kubo/cmd/ipfs/ipfs config --json Internal.Bitswap.MaxOutstandingBytesPerPeer 1073741824')
         node.appendStartCommand('while true; do /kubo/cmd/ipfs/ipfs daemon --debug; done')
 
     def print(self, indent: int) -> str:

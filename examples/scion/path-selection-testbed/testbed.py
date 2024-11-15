@@ -226,6 +226,16 @@ for name, ctr in ctrs.items():
         ])
         file.write(output.decode('utf8'))
 
+# Set path selection strategy
+for name, ctr in ctrs.items():
+    if 'kubo' not in name:
+        continue
+
+    _, output = ctr.exec_run(
+        '/kubo/cmd/ipfs/ipfs config --json ' +
+        'Internal.Bitswap.PathSelectionStrategy 1'
+    )
+
 # Collect peer IDs
 peers = dict()
 for name, ctr in ctrs.items():

@@ -30,18 +30,21 @@ scenarios=(
     '100,200,102400000'
 )
 
-for scenario in "${scenarios[@]}"
+for i in `seq 1 5`
 do
-    while IFS=',' read -r latency bandwidth content; do
-        for links in `seq 1 20`
-        do
-            rm -rf output
-            python3 testbed.py \
-                --num-links $links \
-                --link-latency $latency \
-                --link-bandwidth $bandwidth \
-                --content-size $content \
-                --output-file runs/$RANDOM.log
-        done
-    done <<< "$scenario"
+    for scenario in "${scenarios[@]}"
+    do
+        while IFS=',' read -r latency bandwidth content; do
+            for links in `seq 1 20`
+            do
+                rm -rf output
+                python3 testbed.py \
+                    --num-links $links \
+                    --link-latency $latency \
+                    --link-bandwidth $bandwidth \
+                    --content-size $content \
+                    --output-file runs/$RANDOM-$RANDOM-$RANDOM.log
+            done
+        done <<< "$scenario"
+    done
 done
