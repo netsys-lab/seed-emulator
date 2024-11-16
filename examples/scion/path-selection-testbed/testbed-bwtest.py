@@ -2,6 +2,8 @@
 
 import re
 import time
+import argparse
+from pathlib import Path
 
 import docker
 import python_on_whales
@@ -26,8 +28,61 @@ ibgp = Ibgp()
 ebgp = Ebgp()
 bwtest = Libp2pBwtestService()
 
-# load topo.json to dict
-topo = json.load(open('topo/topo.json'))
+# Parse CLI args
+parser = argparse.ArgumentParser(__package__)
+parser.add_argument('--num-links', type=int, required=True)
+parser.add_argument('--link-latency', type=int, required=True)
+parser.add_argument('--link-bandwidth', type=int, required=True)
+parser.add_argument('--content-size', type=int, required=True)
+parser.add_argument('--output-file', type=Path, required=True)
+args = parser.parse_args()
+
+# Open file to write results
+file = open(args.output_file, mode='w', encoding='utf-8')
+file.write(
+    'num_links={}, link_latency={}, '.format(
+        args.num_links, args.link_latency) +
+    'link_bandwidth={}, content_size={}'.format(
+        args.link_bandwidth, args.content_size) +
+    '\n'
+)
+
+# Build topology
+topo = {
+    'ISDs' : [1],
+    'ASes' : [
+        {
+            'asn' : 101,
+            'isd' : 1,
+            'label' : '101',
+            'is_core_as' : True,
+            'kubos': 1,
+            'bwserver': True,
+        },
+        {
+            'asn' : 102,
+            'isd' : 1,
+            'label' : '102',
+            'is_core_as' : True,
+            'kubos': 1,
+            'bwclient': True,
+        },
+    ],
+    'links' : [],
+    'dashboard_asn' : 101,
+    'sender_asn' : 101,
+    'receiver_asn' : 102,
+}
+
+for i in range(args.num_links):
+    topo['links'].append({
+        'id' : 200 + i,
+        'is_core_link' : True,
+        'source_asn' : 101,
+        'dest_asn' : 102,
+        'latency': args.link_latency,
+        'bandwidth': args.link_bandwidth,
+    })
 
 # Create isolation domains
 for isd in topo['ISDs']:
@@ -53,11 +108,11 @@ for as__ in topo['ASes']:
     if not is_core:
         issuer = as__['cert_issuer']
         scion_isd.setCertIssuer((isd, asn), issuer=issuer)
-    
-    as_.createNetwork('net0')  
+
+    as_.createNetwork('net0')
     as_.createControlService('cs0').joinNetwork('net0')
     as_br0 = as_.createRouter('br0')
-    as_br0.joinNetwork('net0')    
+    as_br0.joinNetwork('net0')
     as_br0.addSoftware("iperf3")
     as_br0.addSoftware("python3")
     as_br0.addSoftware("python3-pip")
@@ -69,7 +124,7 @@ for as__ in topo['ASes']:
         as_br0.joinNetwork('ix{}'.format(ix))
 
     if asn == dashboard_asn:
-        h1 = as_.createHost('h1').joinNetwork('net0')  
+        h1 = as_.createHost('h1').joinNetwork('net0')
         h1.addSoftware("iperf3")
         h1.addSoftware("mosquitto")
         h1.addSoftware("python3")
@@ -82,7 +137,7 @@ for as__ in topo['ASes']:
         h1.addSharedFolder("/topo", "../topo")
         h1.addSharedFolder("/dashboard", "../dashboard")
     #if asn == sender_asn:
-    #    h1 = as_.createHost('h1').joinNetwork('net0')  
+    #    h1 = as_.createHost('h1').joinNetwork('net0')
     #    h1.addSoftware("iperf3")
     #    h1.addSoftware("python3")
     #    h1.addSoftware("python3-pip")
@@ -91,7 +146,7 @@ for as__ in topo['ASes']:
     #    h1.addSharedFolder("/sender", "../sender")
     #    h1.addSharedFolder("/topo", "../topo")
     #if asn == receiver_asn:
-    #    h1 = as_.createHost('h1').joinNetwork('net0')  
+    #    h1 = as_.createHost('h1').joinNetwork('net0')
     #    h1.addSoftware("iperf3")
     #    h1.addSoftware("python3")
     #    h1.addSoftware("python3-pip")
@@ -111,7 +166,7 @@ for as__ in topo['ASes']:
         bwserver = bwtest.install(bwserver_host)
         emu.addBinding(Binding(bwserver_host,
             filter=Filter(asn=bwserver_asn, nodeName=bwserver_host)))
-        
+
     if bwclient:
         bwclient_host = f'bwclient-{asn}'
         bwclient_asn = asn
@@ -145,7 +200,7 @@ for link in topo['links']:
     if link['is_core_link'] == True:
         link_type = ScLinkType.Core
         link_type_bgp = PeerRelationship.Peer
-    
+
     scion.addIxLink(id, (source_isd, source_asn), (dest_isd, dest_asn), link_type)
     ebgp.addPrivatePeering(id, source_asn, dest_asn, abRelationship=link_type_bgp)
 
@@ -182,30 +237,38 @@ for name, ctr in ctrs.items():
     if 'br0' not in name:
         continue
 
-    for i in range(len(topo['links'])):
+    for link in topo['links']:
+        id, bw, lat = link['id'], link['bandwidth'], link['latency']
         _, output = ctr.exec_run([
             'bash', '-c',
-            f'tc qdisc del dev ix{200+i} root &&'
-            f'tc qdisc add dev ix{200+i} root netem rate 1mbit delay 1ms loss 0% &&'
-            f'echo configured ix{200+i}'
+            f'tc qdisc del dev ix{id} root &&'
+            f'tc qdisc add dev ix{id} root netem rate {bw}mbit delay {lat}ms loss 0% &&'
+            f'echo configured ix{id}'
         ])
-        print(output.decode('utf8').splitlines()[0])
+        file.write(output.decode('utf8'))
 
 # Determine hosts to use
 bwserver_ctr = next((ctr for name, ctr in ctrs.items() if bwserver_host in name), None)
 bwclient_ctr = next((ctr for name, ctr in ctrs.items() if bwclient_host in name), None)
 
 # Start server
-nbytes, npaths = 1024000, 1
-_, output = bwserver_ctr.exec_run(['bash', '-c', f'/go-libp2p/p2p/transport/scionquic/cmd/server/main 1-{bwserver_asn} {bwserver_addr} 12345 {nbytes} > bwserver.txt'], detach=True)
+_, output = bwserver_ctr.exec_run([
+    'bash', '-c',
+    f'/go-libp2p/p2p/transport/scionquic/cmd/server/main 1-{bwserver_asn} '
+    f'{bwserver_addr} 12345 {args.content_size} > bwserver.txt'
+], detach=True)
 
 # Wait till started
 _, output = bwserver_ctr.exec_run(['bash', '-c', 'tail -f bwserver.txt | sed "/Listening/ q"'])
 match = re.search(r'Listening\. Now run: .* (\/scion.*)', output.decode('utf8'), re.MULTILINE)
-print(match.group(1))
+file.write(f'{match.group(1)}\n')
 
 # Start client
-_, output = bwclient_ctr.exec_run(f'/go-libp2p/p2p/transport/scionquic/cmd/client/main {match.group(1)} {nbytes} {npaths}')
-print(output.decode('utf8'))
+_, output = bwclient_ctr.exec_run(
+    '/go-libp2p/p2p/transport/scionquic/cmd/client/main '
+    f'{match.group(1)} {args.content_size} {args.num_links}'
+)
+file.write(output.decode('utf8'))
 
 whales.compose.down()
+file.close()
