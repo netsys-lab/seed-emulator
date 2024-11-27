@@ -7,7 +7,7 @@ do
         rm -rf output
         python bwtest-topo.py \
             --num-paths $num_paths \
-            --content-size 10240000 \
+            --content-size 40960000 \
             --output-file runs/$RANDOM-$RANDOM-$RANDOM.log
     done
 done
