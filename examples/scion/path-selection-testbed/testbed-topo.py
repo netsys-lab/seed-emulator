@@ -52,220 +52,92 @@ base.createIsolationDomain(1)
 
 #
 
-base.createInternetExchange(150)
-base.createInternetExchange(151)
+links = [
+    (18, 11),
+    (18, 17),
+    (18, 102),
+    (18, 101),
+    (11, 17),
+    (17, 102),
+    (17, 105),
+    (102, 101),
+    (102, 104),
+    (102, 103),
+    (102, 105),
+    (105, 101),
+    (105, 12),
+    (105, 103),
+    (105, 104),
+    (12, 15),
+    (13, 15),
+    (13, 104),
+    (13, 103),
+    (13, 14),
+    (104, 101),
+    (104, 103),
+    (104, 10),
+    (103, 101),
+    (103, 10),
+    (103, 14),
+    (10, 14),
+    (10, 19),
+    (10, 16),
+    (14, 16),
+    (14, 19),
+    (16, 19),
+]
+for a, b in links:
+    assert (b, a) not in links
+
+ases = set()
+ases.update(a for a, _ in links)
+ases.update(b for _, b in links)
+
+tier1 = { a for a in ases if a > 100 }
+tier2 = { a for a in ases if a < 100 }
+is_tier1_link = lambda a, b: a in tier1 and b in tier1
 
 #
 
-as101 = base.createAutonomousSystem(101)
-scion_isd.addIsdAs(1, 101, is_core=True)
-as101.createNetwork('net0')
-cs1 = as101.createControlService('cs1').joinNetwork('net0')
-router = as101.createRouter('br0')
-router.joinNetwork('net0').joinNetwork('ix150')
-router2 = as101.createRouter('br1')
-router2.joinNetwork('net0').joinNetwork('ix151')
-router.appendStartCommand('tcset ix150 --delay=20ms --rate 10000Kbps --overwrite')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
-
-as102 = base.createAutonomousSystem(102)
-scion_isd.addIsdAs(1, 102, is_core=True)
-as102.createNetwork('net0')
-cs1 = as102.createControlService('cs1').joinNetwork('net0')
-router = as102.createRouter('br0')
-router.joinNetwork('net0').joinNetwork('ix150')
-router2 = as102.createRouter('br1')
-router2.joinNetwork('net0').joinNetwork('ix151')
-router.appendStartCommand('tcset ix150 --delay=20ms --rate 10000Kbps --overwrite')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
-
-as103 = base.createAutonomousSystem(103)
-scion_isd.addIsdAs(1, 103, is_core=True)
-as103.createNetwork('net0')
-cs1 = as103.createControlService('cs1').joinNetwork('net0')
-router = as103.createRouter('br0')
-router.joinNetwork('net0').joinNetwork('ix150')
-router2 = as103.createRouter('br1')
-router2.joinNetwork('net0').joinNetwork('ix151')
-router.appendStartCommand('tcset ix150 --delay=20ms --rate 10000Kbps --overwrite')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
-
-as104 = base.createAutonomousSystem(104)
-scion_isd.addIsdAs(1, 104, is_core=True)
-as104.createNetwork('net0')
-cs1 = as104.createControlService('cs1').joinNetwork('net0')
-router = as104.createRouter('br0')
-router.joinNetwork('net0').joinNetwork('ix150')
-router2 = as104.createRouter('br1')
-router2.joinNetwork('net0').joinNetwork('ix151')
-router.appendStartCommand('tcset ix150 --delay=20ms --rate 10000Kbps --overwrite')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
-
-as105 = base.createAutonomousSystem(105)
-scion_isd.addIsdAs(1, 105, is_core=True)
-as105.createNetwork('net0')
-cs1 = as105.createControlService('cs1').joinNetwork('net0')
-router = as105.createRouter('br0')
-router.joinNetwork('net0').joinNetwork('ix150')
-router2 = as105.createRouter('br1')
-router2.joinNetwork('net0').joinNetwork('ix151')
-router.appendStartCommand('tcset ix150 --delay=20ms --rate 10000Kbps --overwrite')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
+for i, _ in enumerate(links):
+    base.createInternetExchange(200 + i)
 
 #
 
-scion.addIxLink(150, (1, 101), (1, 102), ScLinkType.Core)
-scion.addIxLink(150, (1, 101), (1, 103), ScLinkType.Core)
-scion.addIxLink(150, (1, 101), (1, 104), ScLinkType.Core)
-scion.addIxLink(150, (1, 101), (1, 105), ScLinkType.Core)
-scion.addIxLink(150, (1, 102), (1, 103), ScLinkType.Core)
-scion.addIxLink(150, (1, 102), (1, 104), ScLinkType.Core)
-scion.addIxLink(150, (1, 102), (1, 105), ScLinkType.Core)
+for asn in ases:
+    as_ = base.createAutonomousSystem(asn)
+    scion_isd.addIsdAs(1, asn, is_core=True)
+    as_.createNetwork('net0')
+    as_.createControlService('cs0').joinNetwork('net0')
+    as_br0 = as_.createRouter('br0')
+    as_br0.joinNetwork('net0')
 
-as11 = base.createAutonomousSystem(11)
-scion_isd.addIsdAs(1, 11, is_core=False)
-scion_isd.setCertIssuer((1, 11), 101)
-as11.createNetwork('net0')
-cs1 = as11.createControlService('cs1').joinNetwork('net0')
-router2 = as11.createRouter('br1')
-router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
+    for i, (a, b) in enumerate(links):
+        if a == asn or b == asn:
+            as_br0.joinNetwork('ix{}'.format(200 + i))
 
-as12 = base.createAutonomousSystem(12)
-scion_isd.addIsdAs(1, 12, is_core=False)
-scion_isd.setCertIssuer((1, 12), 101)
-as12.createNetwork('net0')
-cs1 = as12.createControlService('cs1').joinNetwork('net0')
-router2 = as12.createRouter('br1')
-router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
+    N = args.num_nodes
 
-as13 = base.createAutonomousSystem(13)
-scion_isd.addIsdAs(1, 13, is_core=False)
-scion_isd.setCertIssuer((1, 13), 101)
-as13.createNetwork('net0')
-cs1 = as13.createControlService('cs1').joinNetwork('net0')
-router2 = as13.createRouter('br1')
-router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
-
-as14 = base.createAutonomousSystem(14)
-scion_isd.addIsdAs(1, 14, is_core=False)
-scion_isd.setCertIssuer((1, 14), 101)
-as14.createNetwork('net0')
-cs1 = as14.createControlService('cs1').joinNetwork('net0')
-router2 = as14.createRouter('br1')
-router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
-
-as15 = base.createAutonomousSystem(15)
-scion_isd.addIsdAs(1, 15, is_core=False)
-scion_isd.setCertIssuer((1, 15), 101)
-as15.createNetwork('net0')
-cs1 = as15.createControlService('cs1').joinNetwork('net0')
-router2 = as15.createRouter('br1')
-router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
-
-as16 = base.createAutonomousSystem(16)
-scion_isd.addIsdAs(1, 16, is_core=False)
-scion_isd.setCertIssuer((1, 16), 101)
-as16.createNetwork('net0')
-cs1 = as16.createControlService('cs1').joinNetwork('net0')
-router2 = as16.createRouter('br1')
-router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
-
-as17 = base.createAutonomousSystem(17)
-scion_isd.addIsdAs(1, 17, is_core=False)
-scion_isd.setCertIssuer((1, 17), 101)
-as17.createNetwork('net0')
-cs1 = as17.createControlService('cs1').joinNetwork('net0')
-router2 = as17.createRouter('br1')
-router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
-
-as18 = base.createAutonomousSystem(18)
-scion_isd.addIsdAs(1, 18, is_core=False)
-scion_isd.setCertIssuer((1, 18), 101)
-as18.createNetwork('net0')
-cs1 = as18.createControlService('cs1').joinNetwork('net0')
-router2 = as18.createRouter('br1')
-router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
-
-as19 = base.createAutonomousSystem(19)
-scion_isd.addIsdAs(1, 19, is_core=False)
-scion_isd.setCertIssuer((1, 19), 101)
-as19.createNetwork('net0')
-cs1 = as19.createControlService('cs1').joinNetwork('net0')
-router2 = as19.createRouter('br1')
-router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
-
-as10 = base.createAutonomousSystem(10)
-scion_isd.addIsdAs(1, 10, is_core=False)
-scion_isd.setCertIssuer((1, 10), 101)
-as10.createNetwork('net0')
-cs1 = as10.createControlService('cs1').joinNetwork('net0')
-router2 = as10.createRouter('br1')
-router2.joinNetwork('net0').joinNetwork('ix151')
-router2.appendStartCommand('tcset ix151 --delay=30ms --rate 5000Kbps --overwrite')
+    if asn == 18 or asn == 19:
+        for i in range(N):
+            as_ \
+                .createHost(f'kubo-{asn}-{i}') \
+                .joinNetwork('net0', address=f'10.{asn}.0.{30+i}')
+            scionkubo \
+                .install(f'kubo-{asn}-{i}') \
+                .setAddress(f'/scion/1-{asn}/ip4/10.{asn}.0.{30+i}/udp/12345/quic-v1')
+            emu.addBinding(Binding(f'kubo-{asn}-{i}',
+                filter=Filter(asn=asn, nodeName=f'kubo-{asn}-{i}')))
 
 #
 
-scion.addIxLink(151, (1, 101), (1, 18), ScLinkType.Transit)
-scion.addIxLink(151, (1, 102), (1, 18), ScLinkType.Transit)
-scion.addIxLink(151, (1, 102), (1, 17), ScLinkType.Transit)
-scion.addIxLink(151, (1, 105), (1, 17), ScLinkType.Transit)
-scion.addIxLink(151, (1, 17), (1, 11), ScLinkType.Transit)
-scion.addIxLink(151, (1, 18), (1, 11), ScLinkType.Transit)
-scion.addIxLink(151, (1, 18), (1, 17), ScLinkType.Transit)
-
-#
-
-scion.addIxLink(151, (1, 105), (1, 12), ScLinkType.Transit)
-scion.addIxLink(151, (1, 103), (1, 13), ScLinkType.Transit)
-scion.addIxLink(151, (1, 104), (1, 13), ScLinkType.Transit)
-scion.addIxLink(151, (1, 103), (1, 14), ScLinkType.Transit)
-scion.addIxLink(151, (1, 14), (1, 13), ScLinkType.Transit)
-scion.addIxLink(151, (1, 12), (1, 15), ScLinkType.Transit)
-scion.addIxLink(151, (1, 13), (1, 15), ScLinkType.Transit)
-
-#
-
-scion.addIxLink(151,   (1, 103), (1, 10), ScLinkType.Transit)
-scion.addIxLink(151,   (1, 104), (1, 10), ScLinkType.Transit)
-scion.addIxLink(151,   (1, 10), (1, 14), ScLinkType.Transit)
-scion.addIxLink(151,   (1, 10), (1, 16), ScLinkType.Transit)
-scion.addIxLink(151,   (1, 16), (1, 19), ScLinkType.Transit)
-scion.addIxLink(151,   (1, 10), (1, 19), ScLinkType.Transit)
-scion.addIxLink(151,   (1, 16), (1, 14), ScLinkType.Transit)
-scion.addIxLink(151,   (1, 19), (1, 14), ScLinkType.Transit)
-
-#
-
-N = args.num_nodes
-
-for i in range(N):
-    as18 \
-        .createHost(f'kubo-18-{i}') \
-        .joinNetwork('net0', address=f'10.18.0.{30+i}')
-    scionkubo \
-        .install(f'kubo-18-{i}') \
-        .setAddress(f'/scion/1-18/ip4/10.18.0.{30+i}/udp/12345/quic-v1')
-    emu.addBinding(Binding(f'kubo-18-{i}',
-        filter=Filter(asn=18, nodeName=f'kubo-18-{i}')))
-
-for i in range(N):
-    as19 \
-        .createHost(f'kubo-19-{i}') \
-        .joinNetwork('net0', address=f'10.19.0.{30+i}')
-    scionkubo \
-        .install(f'kubo-19-{i}') \
-        .setAddress(f'/scion/1-19/ip4/10.19.0.{30+i}/udp/12345/quic-v1')
-    emu.addBinding(Binding(f'kubo-19-{i}',
-        filter=Filter(asn=19, nodeName=f'kubo-19-{i}')))
+for i, (a, b) in enumerate(links):
+    scion.addIxLink(
+        200 + i,
+        (1, a),
+        (1, b),
+        ScLinkType.Core
+    )
 
 #
 
@@ -300,6 +172,29 @@ ctrs = {
 }
 
 time.sleep(20)
+
+#
+
+for name, ctr in ctrs.items():
+    if 'br0' not in name:
+        continue
+
+    for i, (a, b) in enumerate(links):
+        if f'as{a}' not in name and f'as{b}' not in name:
+            continue
+
+        lat = 10
+        bw = 15 if is_tier1_link(a, b) else 10
+
+        _, output = ctr.exec_run([
+            'bash', '-c',
+            f'tc qdisc del dev ix{200+i} root &&'
+            f'tc qdisc add dev ix{200+i} root netem rate {bw}mbit delay {lat}ms loss 0% &&'
+            f'echo configured ix{200+i}'
+        ])
+        file.write(output.decode('utf8'))
+
+#
 
 # Set path selection strategy
 for name, ctr in ctrs.items():
