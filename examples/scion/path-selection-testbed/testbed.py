@@ -79,6 +79,7 @@ for as__ in topo['ASes']:
         h1.addBuildCommand('pip3 install pyyaml flask numpy')
         h1.addSharedFolder("/sender", "../sender")
         h1.addSharedFolder("/topo", "../topo")
+        h1.addPortForwarding(5000, 5000, proto="udp")        
     if asn == receiver_asn:
         h1 = as_.createHost('h1').joinNetwork('net0')  
         h1.addSoftware("iperf3")
@@ -88,6 +89,7 @@ for as__ in topo['ASes']:
         h1.addBuildCommand('pip3 install pyyaml flask numpy')
         h1.addSharedFolder("/receiver", "../receiver")
         h1.addSharedFolder("/topo", "../topo")
+        h1.addPortForwarding(5006, 5006)
 
 
 # add scion and bgp links
