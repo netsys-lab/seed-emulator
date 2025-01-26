@@ -49,30 +49,12 @@ mysciontraceroute() {
 # a list of json 'points'
 local input_string="$1"
 local tokens=($input_string)  # Split input_string by space into an array
-command="scion traceroute ${tokens[@]}"
-input="`eval $command | grep -Eo '([0-9]+)-([0-9:A-Fa-f]+),(\[[^-. \]]+\]|[[:digit:]]{1,3}\.[[:digit:]]{1,3}\.[[:digit:]]{1,3}\.[[:digit:]]{1,3})(:([0-9]+))?' | sed -E 's/([0-9]+)-([0-9:A-Fa-f]+),(\[[^-. \]]+\]|[[:digit:]]{1,3}\.[[:digit:]]{1,3}\.[[:digit:]]{1,3}\.[[:digit:]]{1,3})(:([0-9]+))?/{ "isd": \1, "asn": \2, "ip": "\3" }/g' `"
-
-# Initialize an empty array
-declare -a entries
-
-# Read the input into the array
-readarray -t entries <<< "$input"
-
-# Calculate the length of the array
-length=${#entries[@]}
-
-# Initialize an empty array to store json 'segments'
-pairs=()
-
-# Loop over the array to create json 'segments' from every pair of adjacent points
-for ((i = 0; i < length - 1; i++)); do
-    pair="{ \"from\": ${entries[i]}, \"to\": ${entries[i+1]} }"
-    pairs+=("$pair")
-done
+command="scion traceroute --format json ${tokens[@]}"
+input="`eval $command | jq '([ [ .hops[0:] |.[]| [.ip, (.isd_as|split("-")),.interface_id ]  ], [ .hops[1:] |.[]| [.ip, (.isd_as|split("-")), .interface_id ] ] ] | transpose | map( {"from": { "ip": .[0][0], "isd": .[0][1][0], "asn": .[0][1][1], "ifid": .[0][2] }, "to": { "ip": .[1][0], "isd": .[1][1][0], "asn": .[1][1][1], "ifid": .[1][2] }, "hops": [] }) )| .[:-1]' `"
 
 # Print the resulting json segment array
 
-IFS=','; echo "[ ${pairs[*]} ]"
+echo "${input}"
 return
 }
 
