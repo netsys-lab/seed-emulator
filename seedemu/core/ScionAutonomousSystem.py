@@ -18,7 +18,14 @@ class IA(NamedTuple):
     asn: int
 
     def __str__(self):
-        return f"{self.isd}-{self.asn}"
+        asn1 = f"{self.asn:012x}"[:3].lstrip('0') + f"{self.asn:012x}"[3]
+        asn2 = f"{self.asn:012x}"[4:7].lstrip('0') + f"{self.asn:012x}"[7]
+        asn3 = f"{self.asn:012x}"[8:11].lstrip('0') + f"{self.asn:012x}"[11]
+        if asn1 == "0":
+            if asn2 == "0":
+                return f"{self.isd}-{self.asn}"
+            return f"{self.isd}-" + asn2 + ":" + asn3
+        return f"{self.isd}-" + asn1 + ":" + asn2 + ":" + asn3
 
 
 class ScionAutonomousSystem(AutonomousSystem):
@@ -190,7 +197,7 @@ class ScionAutonomousSystem(AutonomousSystem):
 
         return {
             'attributes': self.getAsAttributes(isd),
-            'isd_as': f'{isd}-{self.getAsn()}',
+            'isd_as': f'{isd}-{self.getAsnStr()}',
             'mtu': self.__mtu,
             'control_service': control_services,
             'discovery_service': control_services,
@@ -262,6 +269,17 @@ class ScionAutonomousSystem(AutonomousSystem):
         @returns Flag.
         """
         return self.__generateStaticInfoConfig
+
+    def getAsnStr(self):
+        asn = self.getAsn()
+        asn1 = f"{asn:012x}"[:3].lstrip('0') + f"{asn:012x}"[3]
+        asn2 = f"{asn:012x}"[4:7].lstrip('0') + f"{asn:012x}"[7]
+        asn3 = f"{asn:012x}"[8:11].lstrip('0') + f"{asn:012x}"[11]
+        if asn1 == "0":
+            if asn2 == "0":
+                return f"{asn}"
+            return asn2 + ":" + asn3
+        return asn1 + ":" + asn2 + ":" + asn3
 
     def _doCreateGraphs(self, emulator: Emulator):
         """!

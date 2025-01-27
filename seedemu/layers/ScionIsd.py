@@ -140,7 +140,7 @@ class ScionIsd(Layer):
                     asn = node.getAsn()
                     as_: ScionAutonomousSystem = base_layer.getAutonomousSystem(asn)
                     isds = self.getAsIsds(asn)
-                    assert len(isds) == 1, f"AS {asn} must be a member of exactly one ISD"
+                    assert len(isds) == 1, f"AS {hex(asn)} must be a member of exactly one ISD"
                     self.__provision_crypto(as_, *isds[0], node, tempdir)
 
     def print(self, indent: int = 0) -> str:
@@ -184,19 +184,31 @@ class ScionIsd(Layer):
                 as_: ScionAutonomousSystem = base_layer.getAutonomousSystem(asn)
                 isds = self.getAsIsds(asn)
                 isd, is_core = isds[0]
-                assert len(isds) == 1, f"AS {asn} must be a member of exactly one ISD"
+                assert len(isds) == 1, f"AS {strAsn} must be a member of exactly one ISD"
+                ia = IA(isd, asn)
 
-                f.write(f'  "{isd}-{asn}": ')
+                f.write(f'  "{ia}": ')
                 attributes = [f"'{attrib}': true" for attrib in as_.getAsAttributes(isd)]
                 if not is_core:
-                    assert (isd, asn) in self.__cert_issuer, f"non-core AS{asn} does not have a cert issuer in ISD{isd}"
+                    assert (isd, asn) in self.__cert_issuer, f"non-core AS{ia} does not have a cert issuer in ISD{isd}"
                     issuer = self.__cert_issuer[(isd, asn)]
+                    ia = IA(isd, issuer)
                     assert issuer in self.__isd_core[isd] and asn in self.__isd_members[isd]
-                    attributes.append(f"'cert_issuer': {isd}-{issuer}")
+                    attributes.append(f"'cert_issuer': {ia}")
 
                 f.write("{{{}}}\n".format(", ".join(attributes)))
 
         return path
+
+    def __asn_to_name(self, asn: int) -> str:
+        asn1 = f"{asn:012x}"[:3].lstrip('0') + f"{asn:012x}"[3]
+        asn2 = f"{asn:012x}"[4:7].lstrip('0') + f"{asn:012x}"[7]
+        asn3 = f"{asn:012x}"[8:11].lstrip('0') + f"{asn:012x}"[11]
+        if asn1 == "0":
+            if asn2 == "0":
+                return f"{asn}"
+            return asn2 + "_" + asn3
+        return asn1 + "_" + asn2 + "_" + asn3
 
     def __provision_crypto(self, as_: ScionAutonomousSystem, isd: int, is_core: bool, node: Node, tempdir: str):
         basedir = "/etc/scion"
@@ -215,18 +227,18 @@ class ScionIsd(Layer):
             node.setFile(dst, content)
 
         def myImport(name):
-            copyFile(pjoin(tempdir, f"AS{asn}", "crypto", name), pjoin(basedir, "crypto", name))
+            copyFile(pjoin(tempdir, f"AS{self.__asn_to_name(asn)}", "crypto", name), pjoin(basedir, "crypto", name))
 
         if is_core:
             for kind in ["sensitive", "regular"]:
-                myImport(pjoin("voting", f"ISD{isd}-AS{asn}.{kind}.crt"))
+                myImport(pjoin("voting", f"ISD{isd}-AS{self.__asn_to_name(asn)}.{kind}.crt"))
                 myImport(pjoin("voting", f"{kind}-voting.key"))
                 myImport(pjoin("voting", f"{kind}.tmpl"))
             for kind in ["root", "ca"]:
-                myImport(pjoin("ca", f"ISD{isd}-AS{asn}.{kind}.crt"))
+                myImport(pjoin("ca", f"ISD{isd}-AS{self.__asn_to_name(asn)}.{kind}.crt"))
                 myImport(pjoin("ca", f"cp-{kind}.key"))
                 myImport(pjoin("ca", f"cp-{kind}.tmpl"))
-        myImport(pjoin("as", f"ISD{isd}-AS{asn}.pem"))
+        myImport(pjoin("as", f"ISD{isd}-AS{self.__asn_to_name(asn)}.pem"))
         myImport(pjoin("as", "cp-as.key"))
         myImport(pjoin("as", "cp-as.tmpl"))
 
