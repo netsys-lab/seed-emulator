@@ -140,7 +140,8 @@ class ScionIsd(Layer):
                     asn = node.getAsn()
                     as_: ScionAutonomousSystem = base_layer.getAutonomousSystem(asn)
                     isds = self.getAsIsds(asn)
-                    assert len(isds) == 1, f"AS {hex(asn)} must be a member of exactly one ISD"
+                    
+                    assert len(isds) == 1, f"AS {hex(asn) if asn>65536 else asn} must be a member of exactly one ISD"
                     self.__provision_crypto(as_, *isds[0], node, tempdir)
 
     def print(self, indent: int = 0) -> str:
@@ -205,9 +206,7 @@ class ScionIsd(Layer):
         asn2 = f"{asn:012x}"[4:7].lstrip('0') + f"{asn:012x}"[7]
         asn3 = f"{asn:012x}"[8:11].lstrip('0') + f"{asn:012x}"[11]
         if asn1 == "0":
-            if asn2 == "0":
-                return f"{asn}"
-            return asn2 + "_" + asn3
+            return f"{asn}"
         return asn1 + "_" + asn2 + "_" + asn3
 
     def __provision_crypto(self, as_: ScionAutonomousSystem, isd: int, is_core: bool, node: Node, tempdir: str):
