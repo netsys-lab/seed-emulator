@@ -71,6 +71,8 @@ class Scion(Layer, Graphable):
     def getName(self) -> str:
         return "Scion"
 
+    def getXcLinks(self):
+        return self.__links
 
     def addXcLink(self, a: Union[IA, Tuple[int, int]], b: Union[IA, Tuple[int, int]],
                   linkType: LinkType, count: int=1, a_router: str="", b_router: str="",) -> 'Scion':
