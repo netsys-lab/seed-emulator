@@ -509,6 +509,9 @@ class Scion(Layer, Graphable):
         Scion.__if_ids_by_as[ia] = ifs
         return last+1
 
+    def getXcLinks(self):
+        return self.__links
+
     def addXcLink(self, a: Union[IA, Tuple[int, int]], b: Union[IA, Tuple[int, int]],
                   linkType: LinkType, count: int=1, a_router: str="", b_router: str="",) -> 'Scion':
         """!
