@@ -201,17 +201,9 @@ class ScionIsd(Layer):
 
         return path
 
-    def __asn_to_name(self, asn: int) -> str:
-        asn1 = f"{asn:012x}"[:3].lstrip('0') + f"{asn:012x}"[3]
-        asn2 = f"{asn:012x}"[4:7].lstrip('0') + f"{asn:012x}"[7]
-        asn3 = f"{asn:012x}"[8:11].lstrip('0') + f"{asn:012x}"[11]
-        if asn1 == "0":
-            return f"{asn}"
-        return asn1 + "_" + asn2 + "_" + asn3
-
     def __provision_crypto(self, as_: ScionAutonomousSystem, isd: int, is_core: bool, node: Node, tempdir: str):
         basedir = "/etc/scion"
-        asn = as_.getAsn()
+        asn = as_.getScionAsn()
 
         def copyFile(src, dst):
             # Tempdir will be gone when imports are resolved, therefore we must use setFile
@@ -226,18 +218,18 @@ class ScionIsd(Layer):
             node.setFile(dst, content)
 
         def myImport(name):
-            copyFile(pjoin(tempdir, f"AS{self.__asn_to_name(asn)}", "crypto", name), pjoin(basedir, "crypto", name))
+            copyFile(pjoin(tempdir, f"AS{asn.getFileStr()}", "crypto", name), pjoin(basedir, "crypto", name))
 
         if is_core:
             for kind in ["sensitive", "regular"]:
-                myImport(pjoin("voting", f"ISD{isd}-AS{self.__asn_to_name(asn)}.{kind}.crt"))
+                myImport(pjoin("voting", f"ISD{isd}-AS{asn.getFileStr()}.{kind}.crt"))
                 myImport(pjoin("voting", f"{kind}-voting.key"))
                 myImport(pjoin("voting", f"{kind}.tmpl"))
             for kind in ["root", "ca"]:
-                myImport(pjoin("ca", f"ISD{isd}-AS{self.__asn_to_name(asn)}.{kind}.crt"))
+                myImport(pjoin("ca", f"ISD{isd}-AS{asn.getFileStr()}.{kind}.crt"))
                 myImport(pjoin("ca", f"cp-{kind}.key"))
                 myImport(pjoin("ca", f"cp-{kind}.tmpl"))
-        myImport(pjoin("as", f"ISD{isd}-AS{self.__asn_to_name(asn)}.pem"))
+        myImport(pjoin("as", f"ISD{isd}-AS{asn.getFileStr()}.pem"))
         myImport(pjoin("as", "cp-as.key"))
         myImport(pjoin("as", "cp-as.tmpl"))
 

@@ -10,6 +10,7 @@ import yaml
 
 from seedemu.core import Emulator, Node, ScionAutonomousSystem, ScionRouter, Network, Router
 from seedemu.core.enums import NetworkType
+from seedemu.core.ScionAutonomousSystem import IA
 from seedemu.layers import Routing, ScionBase, ScionIsd
 from seedemu.layers.Scion import Scion
 from seedemu.core.ScionAutonomousSystem import IA
@@ -245,7 +246,7 @@ class ScionRouting(Routing):
     def __provision_dispatcher_config(node: Node, isd: int, as_: ScionAutonomousSystem):
         """Set dispatcher configuration on host and cs nodes."""
 
-        isd_as = f"{isd}-{as_.getAsnStr()}"
+        isd_as = f"{IA(isd, as_.getScionAsn())}"
         
         ip = None
         ifaces = node.getInterfaces()
