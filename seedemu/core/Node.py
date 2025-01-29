@@ -381,6 +381,17 @@ class Node(Printable, Registrable, Configurable, Vertex):
         self.__host_names.append(name)
         return self
 
+
+
+    def getLocalIPAddress(self) -> str:
+        """!
+        @brief Get the IP address of the local interface for this node.
+        """
+        for iface in self.getInterfaces():
+            if iface.getNet().getType() == NetworkType.Local:
+                return iface.getAddress()
+        return ''
+
     def getNameServers(self) -> List[str]:
         """!
         @brief get configured recursive name servers on this node.
@@ -1030,6 +1041,7 @@ class Router(Node):
 
     def __init__(self, name: str, role: NodeRole, asn: int, scope: str = None):
         self.__is_border_router = False
+        self.__loopback_address=None
         super().__init__( name,role,asn,scope)
         
     def getRole(self) -> NodeRole:
