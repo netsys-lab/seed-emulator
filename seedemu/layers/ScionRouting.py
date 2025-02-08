@@ -9,6 +9,7 @@ import yaml
 from seedemu.core import Emulator, Node, ScionAutonomousSystem, ScionRouter, Network
 from seedemu.core.enums import NetworkType
 from seedemu.layers import Routing, ScionBase, ScionIsd
+from seedemu.layers.Scion import Scion, ScionBuildConfig
 
 
 _Templates: Dict[str, str] = {}
@@ -78,8 +79,8 @@ class ScionRouting(Routing):
         @brief Install SCION on router, control service and host nodes.
         """
         super().configure(emulator)
-
         reg = emulator.getRegistry()
+
         for ((scope, type, name), obj) in reg.getAll().items():
             # SCION inter-domain routing affects only border-routers
             if type == 'brdnode':
@@ -88,33 +89,29 @@ class ScionRouting(Routing):
                     rnode.__class__ = ScionRouter
                     rnode.initScionRouter()
 
-                self.__install_scion(rnode)
+                self.__install_scion(emulator,rnode)
                 name = rnode.getName()
                 rnode.appendStartCommand(_CommandTemplates['br'].format(name=name), fork=True)
 
             elif type == 'csnode':
                 csnode: Node = obj
-                self.__install_scion(csnode)
+                self.__install_scion(emulator,csnode)
                 self.__append_scion_command(csnode)
                 name = csnode.getName()
                 csnode.appendStartCommand(_CommandTemplates['cs'].format(name=name), fork=True)
 
             elif type == 'hnode':
                 hnode: Node = obj
-                self.__install_scion(hnode)
+                self.__install_scion(emulator,hnode)
                 self.__append_scion_command(hnode)
 
-    def __install_scion(self, node: Node):
+    def __install_scion(self, emulator: Emulator, node: Node):
         """Install SCION packages on the node."""
-        node.addBuildCommand(
-            'echo "deb [trusted=yes] https://packages.netsec.inf.ethz.ch/debian all main"'
-            ' > /etc/apt/sources.list.d/scionlab.list')
-        node.addBuildCommand(
-            "apt-get update && apt-get install -y"
-            " scion-border-router scion-control-service scion-daemon scion-dispatcher scion-tools"
-            " scion-apps-bwtester")
-        node.addSoftware("apt-transport-https")
-        node.addSoftware("ca-certificates")
+        scion_layer: Scion = emulator.getLayer(layerName="Scion")
+        buildConfiguration: ScionBuildConfig = scion_layer.getBuildConfiguration()
+        build_dir = buildConfiguration.generateBuild()
+        node.addSharedFolder("/bin/scion/", build_dir)
+        node.addBuildCommand("export PATH=$PATH:/bin/scion/")
 
     def __append_scion_command(self, node: Node):
         """Append commands for starting the SCION host stack on the node."""
