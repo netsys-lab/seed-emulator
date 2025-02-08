@@ -9,7 +9,7 @@ from .Emulator import Emulator
 from .Configurable import Configurable
 from .Node import RealWorldRouter
 from ipaddress import IPv4Network
-from typing import Dict, List
+from typing import Dict, List, Optional, Union
 import requests
 
 RIS_PREFIXLIST_URL = 'https://stat.ripe.net/data/announced-prefixes/data.json'
@@ -26,7 +26,7 @@ class AutonomousSystem(Printable, Graphable, Configurable):
     __routers: Dict[str, Node]
     __hosts: Dict[str, Node]
     __nets: Dict[str, Network]
-
+    __as_features: Dict[str, str]
     __name_servers: List[str]
 
     def __init__(self, asn: int, subnetTemplate: str = "10.{}.0.0/16"):
@@ -43,6 +43,35 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         self.__asn = asn
         self.__subnets = None if asn > 255 else list(IPv4Network(subnetTemplate.format(asn)).subnets(new_prefix = 24))
         self.__name_servers = []
+        self.__as_features = {}
+
+    def setFeatures(self, key_val: Optional[Union[Dict[str, str], tuple]] = None, key: Optional[str] = None, val: Optional[str] = None):
+        if isinstance(key_val, dict):
+            # Handle the case where a dictionary is passed
+            for k, v in key_val.items():
+               self.setFeature(key, val)
+        elif isinstance(key_val, tuple) and len(key_val) == 2:
+            # Handle the case where a tuple (key, val) is passed
+            key, val = key_val
+            self.setFeature(key, val)
+        elif key is not None and val is not None:
+            # Handle the case where key and val are passed as separate arguments
+            self.setFeature(key, val)
+        else:
+            raise ValueError("Invalid arguments")
+
+    def setFeature(self, key: str, val: str):
+        """!
+            @brief AS features allow to override settings such as LOGLEVEL or DISABLE/ENABLE_FEATURE_XYZ
+                on all nodes of an AS, which are otherwise set 'simulation-wide' by the Routing-Layer
+        """
+        self.__as_features[key] = val
+
+    def getFeatures(self):
+        """!
+            @brief return any configuration variables set on this AS
+        """
+        return self.__as_features
 
     def setNameServers(self, servers: List[str]) -> AutonomousSystem:
         """!

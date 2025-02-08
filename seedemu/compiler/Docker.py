@@ -136,6 +136,8 @@ DockerCompilerFileTemplates['compose_service'] = """\
 {networks}{ports}{volumes}
         labels:
 {labelList}
+        environment:
+        {environment}
 """
 
 DockerCompilerFileTemplates['compose_label_meta'] = """\
@@ -319,6 +321,7 @@ class Docker(Compiler):
     __disable_images: bool
     __image_per_node_list: Dict[Tuple[str, str], DockerImage]
     _used_images: Set[str]
+    __env_vars: Dict[str ,Dict[str, str]]# {key -> {scope -> value}}
 
     __basesystem_dockerimage_mapping: dict
 
@@ -391,6 +394,8 @@ class Docker(Compiler):
         self.__platform = platform
 
         self.__basesystem_dockerimage_mapping = BASESYSTEM_DOCKERIMAGE_MAPPING_PER_PLATFORM[self.__platform]
+
+        self.__env_vars = dict() # variables for '.env' file alongside 'docker-compose.yml'
         
         for name, image in self.__basesystem_dockerimage_mapping.items():
             priority = 0
@@ -398,7 +403,44 @@ class Docker(Compiler):
                 priority = 1
             self.addImage(image, priority=priority)
         
+    def _getEnvVars(self) :
+        """! 
+        @brief returns the set of (KEY:str, (SCOPE:str, VALUE:str) ) environment variables
+             that were referenced accross the simulation.
+             The '.env' file will provide their definitions.
+        """
+        return self.__env_vars
+    
+    def _getScopedEnvVars(self, scope: str ) -> Dict[str,str]:
+        """!
+            @brief retuns ENV variables defined in the given scope
+        """
+        import toolz
+        if scope =='':
+            return toolz.dicttoolz.valmap( lambda d: list(d.values())[0] if len(d)==1 else list(d.values())[0] if len(set(d.values()))==1 else None, self._getEnvVars())
+        else:
+            return { k: v[scope] for k,v in  self.__env_vars.items() if scope in v }
 
+
+    def _addEnvVar(self, key: str, val: str, scope: str =''):
+        """!
+         @brief  adds a variable to the environment
+            specified in the '.env' file.
+        @param key name of the variable
+        @param val value of the variable
+        @param scope limits the scope of the ENV var i.e. to a certain AS only
+        """
+                
+        from cawdrey import frozendict
+        if not key in self.__env_vars:
+            self.__env_vars[key] = frozendict({scope: val})
+        else:
+            
+            if scope not in (d:=self.__env_vars[key]):
+                self.__env_vars[key]= d + {scope: val}
+            else:
+                assert (prev:=d[scope])==val, f'inconsistent value {val} for environment variable {key} in scope {scope}! Already defined to: {prev}'
+    
     def getName(self) -> str:
         return "Docker"
 
@@ -808,6 +850,40 @@ class Docker(Compiler):
         copyfile(hostpath, staged_path)
         return 'COPY {} {}\n'.format(staged_path, path)
 
+
+    def computeNodeName(self, node ):
+        """
+        @brief given a node, compute its final container name, as it will be known in the docker-compose file
+        """
+        name = self.__naming_scheme.format(
+            asn = node.getAsn(),
+            role = self._nodeRoleToString(node.getRole()),
+            name = node.getName(),
+            displayName = node.getDisplayName() if node.getDisplayName() != None else node.getName(),
+            primaryIp = node.getInterfaces()[0].getAddress()
+        )
+
+        return sub(r'[^a-zA-Z0-9_.-]', '_', name)
+
+    def realNodeName(self, node):
+        """
+        @brief computes the sub directory names inside the output folder
+         
+        why is it distinct from computeNodeName() ?!
+        """
+        (scope, type, _) = node.getRegistryInfo()
+        prefix = self._contextToPrefix(scope, type)
+        return '{}{}'.format(prefix, node.getName())
+    
+    def realNetName(self,net):
+          """
+          @brief computes name  of a network as it will be known in the docker-compose file
+          """
+          (netscope, _, _) = net.getRegistryInfo()
+          net_prefix = self._contextToPrefix(netscope, 'net')
+          if net.getType() == NetworkType.Bridge: net_prefix = ''
+          return '{}{}'.format(net_prefix, net.getName())
+    
     def _compileNode(self, node: Node) -> str:
         """!
         @brief Compile a single node. Will create folder for node and the
@@ -817,18 +893,13 @@ class Docker(Compiler):
 
         @returns docker-compose service string.
         """
-        (scope, type, _) = node.getRegistryInfo()
-        prefix = self._contextToPrefix(scope, type)
-        real_nodename = '{}{}'.format(prefix, node.getName())
+        real_nodename = self.realNodeName(node)
         node_nets = ''
         dummy_addr_map = ''
 
         for iface in node.getInterfaces():
             net = iface.getNet()
-            (netscope, _, _) = net.getRegistryInfo()
-            net_prefix = self._contextToPrefix(netscope, 'net')
-            if net.getType() == NetworkType.Bridge: net_prefix = ''
-            real_netname = '{}{}'.format(net_prefix, net.getName())
+            real_netname = self.realNetName(net)
             address = iface.getAddress()
 
             if self.__self_managed_network and net.getType() != NetworkType.Bridge:
@@ -896,6 +967,7 @@ class Docker(Compiler):
             volumes = DockerCompilerFileTemplates['compose_volumes'].format(
                 volumeList = lst
             )
+        name = self.computeNodeName(node)
 
         dockerfile = DockerCompilerFileTemplates['dockerfile']
         mkdir(real_nodename)
@@ -918,6 +990,7 @@ class Docker(Compiler):
         dockerfile = 'FROM {}\n'.format(md5(image.getName().encode('utf-8')).hexdigest()) + dockerfile
         self._used_images.add(image.getName())
 
+        for cmd in node.getDockerCommands(): dockerfile += '{}\n'.format(cmd)
         for cmd in node.getBuildCommands(): dockerfile += 'RUN {}\n'.format(cmd)
 
         start_commands = ''
@@ -958,15 +1031,14 @@ class Docker(Compiler):
 
         chdir('..')
 
-        name = self.__naming_scheme.format(
-            asn = node.getAsn(),
-            role = self._nodeRoleToString(node.getRole()),
-            name = node.getName(),
-            displayName = node.getDisplayName() if node.getDisplayName() != None else node.getName(),
-            primaryIp = node.getInterfaces()[0].getAddress()
-        )
+        import re
+        p=re.compile('\$\{([A-Z_\d-]*)\}') # aka '${VARIABLE_NAME}'
+        vars = [  (m[1], _var[2]) for _var in node.getCustomEnv() if ( m:=p.match(_var[1])) ]
+      
+        for v in vars:
+            self._addEnvVar(v[0], v[1], str(node.getAsn()))
 
-        name = sub(r'[^a-zA-Z0-9_.-]', '_', name)
+        keyval_list = map(lambda x: f'- {x[0]}={x[1]}', node.getCustomEnv())
 
         return DockerCompilerFileTemplates['compose_service'].format(
             nodeId = real_nodename,
@@ -976,7 +1048,8 @@ class Docker(Compiler):
             # privileged = 'true' if node.isPrivileged() else 'false',
             ports = ports,
             labelList = self._getNodeMeta(node),
-            volumes = volumes
+            volumes = volumes,
+            environment= "    - CONTAINER_NAME={}\n            ".format(name) + '\n            '.join(keyval_list)
         )
 
     def _compileNet(self, net: Network) -> str:
@@ -987,22 +1060,30 @@ class Docker(Compiler):
 
         @returns docker-compose network string.
         """
-        (scope, _, _) = net.getRegistryInfo()
         if self.__self_managed_network and net.getType() != NetworkType.Bridge:
             pfx = next(self.__dummy_network_pool)
             net.setAttribute('dummy_prefix', pfx)
             net.setAttribute('dummy_prefix_index', 2)
             self._log('self-managed network: using dummy prefix {}'.format(pfx))
-
-        net_prefix = self._contextToPrefix(scope, 'net')
-        if net.getType() == NetworkType.Bridge: net_prefix = ''
-
         return DockerCompilerFileTemplates['compose_network'].format(
-            netId = '{}{}'.format(net_prefix, net.getName()),
+            netId = self.realNetName(net),
             prefix = net.getAttribute('dummy_prefix') if self.__self_managed_network and net.getType() != NetworkType.Bridge else net.getPrefix(),
             mtu = net.getMtu(),
             labelList = self._getNetMeta(net)
         )
+
+    def generateEnvFile(self, scope: str ='', dir_prefix: str = '/'):
+        """!     
+           @brief   generates the '.env' file that accompanies any 'docker-compose.yml' file
+           @param scope  filter ENV variables by scope (i.e. ASN)
+        """
+        prefix=dir_prefix
+        if dir_prefix != '' and not dir_prefix.endswith('/'):
+            prefix += '/'
+
+        vars = self._getScopedEnvVars(scope)
+        env_list = map(lambda x: f'{x[0]}={x[1]}', vars.items())
+        print( '\n'.join(env_list) ,file=open(f'{prefix}.env','w'))
 
     def _makeDummies(self) -> str:
         """!
@@ -1103,3 +1184,5 @@ class Docker(Compiler):
             networks = self.__networks,
             dummies = local_images + self._makeDummies()
         ), file=open('docker-compose.yml', 'w'))
+
+        self.generateEnvFile('','')

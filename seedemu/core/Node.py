@@ -216,6 +216,7 @@ class Node(Printable, Registrable, Configurable, Vertex):
     __imported_files: Dict[str, str]
     __softwares: Set[str]
     __build_commands: List[str]
+    __docker_cmds: List[str]
     __start_commands: List[Tuple[str, bool]]
     __post_config_commands: List[Tuple[str, bool]]
     __ports: List[Tuple[int, int, str]]
@@ -229,7 +230,7 @@ class Node(Printable, Registrable, Configurable, Vertex):
 
     __shared_folders: Dict[str, str]
     __persistent_storages: List[str]
-
+    __custom_env: List[ Tuple[str,str,str|None]] # (key,val,default_val)
     __name_servers: List[str]
 
     __geo: Tuple[float,float,str] # (Latitude,Longitude,Address) -- optional parameter that contains the geographical location of the Node
@@ -257,6 +258,7 @@ class Node(Printable, Registrable, Configurable, Vertex):
         self.__scope = scope if scope != None else str(asn)
         self.__softwares = set()
         self.__build_commands = []
+        self.__docker_cmds = []
         self.__start_commands = []
         self.__post_config_commands = []
         self.__ports = []
@@ -269,6 +271,7 @@ class Node(Printable, Registrable, Configurable, Vertex):
 
         self.__shared_folders = {}
         self.__persistent_storages = []
+        self.__custom_env = []
 
         for soft in DEFAULT_SOFTWARE:
             self.__softwares.add(soft)
@@ -364,6 +367,27 @@ class Node(Printable, Registrable, Configurable, Vertex):
         self.__name_servers = servers
 
         return self
+
+    def setCustomEnv(self, key: str, val: str, default_val:str= None ):
+        """!
+        @param env  an environment variable that compiler shall pass to this nodes docker-compose service
+
+            it gets inserted into the 'environment:'  section of the node
+            i.e.:
+                environment:
+                    - DEBUG=${DEBUG}
+                    - KEY=VALUE
+            the 'default value' will be the value in the accompanying '.env' file for the corresponding secondary-key,
+            if VALUE has the form '${SECONDARY_KEY}'
+        """
+        self.__custom_env.append((key,val,default_val))
+        return self
+
+    def getCustomEnv(self) -> List[Tuple[str, str, str | None]]:
+        """!
+        @brief return this nodes ENV variables
+        """
+        return self.__custom_env
 
     def getHostNames(self) -> str:
         """!
@@ -753,6 +777,22 @@ class Node(Printable, Registrable, Configurable, Vertex):
         self.__build_commands.append(cmd)
 
         return self
+    
+    def addDockerCommand(self, cmd: str) -> Node:
+        """! 
+        @brief Add new docker command to build step (possibly of kind other than RUN).
+                Unlike the ones added with addBuildCommands these commands wont be prefixed with RUN,
+                but are assumed to be valid Docker Commands by themselves.
+        @note don't use this method to ADD or COPY !! See setFile(), appendFile(), importFile() for this
+        """
+        self.__docker_cmds.append(cmd)
+        return self
+    
+    def getDockerCommands(self)-> List[str]:
+        """!
+        @brief retrieve any custom directives for the node's Dockerfile
+        """
+        return self.__docker_cmds
 
     def getBuildCommands(self) -> List[str]:
         """!
@@ -1030,6 +1070,7 @@ class Router(Node):
 
     def __init__(self, name: str, role: NodeRole, asn: int, scope: str = None):
         self.__is_border_router = False
+        self.__loopback_address = None
         super().__init__( name,role,asn,scope)
         
     def getRole(self) -> NodeRole:
