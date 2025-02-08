@@ -2,8 +2,10 @@ from __future__ import annotations
 from .Printable import Printable
 from .Network import Network
 from .enums import NodeRole
+from .Scope import *
 from .Registry import Registrable
 from .Emulator import Emulator
+from .Customizable import Customizable
 from .Configurable import Configurable
 from .enums import NetworkType
 from .Visualization import Vertex
@@ -197,7 +199,7 @@ class Interface(Printable):
 
         return out
 
-class Node(Printable, Registrable, Configurable, Vertex):
+class Node(Printable, Registrable, Configurable, Vertex, Customizable):
     """!
     @brief Node base class.
 
@@ -216,6 +218,7 @@ class Node(Printable, Registrable, Configurable, Vertex):
     __imported_files: Dict[str, str]
     __softwares: Set[str]
     __build_commands: List[str]
+    __docker_cmds: List[str]
     __start_commands: List[Tuple[str, bool]]
     __post_config_commands: List[Tuple[str, bool]]
     __ports: List[Tuple[int, int, str]]
@@ -229,7 +232,6 @@ class Node(Printable, Registrable, Configurable, Vertex):
 
     __shared_folders: Dict[str, str]
     __persistent_storages: List[str]
-
     __name_servers: List[str]
 
     __geo: Tuple[float,float,str] # (Latitude,Longitude,Address) -- optional parameter that contains the geographical location of the Node
@@ -257,6 +259,7 @@ class Node(Printable, Registrable, Configurable, Vertex):
         self.__scope = scope if scope != None else str(asn)
         self.__softwares = set()
         self.__build_commands = []
+        self.__docker_cmds = []
         self.__start_commands = []
         self.__post_config_commands = []
         self.__ports = []
@@ -278,6 +281,22 @@ class Node(Printable, Registrable, Configurable, Vertex):
 
         self.__geo = None
         self.__note = None
+
+
+    def scope(self)-> Scope:
+        return Scope(ScopeTier.Node,
+                     node_type=ScopeType.from_node(self),
+                     node_id=self.getName(),
+                     as_id=self.getAsn())
+
+    def handDown(self, other: Customizable):
+        """!@brief nodes are atomic (not further decomposable)"""
+        raise NotImplementedError
+    # maybe add method 'requiresEnvsubst()' here that checks if there is an option set,
+    # which has OptionMode.RUN_TIME
+
+   
+
 
     def configure(self, emulator: Emulator):
         """!
@@ -365,6 +384,17 @@ class Node(Printable, Registrable, Configurable, Vertex):
 
         return self
 
+    # TODO: if a separate .env file is created, or the values are given directly in the docker-compose.yml 'environment' section
+    # could be a setting of the Docker compiler
+    # def setCustomEnv(self, key: str, actual_value: str, scope: ScopeTier=ScopeTier.Node, use_envsubst: bool=False):
+
+
+    #def _setBuildTimeEnv(self, var: str, value: str, scope: ScopeTier):    
+    
+    #def getCustomRuntimeEnv(self) -> Dict[str,Dict[Scope,Tuple[str,str|None]]]:
+    #    """!      @brief return this nodes runtime ENV variables for use with envsubst        """
+    #    return self.__custom_env
+    
     def getHostNames(self) -> str:
         """!
         @brief Get all host names for this node.
@@ -380,7 +410,19 @@ class Node(Printable, Registrable, Configurable, Vertex):
         """
         self.__host_names.append(name)
         return self
-
+    
+    def getLocalIPAddress(self) -> str:
+        """!
+        @brief Get the IP address of the local interface for this node.
+           Returns None if node is connected to more than one local net(i.e. router).
+        """
+        has_single_local_net=lambda router: list([ ifn.getNet().isDirect() for ifn in router.getInterfaces() ]).count(True) == 1
+        if not has_single_local_net(self): return None
+        for iface in self.getInterfaces():
+            if iface.getNet().getType() == NetworkType.Local:
+                return iface.getAddress()
+        return None
+    
     def getNameServers(self) -> List[str]:
         """!
         @brief get configured recursive name servers on this node.
@@ -753,6 +795,22 @@ class Node(Printable, Registrable, Configurable, Vertex):
         self.__build_commands.append(cmd)
 
         return self
+    
+    def addDockerCommand(self, cmd: str) -> Node:
+        """! 
+        @brief Add new docker command to build step (possibly of kind other than RUN).
+                Unlike the ones added with addBuildCommands these commands wont be prefixed with RUN,
+                but are assumed to be valid Docker Commands by themselves.
+        @note don't use this method to ADD or COPY !! See setFile(), appendFile(), importFile() for this
+        """
+        self.__docker_cmds.append(cmd)
+        return self
+    
+    def getDockerCommands(self)-> List[str]:
+        """!
+        @brief retrieve any custom directives for the node's Dockerfile
+        """
+        return self.__docker_cmds
 
     def getBuildCommands(self) -> List[str]:
         """!
@@ -1030,6 +1088,7 @@ class Router(Node):
 
     def __init__(self, name: str, role: NodeRole, asn: int, scope: str = None):
         self.__is_border_router = False
+        self.__loopback_address = None
         super().__init__( name,role,asn,scope)
         
     def getRole(self) -> NodeRole:
