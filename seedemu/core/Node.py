@@ -368,7 +368,7 @@ class Node(Printable, Registrable, Configurable, Vertex):
 
         return self
 
-    def setCustomEnv(self, key: str, val: str, default_val:str= None ):
+    def setCustomEnv(self, key: str, val: str, default_val:str= None ): #TODO maybe rename to sth. with 'feature' to be consistent with  AutonomousSystem::setFeature()
         """!
         @param env  an environment variable that compiler shall pass to this nodes docker-compose service
 

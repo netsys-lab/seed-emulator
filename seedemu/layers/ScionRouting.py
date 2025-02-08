@@ -99,14 +99,16 @@ class ScionRouting(Routing):
     During layer configuration Router nodes are replaced with ScionRouters which
     add methods for configuring SCION border router interfaces.
     """
+    # this should be a method of the ScionBuildConfig
     CMDNAMES: Dict[str,str] = {'router': 'scion-border-router',
                                'control': 'scion-control-service',
                                'dispatcher': 'scion-dispatcher',
                                'daemon': 'sciond' }
+    # global defaults
     _rotate_logs: bool = False
     _use_envsubst: bool = True
     __disable_bfd: bool = True
-    __loglevel: str = 'debug'
+    __loglevel: str = 'error'
     _experimental_scmp: bool =False
 
     def __init__(self, loopback_range: str = '10.0.0.0/16',
@@ -116,7 +118,7 @@ class ScionRouting(Routing):
                  loglevel:str = 'debug',
                  experimental_scmp: bool =False ):
         super().__init__(loopback_range)
-        ScionRouting._use_envsubst = use_envsubst # TODO: maybe allow scoping of this i.e. override by NodeRole or individual nodes
+        ScionRouting._use_envsubst = use_envsubst
         ScionRouting._experimental_scmp = experimental_scmp
         ScionRouting.__disable_bfd = disable_bfd
         ScionRouting._rotate_logs = rotate_logs
@@ -127,10 +129,15 @@ class ScionRouting(Routing):
         """!
             @brief return the value of the Flag variable on the given node in the given AS
             Nodes may have overrides of its AS's configuration
-            which is in turn an override of the ScionRouting layer defaults
+            which is in turn an override of the ScionRouting layer defaults.
+            @note use this method only for config files of SCION distributables and docker-compose.yml file.
+              (it may return '${VAR}' placeholders if 'use_envsubst' is true)
         """
 
         if flag not in ['loglevel',
+                        'use_envsubst',
+                        'rotate_logs',
+                        'serve_metrics',
                         'disable_bfd',
                         'experimental_scmp',
                         'appropriate_digest']:
@@ -139,29 +146,42 @@ class ScionRouting(Routing):
         flag_envsub ={'loglevel' : '${LOGLEVEL}',
                       'disable_bfd': "${DISABLE_BFD}",
                       'experimental_scmp': "${EXPERIMENTAL_SCMP}"}
-        global_defaults = {'disable_bfd': 'true' if ScionRouting.__disable_bfd else 'false',
-                           'experimental_scmp': 'true' if ScionRouting._experimental_scmp else 'false',
-                           'loglevel': ScionRouting.__loglevel }
-        flag_hardcode = {'loglevel': _as.getFeatures()['loglevel'] if 'loglevel' in _as.getFeatures() else global_defaults["loglevel"],
-                         'disable_bfd': _as.getFeatures()['disable_bfd'] if 'disable_bfd' in _as.getFeatures() else global_defaults["disable_bfd"],
-                         'experimental_scmp': _as.getFeatures()['experimental_scmp'] if 'experimenta_scmp' in _as.getFeatures() else global_defaults["experimental_scmp"]
+        
+        flag_hardcode = {'loglevel': ScionRouting.logLevel(_as,node),
+                         'disable_bfd': ScionRouting.disableBFD(_as,node),
+                         'experimental_scmp': ScionRouting.experimentalSCMP(_as,node)
                          }
         if ScionRouting._use_envsubst:
             return flag_envsub[flag]
         else:
             return flag_hardcode[flag]
 
-    # TODO: add AS & node as parameter to allow overrides of the global defaults
     @staticmethod
-    def disableBFD()-> bool:
-        return ScionRouting.__disable_bfd
+    def bool2str(b: bool) -> str:
+        return 'true' if b else 'false'
+
+    @staticmethod
+    def disableBFD( _as: AutonomousSystem=None, node: Node=None )-> str:
+        return _as.getFeatures()['disable_bfd'] if ( _as!=None and 'disable_bfd' in _as.getFeatures() ) else ScionRouting.bool2str(ScionRouting.__disable_bfd)
     
     @staticmethod
-    def rotateLogs()-> bool:
-        return ScionRouting._rotate_logs
+    def rotateLogs( _as: AutonomousSystem=None, node: Node=None )-> bool:
+        return _as.getFeatures()['rotate_logs'] if ( _as!=None and 'rotate_logs' in _as.getFeatures() ) else ScionRouting.bool2str(ScionRouting._rotate_logs)
+
+    @staticmethod
+    def useEnvSubst(_as: AutonomousSystem=None, node: Node=None ) -> bool:
+        return _as.getFeatures()['use_envsubst'] if ( _as!=None and 'use_envsubst' in _as.getFeatures() ) else ScionRouting.bool2str(ScionRouting._use_envsubst)
+
+    @staticmethod
+    def logLevel(_as: AutonomousSystem=None, node: Node=None ) -> str:
+        return _as.getFeatures()['loglevel'] if ( _as!=None and 'loglevel' in _as.getFeatures() ) else ScionRouting.__loglevel
     
     @staticmethod
-    def _nameOfCmd( cmd: str):
+    def experimentalSCMP( _as: AutonomousSystem=None, node: Node=None)-> str:
+        return _as.getFeatures()['experimental_scmp'] if (_as!=None and 'experimental_scmp' in _as.getFeatures() ) else ScionRouting.bool2str(ScionRouting._experimental_scmp)
+    
+    @staticmethod
+    def _nameOfCmd( cmd: str):# TODO delegate to ScionBuildConfig
         """!
         @brief the SCION distributables are named differently in the .deb package,
         than in the actual build
@@ -170,27 +190,25 @@ class ScionRouting(Routing):
 
     def _setScionEnv(self, node: Node, _as: AutonomousSystem):
         """!
-        @brief apply the AS default ENV configuration to the given node
+        @brief apply the AS default ENV configuration to the given node.
+        This is only required if 'use_envsubst' is true for this node.
         """
 
-        def bool2str(b: bool) -> str:
-            return 'true' if b else 'false'
-
-        if not ScionRouting._use_envsubst:
+        if not ScionRouting.useEnvSubst(_as, node):
             return
         # these will have to provided inside an '.env' file alongside the docker-compose.yml
         node.setCustomEnv(key='LOGLEVEL',val='${LOGLEVEL}',
-                          default_val=_as.getFeatures()['loglevel'] if 'loglevel' in _as.getFeatures() else ScionRouting.__loglevel)
+                          default_val= self.logLevel(_as, node))
 
         if node.getRole()==NodeRole.BorderRouter:
             node.setCustomEnv(key='DISABLE_BFD',
                               val='${DISABLE_BFD}',
-                              default_val=bool2str(ScionRouting.disableBFD()))            
+                              default_val=self.disableBFD(_as,node))            
         
         if node.getRole()==NodeRole.BorderRouter or 'cs' in node.getName():
             node.setCustomEnv(key='EXPERIMENTAL_SCMP',
                               val=f'${{EXPERIMENTAL_SCMP_{node.getAsn()}}}',
-                              default_val=_as.getFeatures()['experimental_scmp'] if 'experimental_scmp' in _as.getFeatures() else bool2str(ScionRouting._experimental_scmp))
+                              default_val=self.experimentalSCMP(_as,node))
         #TODO:    node.setCustomEnv( '- APPROPRIATE_DIGEST')
 
 
@@ -202,10 +220,12 @@ class ScionRouting(Routing):
 
         reg = emulator.getRegistry()
         for ((scope, type, name), obj) in reg.getAll().items():
+            
+            if type not in ['hnode', 'csnode', 'brdnode']: continue
             _as = emulator.getLayer('Base').getAutonomousSystem(obj.getAsn())
-            if type in ['hnode', 'csnode', 'brdnode']:
-                # set all SCION related ENV variables on the nodes
-                self._setScionEnv(obj, _as)
+
+            # set all SCION related ENV variables on the nodes
+            self._setScionEnv(obj, _as)
             # SCION inter-domain routing affects only border-routers
             if type == 'brdnode':
                 rnode: ScionRouter = obj
@@ -214,10 +234,9 @@ class ScionRouting(Routing):
                     rnode.initScionRouter()
 
                 self.__install_scion(rnode)
-                name = rnode.getName()
-                br_log = ">> /var/log/scion-border-router.log 2>&1" if not ScionRouting.rotateLogs() else "2>&1 | rotatelogs -n 2 /var/log/scion-border-router.log 1M "
+                br_log = ">> /var/log/scion-border-router.log 2>&1" if not ScionRouting.rotateLogs(_as,rnode) else "2>&1 | rotatelogs -n 2 /var/log/scion-border-router.log 1M "
                 router_start_cmd=""
-                if ScionRouting._use_envsubst:
+                if ScionRouting.useEnvSubst(_as,rnode):
                     router_start_cmd=_CommandTemplates['br_envsubst'].format(name=name,cmd=ScionRouting._nameOfCmd('router'),log=br_log)
                 else:
                     router_start_cmd=_CommandTemplates['br'].format(name=name,cmd=ScionRouting._nameOfCmd('router'),log=br_log)
@@ -228,15 +247,15 @@ class ScionRouting(Routing):
             elif type == 'csnode':
                 csnode: Node = obj
                 self.__install_scion(csnode)
-                self.__append_scion_command(csnode)
+                self.__append_scion_command(csnode,_as)
                 name = csnode.getName()
-                ctrl_log = ">> /var/log/scion-control-service.log 2>&1" if not ScionRouting.rotateLogs() else " 2>&1 | rotatelogs -n 2 /var/log/scion-control-service.log 1M "
-                csnode.appendStartCommand(_CommandTemplates['cs_no_disp' + "_envsubst" if ScionRouting._use_envsubst else ''].format(name=name,cmd=ScionRouting._nameOfCmd('control'),log=ctrl_log), fork=True)
+                ctrl_log = ">> /var/log/scion-control-service.log 2>&1" if not ScionRouting.rotateLogs(_as,csnode) else " 2>&1 | rotatelogs -n 2 /var/log/scion-control-service.log 1M "
+                csnode.appendStartCommand(_CommandTemplates['cs_no_disp' + "_envsubst" if ScionRouting.useEnvSubst(_as,csnode) else ''].format(name=name,cmd=ScionRouting._nameOfCmd('control'),log=ctrl_log), fork=True)
 
             elif type == 'hnode':
                 hnode: Node = obj
                 self.__install_scion(hnode)
-                self.__append_scion_command(hnode)
+                self.__append_scion_command(hnode,_as)
 
     def __install_scion(self, node: Node):
         """Install SCION packages on the node."""
@@ -254,13 +273,13 @@ class ScionRouting(Routing):
         if ScionRouting._use_envsubst: # for envsubst
             node.addSoftware('gettext')
 
-    def __append_scion_command(self, node: Node):
+    def __append_scion_command(self, node: Node, _as: AutonomousSystem):
         """Append commands for starting the SCION host stack on the node."""
-        disp_log = ">> /var/log/scion-dispatcher.log 2>&1" if not ScionRouting.rotateLogs() else "2>&1 |  rotatelogs -n 2 /var/log/scion-dispatcher.log 1M "
-        node.appendStartCommand(_CommandTemplates["disp" + "_envsubst" if ScionRouting._use_envsubst else ''].format(cmd=ScionRouting._nameOfCmd('dispatcher'),log = disp_log ), fork=True)
+        disp_log = ">> /var/log/scion-dispatcher.log 2>&1" if not ScionRouting.rotateLogs(_as,node) else "2>&1 |  rotatelogs -n 2 /var/log/scion-dispatcher.log 1M "
+        node.appendStartCommand(_CommandTemplates["disp" + "_envsubst" if ScionRouting.useEnvSubst(_as,node) else ''].format(cmd=ScionRouting._nameOfCmd('dispatcher'),log = disp_log ), fork=True)
 
-        sciond_log = ">> /var/log/sciond.log 2>&1" if not ScionRouting.rotateLogs() else " 2>&1 | rotatelogs -n 2 /var/log/sciond.log 1M "
-        node.appendStartCommand(_CommandTemplates["sciond"+ "_envsubst" if ScionRouting._use_envsubst else ''].format(cmd=ScionRouting._nameOfCmd('daemon'),log=sciond_log), fork=True)
+        sciond_log = ">> /var/log/sciond.log 2>&1" if not ScionRouting.rotateLogs(_as,node) else " 2>&1 | rotatelogs -n 2 /var/log/sciond.log 1M "
+        node.appendStartCommand(_CommandTemplates["sciond"+ "_envsubst" if ScionRouting.useEnvSubst(_as,node) else ''].format(cmd=ScionRouting._nameOfCmd('daemon'),log=sciond_log), fork=True)
 
     def render(self, emulator: Emulator):
         """!
@@ -308,7 +327,7 @@ class ScionRouting(Routing):
 
         node.setFile("/etc/scion/sciond.toml",
             _Templates["general"].format(name="sd1",
-                                         loglevel=ScionRouting._resolveFlag('loglevel',_as)
+                                         loglevel=ScionRouting._resolveFlag('loglevel',_as,node)
                                          ) +
             _Templates["trust_db"].format(name="sd1") +
             _Templates["path_db"].format(name="sd1")
@@ -347,11 +366,11 @@ class ScionRouting(Routing):
 
         name = router.getName()
         config_content = _Templates["general"].format(name=name,
-                                                      loglevel=ScionRouting._resolveFlag('loglevel',_as))
+                                                      loglevel=ScionRouting._resolveFlag('loglevel',_as,router))
         # config_content += _Templates["metrics"].format(addr:=router.getIPAddress(), port:=30442)
-        _keyvals_router = [ "bfd.disable={}".format(ScionRouting._resolveFlag('disable_bfd',_as)) ]
+        _keyvals_router = [ "bfd.disable={}".format(ScionRouting._resolveFlag('disable_bfd',_as,router)) ]
         _kvals_features = [
-            f"experimental_scmp_authentication={ScionRouting._resolveFlag('experimental_scmp',_as)}" ]
+            f"experimental_scmp_authentication={ScionRouting._resolveFlag('experimental_scmp',_as,router)}" ]
 
         config_content += _Templates["router"] +'\n'+ '\n'.join(_keyvals_router) + '\n'
         if len(_kvals_features) > 0:
@@ -570,12 +589,12 @@ class ScionRouting(Routing):
 
         # Concatenate configuration sections
         name = node.getName()
-        _features =[  f"experimental_scmp={ScionRouting._resolveFlag('experimental_scmp', as_)}" if ScionRouting._experimental_scmp else ''
+        _features =[  f"experimental_scmp={ScionRouting._resolveFlag('experimental_scmp', as_, node)}" if ScionRouting._experimental_scmp else ''
                   # f"appropriate_digest_algorithm={self.resolveFlag('appropriate_digest',as_)}"
                    ]
         node.setFile(os.path.join("/etc/scion/", name + ".toml"),
             _Templates["general"].format(name=name,
-            loglevel=ScionRouting._resolveFlag('loglevel',as_)) +
+            loglevel=ScionRouting._resolveFlag('loglevel',as_,node)) +
             _Templates["trust_db"].format(name=name) +
             _Templates["beacon_db"].format(name=name) +
             _Templates["path_db"].format(name=name) +
