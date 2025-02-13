@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from seedemu.compiler import Docker, Graphviz
-from seedemu.core import Emulator
+from seedemu.core import Emulator, OptionMode
 from seedemu.layers import (
     ScionBase, ScionRouting, ScionIsd, Scion, Ospf, Ibgp, Ebgp, PeerRelationship)
 from seedemu.layers.Scion import LinkType as ScLinkType
@@ -9,7 +9,8 @@ from seedemu.layers.Scion import LinkType as ScLinkType
 # Initialize
 emu = Emulator()
 base = ScionBase()
-routing = ScionRouting()
+# change global defaults here .. .
+routing = ScionRouting(loglevel='error')
 ospf = Ospf()
 scion_isd = ScionIsd()
 scion = Scion()
@@ -30,6 +31,10 @@ base.createInternetExchange(104, create_rs=False)
 # Core AS 1-150
 as150 = base.createAutonomousSystem(150)
 scion_isd.addIsdAs(1, 150, is_core=True)
+
+# override global default for AS150
+as150.setOption(ScionRouting.Option.custom('disable_bfd','true', OptionMode.RUN_TIME))
+
 as150.createNetwork('net0')
 as150.createNetwork('net1')
 as150.createNetwork('net2')
@@ -42,6 +47,12 @@ as150_br0 = as150.createRouter('br0')
 as150_br1 = as150.createRouter('br1')
 as150_br2 = as150.createRouter('br2')
 as150_br3 = as150.createRouter('br3')
+
+# override AS settings for individual nodes
+as150_br0.setOption(ScionRouting.Option.custom('loglevel','debug',OptionMode.RUN_TIME))
+
+as150_br1.setOption(ScionRouting.Option.custom('serve_metrics','true', OptionMode.RUN_TIME))
+
 as150_br0.joinNetwork('net0').joinNetwork('net1').joinNetwork('ix100')
 as150_br1.joinNetwork('net1').joinNetwork('net2').joinNetwork('ix101')
 as150_br2.joinNetwork('net2').joinNetwork('net3').joinNetwork('ix102')

@@ -22,6 +22,7 @@ base.createInternetExchange(100, create_rs=False)
 
 # AS-150
 as150 = base.createAutonomousSystem(150)
+as150.setFeatures({'disable_bfd': 'true', 'experimental_scmp': 'true'})
 scion_isd.addIsdAs(1, 150, is_core=True)
 as150.createNetwork('net0')
 as150.createControlService('cs1').joinNetwork('net0')

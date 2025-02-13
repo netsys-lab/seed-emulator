@@ -85,6 +85,7 @@ class Routing(Layer):
             node.setBaseSystem(BaseSystem.SEEDEMU_ROUTER)
 
     def configure(self, emulator: Emulator):
+        super().configure(emulator)
         reg = emulator.getRegistry()
         for ((scope, type, name), obj) in reg.getAll().items():
             if type == 'rs':
