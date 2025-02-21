@@ -33,7 +33,7 @@ as150 = base.createAutonomousSystem(150)
 scion_isd.addIsdAs(1, 150, is_core=True)
 
 # override global default for AS150
-as150.setOption(ScionRouting.Option.custom('disable_bfd','true', OptionMode.RUN_TIME))
+as150.setOption(ScionRouting.Option.custom('disable_bfd', 'true', OptionMode.RUN_TIME))
 
 as150.createNetwork('net0')
 as150.createNetwork('net1')
@@ -49,9 +49,9 @@ as150_br2 = as150.createRouter('br2')
 as150_br3 = as150.createRouter('br3')
 
 # override AS settings for individual nodes
-as150_br0.setOption(ScionRouting.Option.custom('loglevel','debug',OptionMode.RUN_TIME))
+as150_br0.setOption(ScionRouting.Option.custom('loglevel', 'debug', OptionMode.RUN_TIME))
 
-as150_br1.setOption(ScionRouting.Option.custom('serve_metrics','true', OptionMode.RUN_TIME))
+as150_br1.setOption(ScionRouting.Option.custom('serve_metrics', 'true', OptionMode.RUN_TIME))
 
 as150_br0.joinNetwork('net0').joinNetwork('net1').joinNetwork('ix100')
 as150_br1.joinNetwork('net1').joinNetwork('net2').joinNetwork('ix101')
