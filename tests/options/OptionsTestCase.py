@@ -2,6 +2,7 @@
 # encoding: utf-8
 
 import unittest as ut
+import os
 from seedemu.core import (
     Scope,
     ScopeTier,
@@ -10,10 +11,31 @@ from seedemu.core import (
     OptionMode,
     Customizable,
 )
+from tests import SeedEmuTestCase
 from enum import Enum
 
 
-class SEEDEmuOptionSystemTestCase(ut.TestCase):
+class SEEDEmuOptionSystemTestCase(SeedEmuTestCase):
+    
+    @classmethod
+    def gen_emulation_files(cls):
+        """currently there are just no integration tests for options"""
+        pass
+
+    @classmethod
+    def build_emulator(cls):
+        """currently there are just no integration tests for options"""
+        pass
+    
+    @classmethod
+    def up_emulator(cls):
+        """currently there are just no integration tests for options"""
+        pass
+
+    @classmethod
+    def down_emulator(cls):
+        """currently there are just no integration tests for options"""
+        pass
 
     def test_scope(self):
         """!@brief tests proper inclusion/exclusion, intersection and union of Scopes"""
@@ -301,6 +323,8 @@ class SEEDEmuOptionSystemTestCase(ut.TestCase):
             (opt := child_config.getOption("max_bandwidth")) != None
             and opt.value == 500
         )
+
+    
 
     @classmethod
     def get_test_suite(cls):
