@@ -1,6 +1,7 @@
 from __future__ import annotations
 from ipaddress import IPv4Network, IPv4Address
 from .RemoteAccessProvider import RemoteAccessProvider
+from .ExternalConnectivityProvider import ExternalConnectivityProvider
 from .Printable import Printable
 from .enums import NetworkType, NodeRole
 from .Registry import Registrable
@@ -31,7 +32,9 @@ class Network(Printable, Registrable, Vertex):
 
     __direct: bool
 
+    # these two are exclusive and thus should be aggregated into a single instance of a common base class
     __rap: RemoteAccessProvider
+    __ecp: ExternalConnectivityProvider
 
     def __init__(self, name: str, type: NetworkType, prefix: IPv4Network, aac: AddressAssignmentConstraint = None, direct: bool = False):
         """!
@@ -72,6 +75,7 @@ class Network(Printable, Registrable, Vertex):
         self.__direct = direct
 
         self.__rap = None
+        self.__ecp = None
 
     def isDirect(self) -> bool:
         """!
@@ -266,6 +270,15 @@ class Network(Printable, Registrable, Vertex):
         @returns self, for chaining API calls.
         """
         assert self.__type == NetworkType.Local, 'remote access can only be enabled on local networks.'
+        self.__rap = provider
+
+        return self
+
+    def enableExternalConnectivity(self, provider: ExternalConnectivityProvider) -> Network:
+        """
+        @brief enable nodes on this emulated network to connect to the 'real' Internet
+        """
+        assert self.__type == NetworkType.Local, 'external connectivity can only be enabled on local networks.'
         self.__rap = provider
 
         return self

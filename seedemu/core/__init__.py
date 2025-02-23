@@ -19,6 +19,7 @@ from .Binding import Binding, Action
 from .Filter import Filter
 from .Component import Component
 from .RemoteAccessProvider import RemoteAccessProvider
+from .ExternalConnectivityProvider import ExternalConnectivityProvider
 from .Compiler import Compiler, OptionHandling
 from .BaseSystem import BaseSystem
 from .Scope import *
