@@ -258,7 +258,8 @@ class ScionRouting(Routing):
                  experimental_scmp: BaseOption = None,
                  appropriate_digest: BaseOption = None,
                  serve_metrics: BaseOption = None,
-                 setup_spec: BaseOption = None ):
+                 setup_spec: BaseOption = None,
+                 etc_config_vol: BaseOption = None ):
         """!
         @param static_routing install and configure BIRD routing daemon only on routers
                 which are connected to more than one local-net (actual intra-domain routers).
@@ -439,6 +440,12 @@ class ScionRouting(Routing):
                 hnode: Node = obj
                 self.__install_scion(hnode)
                 self.__append_scion_command(hnode)
+            
+            if (cfg_vol := obj.getOption('etc_config_vol')) != None and cfg_vol.value == 'true':
+                node: Node = obj
+                # TODO use named docker volumes for this: i.e. , f'etcscion_{node.getAsn()}-{node.getName()}'
+                # once seed supports it ( until then it'll be anonymous volumes)
+                node.addPersistentStorage('/etc/scion')
 
     def __install_scion(self, node: Node):
         """Install SCION stack on the node."""
@@ -856,4 +863,3 @@ class ScionRouting(Routing):
             cs_config += _Templates["metrics"].format(node.getLocalIPAddress(), 30452)
         cs_config += "\n".join(beaconing)
         node.setFile(os.path.join("/etc/scion/", name + ".toml"), cs_config)
-
