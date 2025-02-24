@@ -9,7 +9,7 @@ from .Scope import ScopeTier, Scope
 from .Emulator import Emulator
 from .Configurable import Configurable
 from .Customizable import Customizable
-from .Node import RealWorldRouter
+from .Node import promote_to_real_world_router, RealWorldRouterMixin
 from ipaddress import IPv4Network
 from typing import Dict, List
 import requests
@@ -108,8 +108,11 @@ class AutonomousSystem(Printable, Graphable, Configurable, Customizable):
 
                 rap.configureRemoteAccess(emulator, net, brNode, brNet)
 
+            #if (p:=net.getExternalConnectivityProvider()) != None:
+            #    p.configureExternalLink(emulator, net, localNet of brNode , emulator.getServiceNet() )
+
         for router in list(self.__routers.values()):
-            if issubclass(router.__class__, RealWorldRouter):
+            if issubclass(router.__class__, RealWorldRouterMixin):
                 router.joinNetwork(emulator.getServiceNetwork().getName())
 
         for (key, val) in self.__nets.items(): reg.register(str(self.__asn), 'net', key, val)
@@ -235,9 +238,12 @@ class AutonomousSystem(Printable, Graphable, Configurable, Customizable):
         """
         assert name not in self.__routers, 'Router with name {} already exists.'.format(name)
 
-        router: RealWorldRouter = Node(name, NodeRole.Router, self.__asn)
-        router.__class__ = RealWorldRouter
-        router.initRealWorld(hideHops)
+        #router: RealWorldRouterMixin = Node(name, NodeRole.Router, self.__asn)
+        # this skips Router::__init__() which initializes 'loopback_addr' and 'isBorderRouter' attributes. But WHY ?!
+        #router.__class__ = RealWorldRouter
+        #router.initRealWorld(hideHops)
+        router: RealWorldRouterMixin = Router(name, NodeRole.Router, self.__asn)
+        router = promote_to_real_world_router(router, hideHops)
 
         if prefixes == None:
             prefixes = self.getPrefixList()

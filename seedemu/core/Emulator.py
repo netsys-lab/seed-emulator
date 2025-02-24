@@ -109,7 +109,7 @@ class Emulator:
         self.__registry.register('seedemu', 'dict', 'layersdb', self.__layers)
         self.__registry.register('seedemu', 'list', 'bindingdb', self.__bindings)
 
-        self.__service_net_prefix = '192.168.160.0/23'
+        self.__service_net_prefix = serviceNetworkPrefix # '192.168.160.0/23'
         self.__service_net = None
 
     def __render(self, layerName, optional: bool, configure: bool):

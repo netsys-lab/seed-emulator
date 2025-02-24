@@ -1,7 +1,7 @@
 from __future__ import annotations
 from ipaddress import IPv4Network, IPv4Address
 from .RemoteAccessProvider import RemoteAccessProvider
-from .ExternalConnectivityProvider import ExternalConnectivityProvider
+# from .ExternalConnectivityProvider import ExternalConnectivityProvider
 from .Printable import Printable
 from .enums import NetworkType, NodeRole
 from .Registry import Registrable
@@ -270,6 +270,7 @@ class Network(Printable, Registrable, Vertex):
         @returns self, for chaining API calls.
         """
         assert self.__type == NetworkType.Local, 'remote access can only be enabled on local networks.'
+        assert not self.__ecp, 'at the moment RemoteAccess and ExternalConnectivity are mutually exclusive'
         self.__rap = provider
 
         return self
@@ -279,7 +280,8 @@ class Network(Printable, Registrable, Vertex):
         @brief enable nodes on this emulated network to connect to the 'real' Internet
         """
         assert self.__type == NetworkType.Local, 'external connectivity can only be enabled on local networks.'
-        self.__rap = provider
+        assert not self.__rap, 'at the moment RemoteAccess and ExternalConnectivity are mutually exclusive'
+        self.__ecp = provider
 
         return self
 
@@ -300,6 +302,9 @@ class Network(Printable, Registrable, Vertex):
         @returns RAP, or None.
         """
         return self.__rap
+    
+    def getExternalConnectivityProvider(self) -> ExternalConnectivityProvider:
+        return self.__ecp
 
     def print(self, indent: int) -> str:
         out = ' ' * indent

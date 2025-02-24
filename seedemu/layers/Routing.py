@@ -1,4 +1,4 @@
-from seedemu.core import ScopedRegistry, Node, Interface, Network, Emulator, Layer, Router, RealWorldRouter, BaseSystem
+from seedemu.core import ScopedRegistry, Node, Interface, Network, Emulator, Layer, Router, RealWorldRouterMixin, BaseSystem
 from typing import List, Dict
 from ipaddress import IPv4Network
 
@@ -161,9 +161,9 @@ class Routing(Layer):
 
             if type == 'rnode':
                 rnode: Router = obj
-                if issubclass(rnode.__class__, RealWorldRouter):
+                if issubclass(rnode.__class__, RealWorldRouterMixin): # could also be ScionRouter which needs RealWorldAccess
                     self._log("Sealing real-world router as{}/{}...".format(rnode.getAsn(), rnode.getName()))
-                    rnode.seal()
+                    rnode.seal(emulator.getServiceNetwork())
 
             if type in ['hnode', 'csnode']:
                 hnode: Node = obj
