@@ -394,17 +394,6 @@ class Node(Printable, Registrable, Configurable, Vertex, Customizable):
         """!@brief retrieve any volumes mounted on this node's container"""
         return self.__custom_vols
 
-    # TODO: if a separate .env file is created, or the values are given directly in the docker-compose.yml 'environment' section
-    # could be a setting of the Docker compiler
-    # def setCustomEnv(self, key: str, actual_value: str, scope: ScopeTier=ScopeTier.Node, use_envsubst: bool=False):
-
-
-    #def _setBuildTimeEnv(self, var: str, value: str, scope: ScopeTier):
-
-    #def getCustomRuntimeEnv(self) -> Dict[str,Dict[Scope,Tuple[str,str|None]]]:
-    #    """!      @brief return this nodes runtime ENV variables for use with envsubst        """
-    #    return self.__custom_env
-
     def getHostNames(self) -> str:
         """!
         @brief Get all host names for this node.

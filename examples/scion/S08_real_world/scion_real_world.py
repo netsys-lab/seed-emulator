@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 
-#from seedemu.layers import Base, Routing, Ebgp, PeerRelationship, Ibgp, Ospf
-#from seedemu.services import WebService
+
+from seedemu.services import GolangDevService, AccessMode
 from seedemu.core import Emulator, Binding, Filter
 #from seedemu.raps import OpenVpnRemoteAccessProvider
   
@@ -41,6 +41,13 @@ def run(dumpfile = None):
     scion_isd = ScionIsd()
     scion = Scion()
 
+    devsvc = GolangDevService( 'amdfxlucas', 'saculolissat@gmx.de' )
+    repo_url = 'https://github.com/amdfxlucas/scion'
+    repo_branch = 'mcast-dev'
+    repo_path = '/home/root/repos/scion'
+                 
+
+
     # SCION ISDs
     base.createIsolationDomain(1)
 
@@ -69,7 +76,7 @@ def run(dumpfile = None):
     as152 = base.createAutonomousSystem(152)
     scion_isd.addIsdAs(1, 152, is_core=True)
     as152.createNetwork('net0')
-    as152.createControlService('cs1').joinNetwork('net0')
+    as152_cs1 = as152.createControlService('cs1').joinNetwork('net0')
     as152.createRouter('br0').joinNetwork('net0').joinNetwork('ix100')
 
     # AS-153
@@ -77,7 +84,8 @@ def run(dumpfile = None):
     scion_isd.addIsdAs(1, 153, is_core=False)
     scion_isd.setCertIssuer((1, 153), issuer=150)
     as153.createNetwork('net0')
-    as153.createControlService('cs1').joinNetwork('net0')
+    as153_cs1 = as153.createControlService('cs1').joinNetwork('net0') 
+    # TODO: install DevService on as153_cs1 and see if it is automatically externally connected
     as153_router = as153.createRouter('br0')
     as153_router.joinNetwork('net0')
     as153_router.crossConnect(150, 'br0', '10.50.0.3/29')
@@ -88,12 +96,20 @@ def run(dumpfile = None):
     scion.addIxLink(100, (1, 152), (1, 150), ScLinkType.Core)
     scion.addXcLink((1, 150), (1, 153), ScLinkType.Transit)
 
+    svc = devsvc.install(f'dev_152_cs1')
+    svc.checkoutRepo(repo_url, repo_path, repo_branch, AccessMode.shared)
+    emu.addBinding(Binding(f'dev_152_cs1', filter=Filter(nodeName=as152_cs1.getName(), asn=152)))
+
+    svc3 = devsvc.install(f'dev_153_cs1')
+    svc3.checkoutRepo(repo_url, repo_path, repo_branch, AccessMode.shared)
+    emu.addBinding(Binding(f'dev_153_cs1', filter=Filter(nodeName=as153_cs1.getName(), asn=153)))
+
     # Rendering
     emu.addLayer(base)
     emu.addLayer(routing)
     emu.addLayer(scion_isd)
     emu.addLayer(scion)
-
+    emu.addLayer(devsvc)
 
 
     if dumpfile is not None:

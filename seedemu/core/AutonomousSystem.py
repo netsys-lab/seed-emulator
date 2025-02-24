@@ -100,6 +100,8 @@ class AutonomousSystem(Printable, Graphable, Configurable, Customizable):
 
         for val in list(self.__nets.values()):
             net: Network = val
+            # Rap creates a new node for the provider and thus has to be set up 
+            # before node registration
             if net.getRemoteAccessProvider() != None:
                 rap = net.getRemoteAccessProvider()
 
@@ -107,13 +109,16 @@ class AutonomousSystem(Printable, Graphable, Configurable, Customizable):
                 brNet = emulator.getServiceNetwork()
 
                 rap.configureRemoteAccess(emulator, net, brNode, brNet)
-
+            # .. whereas RealWorldConnectivity doesn't, so it can be moved to a later point
+            #  (after the services[which might require real-world-access] have been configured)
             #if (p:=net.getExternalConnectivityProvider()) != None:
             #    p.configureExternalLink(emulator, net, localNet of brNode , emulator.getServiceNet() )
 
-        for router in list(self.__routers.values()):
-            if issubclass(router.__class__, RealWorldRouterMixin):
-                router.joinNetwork(emulator.getServiceNetwork().getName())
+        #for router in list(self.__routers.values()):
+        #    if issubclass(router.__class__, RealWorldRouterMixin):
+        #        router.joinNetwork(emulator.getServiceNetwork().getName())
+        if any([issubclass(r.__class__, RealWorldRouterMixin) for r in list(self.__routers.values())]):
+            _ = emulator.getServiceNetwork() # this will construct and register Svc Net with registry
 
         for (key, val) in self.__nets.items(): reg.register(str(self.__asn), 'net', key, val)
         for (key, val) in self.__hosts.items(): reg.register(str(self.__asn), 'hnode', key, val)

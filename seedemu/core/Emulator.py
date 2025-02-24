@@ -1,5 +1,6 @@
 from __future__ import annotations
 from seedemu.core.enums import NetworkType, NodeRole
+from .ExternalConnectivityProvider import ExternalConnectivityProvider
 from .Merger import Mergeable, Merger
 from .Registry import Registry, Registrable, Printable
 from .Network import Network
@@ -88,6 +89,7 @@ class Emulator:
 
     __service_net: Network
     __service_net_prefix: str
+    __ecp: ExternalConnectivityProvider
 
     def __init__(self, serviceNetworkPrefix: str = '192.168.66.0/24'):
         """!
@@ -111,6 +113,8 @@ class Emulator:
 
         self.__service_net_prefix = serviceNetworkPrefix # '192.168.160.0/23'
         self.__service_net = None
+        self.__ecp = ExternalConnectivityProvider()
+    
 
     def __render(self, layerName, optional: bool, configure: bool):
         """!
@@ -330,6 +334,11 @@ class Emulator:
 
         return self.__service_net
 
+    def getExternalConnectivityProvider(self):
+        # if we already own the service network, its only fair,
+        # we also provide the means to use it properly. . . 
+        return self.__ecp
+    
     def render(self) -> Emulator:
         """!
         @brief Render to emulation.

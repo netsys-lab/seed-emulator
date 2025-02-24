@@ -153,7 +153,7 @@ class Service(Layer):#TODO: add availableOptions()
 
         @throws AssertionError if node is not host node.
         """
-        assert node.getRole() == NodeRole.Host, 'node as{}/{} is not a host node'.format(node.getAsn(), node.getName())
+        #assert node.getRole() == NodeRole.Host, 'node as{}/{} is not a host node'.format(node.getAsn(), node.getName())
         servicesdb: Dict = node.getAttribute('services', {})
 
         for (name, service_info) in servicesdb.items():
