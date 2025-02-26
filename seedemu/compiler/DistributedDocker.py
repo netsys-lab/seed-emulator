@@ -118,8 +118,9 @@ class DistributedDocker(Docker):
                 ), file=open('docker-compose.yml', 'w'))
 
                 self._used_images = set()
-
-                print('COMPOSE_PROJECT_NAME=sim_{}'.format(scope), file=open('.env', 'w'))
+          
+                if scope != 'ix':
+                    self.generateEnvFile(scope, f'./{scope}')
 
             chdir('..')
 

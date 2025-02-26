@@ -55,6 +55,7 @@ class Base(Layer, Graphable):
     def getName(self) -> str:
         return "Base"
 
+
     def configure(self, emulator: Emulator):
         self._log('registering nodes...')
         for asobj in self.__ases.values():
@@ -62,6 +63,7 @@ class Base(Layer, Graphable):
                 asobj.setNameServers(self.__name_servers)
 
             asobj.registerNodes(emulator)
+            asobj.inheritOptions(emulator)            
 
         self._log('setting up internet exchanges...')
         for ix in self.__ixes.values(): ix.configure(emulator)
