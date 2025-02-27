@@ -63,6 +63,21 @@ class LinkType(Enum):
                 assert not core_as, 'Logic error:  Core ASes must only provide transit to customers, not receive it!'
                 return "PARENT"
 
+class ScionConfigMode(Enum):
+    """how shall the /etc/scion config dir contents be handled:"""
+    # TODO: currently only ScionRouting layer understands this...
+    # '/etc/scion/ crypto & keys' is added by ScionIsd Layer, 
+    # which doesn't support Options yet
+    # so this is still baked into the images
+
+    # statically include config in docker image
+    BAKED_IN = 0
+    # mount shared folder from host into /etc/scion path of node
+    SHARED_FOLDER = 1
+    # create named volumes for each container
+    NAMED_VOLUME = 2
+    # TODO all hosts of an AS could in theory share the same volume/bind-mount..
+
 
 
 @dataclass
@@ -458,8 +473,8 @@ class ScionBuilder():
     def installSCION(self, node: Node):
         """!@brief 
         Installs the right SCION stack distributables on the given node based on its role.
-
-        The install is performed as instructed by the nodes SetupSpec option
+        But doesn't configure them ( /etc/scion config dir is untouched by it)
+        The install is performed as instructed by the nodes SetupSpec option.
         """
         spec = node.getOption('setup_spec')
         assert spec != None, 'implementation error - all nodes are supposed to have a SetupSpecification set by ScionRoutingLayer'
