@@ -52,6 +52,9 @@ class ScionStackOpts(BaseOptionGroup):
         @classmethod
         def supportedModes(cls) -> OptionMode:
             return OptionMode.BUILD_TIME | OptionMode.RUN_TIME
+        @classmethod
+        def default(cls):
+            return "false"
 
     class LOGLEVEL(Option):
         @classmethod
@@ -248,7 +251,7 @@ class ScionRouting(Routing):
         option_names = [name for name in args 
                         if (vals[name] is not None) and 
                         name not in ['self', 'static_routing', 'loopback_range'] ]
-        assert not any([ vals[name].name() != name for name in option_names]), 'option-parameter mismatch!'
+        assert not any([ vals[name].name != name for name in option_names]), 'option-parameter mismatch!'
         ScionRouting._static_routing = static_routing
         
         # set the global default options here if not overriden by user

@@ -64,7 +64,7 @@ class OptionRegistry(metaclass=SingletonMeta):
         # also register any children
         if (components := option.components()) != None:
             for c in components:
-                cls.register(c, prefix + option.name().lower())
+                cls.register(c, prefix + option.getName().lower())
 
     @classmethod
     def create_option(cls, name: str, *args, **kwargs) -> 'Option':

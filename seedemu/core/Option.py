@@ -24,15 +24,26 @@ class AutoRegister():
                     OptionRegistry.register(c.name(), cls.name() )
         '''
 
+# makes @property work with @classmethod
+class ClassProperty:
+    def __init__(self, func):
+        self.func = func
 
+    def __get__(self, instance, owner):
+        return self.func(owner)
 
 class BaseComponent(): # metaclass=OptionGroupMeta
 
     
+    @ClassProperty
+    #@classmethod
+    def name(cls) -> str:
+        # some old code expects a property (no '()' call operator )
+        return cls.__name__.lower() # self.__class__.__name__
 
     @classmethod
-    def name(cls) -> str:
-        return cls.__name__.lower() # self.__class__.__name__
+    def getName(cls) -> str:
+        return cls.__name__.lower()
     
     @classmethod
     def components(cls) -> Optional[List['BaseComponent']]:
@@ -70,7 +81,7 @@ class OptionGroupMeta(type): # or BaseComponentMeta ..
 
                     # prefixed_name = f"{name}_{attr_value.name()}"
                     # better call new_cls.add() # here
-                    new_cls._children[attr_value.name()] = attr_value
+                    new_cls._children[attr_value.name] = attr_value
             if hit:
                 OptionRegistry().register(new_cls)
         return new_cls
@@ -133,7 +144,7 @@ class Option(BaseOption):
  
     def __init__(self, value = None, mode: OptionMode = None):
         cls = self.__class__
-        key = cls.name().lower()
+        key = cls.getName().lower()
         # TODO: ONLY REGISTRY IS ALLOWED TO INSTANTIATE ME !!
         # i.e. caller_name must be 'create_option'
         '''
