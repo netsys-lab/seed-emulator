@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 
 from seedemu.compiler import Docker, Graphviz
-from seedemu.core import Emulator, OptionMode, Scope, ScopeTier, ScopeType
+from seedemu.core import Emulator, OptionMode, Scope, ScopeTier, ScopeType, OptionRegistry
 from seedemu.layers import (
     ScionBase, ScionRouting, ScionIsd, Scion, Ospf, Ibgp, Ebgp, PeerRelationship,
     SetupSpecification, CheckoutSpecification)
 from seedemu.layers.Scion import LinkType as ScLinkType
-
 # Initialize
 emu = Emulator()
 base = ScionBase()
 # change global defaults here .. .
-loglvl = ScionRouting.Option.loglevel('error', mode=OptionMode.RUN_TIME)
+loglvl = OptionRegistry().scionstackflags_loglevel('error', mode=OptionMode.RUN_TIME)
 
 spec = SetupSpecification.LOCAL_BUILD(
         CheckoutSpecification(
