@@ -12,7 +12,8 @@ from ipaddress import IPv4Network
 from typing import Dict, List
 import requests
 
-RIS_PREFIXLIST_URL = 'https://stat.ripe.net/data/announced-prefixes/data.json'
+RIS_PREFIXLIST_URL = "https://stat.ripe.net/data/announced-prefixes/data.json"
+
 
 class AutonomousSystem(Printable, Graphable, Configurable):
     """!
@@ -41,7 +42,11 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         self.__routers = {}
         self.__nets = {}
         self.__asn = asn
-        self.__subnets = None if asn > 255 else list(IPv4Network(subnetTemplate.format(asn)).subnets(new_prefix = 24))
+        self.__subnets = (
+            None
+            if asn > 255
+            else list(IPv4Network(subnetTemplate.format(asn)).subnets(new_prefix=24))
+        )
         self.__name_servers = []
 
     def setNameServers(self, servers: List[str]) -> AutonomousSystem:
@@ -75,16 +80,14 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         @throw AssertionError if API failed.
         """
 
-        rslt = requests.get(RIS_PREFIXLIST_URL, {
-            'resource': self.__asn
-        })
+        rslt = requests.get(RIS_PREFIXLIST_URL, {"resource": self.__asn})
 
-        assert rslt.status_code == 200, 'RIPEstat API returned non-200'
+        assert rslt.status_code == 200, "RIPEstat API returned non-200"
 
         json = rslt.json()
-        assert json['status'] == 'ok', 'RIPEstat API returned not-OK'
+        assert json["status"] == "ok", "RIPEstat API returned not-OK"
 
-        return [p['prefix'] for p in json['data']['prefixes'] if ':' not in p['prefix']]
+        return [p["prefix"] for p in json["data"]["prefixes"] if ":" not in p["prefix"]]
 
     def registerNodes(self, emulator: Emulator):
         """!
@@ -102,7 +105,7 @@ class AutonomousSystem(Printable, Graphable, Configurable):
             if net.getRemoteAccessProvider() != None:
                 rap = net.getRemoteAccessProvider()
 
-                brNode = self.createRouter('br-{}'.format(net.getName()))
+                brNode = self.createRouter("br-{}".format(net.getName()))
                 brNet = emulator.getServiceNetwork()
 
                 rap.configureRemoteAccess(emulator, net, brNode, brNet)
@@ -111,9 +114,12 @@ class AutonomousSystem(Printable, Graphable, Configurable):
             if issubclass(router.__class__, RealWorldRouter):
                 router.joinNetwork(emulator.getServiceNetwork().getName())
 
-        for (key, val) in self.__nets.items(): reg.register(str(self.__asn), 'net', key, val)
-        for (key, val) in self.__hosts.items(): reg.register(str(self.__asn), 'hnode', key, val)
-        for (key, val) in self.__routers.items(): reg.register(str(self.__asn), 'rnode', key, val)
+        for key, val in self.__nets.items():
+            reg.register(str(self.__asn), "net", key, val)
+        for key, val in self.__hosts.items():
+            reg.register(str(self.__asn), "hnode", key, val)
+        for key, val in self.__routers.items():
+            reg.register(str(self.__asn), "rnode", key, val)
 
     def configure(self, emulator: Emulator):
         """!
@@ -135,7 +141,9 @@ class AutonomousSystem(Printable, Graphable, Configurable):
 
             router.configure(emulator)
             if router.isBorderRouter():
-                emulator.getRegistry().register( str(self.__asn), 'brdnode', name, router )
+                emulator.getRegistry().register(
+                    str(self.__asn), "brdnode", name, router
+                )
 
     def getAsn(self) -> int:
         """!
@@ -145,7 +153,13 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         """
         return self.__asn
 
-    def createNetwork(self, name: str, prefix: str = "auto", direct: bool = True, aac: AddressAssignmentConstraint = None) -> Network:
+    def createNetwork(
+        self,
+        name: str,
+        prefix: str = "auto",
+        direct: bool = True,
+        aac: AddressAssignmentConstraint = None,
+    ) -> Network:
         """!
         @brief Create a new network.
 
@@ -164,7 +178,9 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         assert prefix != "auto" or self.__asn <= 255, "can't use auto: asn > 255"
 
         network = IPv4Network(prefix) if prefix != "auto" else self.__subnets.pop(0)
-        assert name not in self.__nets, 'Network with name {} already exist.'.format(name)
+        assert name not in self.__nets, "Network with name {} already exist.".format(
+            name
+        )
         self.__nets[name] = Network(name, NetworkType.Local, network, aac, direct)
 
         return self.__nets[name]
@@ -193,12 +209,16 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         @param name name of the new node.
         @returns Node.
         """
-        assert name not in self.__routers, 'Router with name {} already exists.'.format(name)
+        assert name not in self.__routers, "Router with name {} already exists.".format(
+            name
+        )
         self.__routers[name] = Router(name, NodeRole.Router, self.__asn)
 
         return self.__routers[name]
 
-    def createRealWorldRouter(self, name: str, hideHops: bool = True, prefixes: List[str] = None) -> Node:
+    def createRealWorldRouter(
+        self, name: str, hideHops: bool = True, prefixes: List[str] = None
+    ) -> Node:
         """!
         @brief Create a real-world router node.
 
@@ -214,7 +234,9 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         RIS)
         @returns new node.
         """
-        assert name not in self.__routers, 'Router with name {} already exists.'.format(name)
+        assert name not in self.__routers, "Router with name {} already exists.".format(
+            name
+        )
 
         router: RealWorldRouter = Node(name, NodeRole.Router, self.__asn)
         router.__class__ = RealWorldRouter
@@ -238,11 +260,13 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         """
         return list(self.__routers.keys())
 
-    def getBorderRouters(self)->List[str]:
+    def getBorderRouters(self) -> List[str]:
         """
         @brief return the subset of all routers that participate in inter-domain routing
         """
-        return [router for name, router in self.__routers.items() if router.isBorderRouter() ]
+        return [
+            router for name, router in self.__routers.items() if router.isBorderRouter()
+        ]
 
     def getRouter(self, name: str) -> Node:
         """!
@@ -260,7 +284,9 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         @param name name of the new node.
         @returns Node.
         """
-        assert name not in self.__hosts, 'Host with name {} already exists.'.format(name)
+        assert name not in self.__hosts, "Host with name {} already exists.".format(
+            name
+        )
         self.__hosts[name] = Node(name, NodeRole.Host, self.__asn)
 
         return self.__hosts[name]
@@ -287,34 +313,42 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         @brief create l2 connection graphs.
         """
 
-        l2graph = self._addGraph('AS{}: Layer 2 Connections'.format(self.__asn), False)
+        l2graph = self._addGraph("AS{}: Layer 2 Connections".format(self.__asn), False)
 
         for obj in self.__nets.values():
             net: Network = obj
-            l2graph.addVertex('Network: {}'.format(net.getName()), shape = 'rectangle', group = 'AS{}'.format(self.__asn))
+            l2graph.addVertex(
+                "Network: {}".format(net.getName()),
+                shape="rectangle",
+                group="AS{}".format(self.__asn),
+            )
 
         for obj in self.__routers.values():
             router: Node = obj
-            rtrname = 'Router: {}'.format(router.getName(), group = 'AS{}'.format(self.__asn))
-            l2graph.addVertex(rtrname, group = 'AS{}'.format(self.__asn), shape = 'diamond')
+            rtrname = "Router: {}".format(
+                router.getName(), group="AS{}".format(self.__asn)
+            )
+            l2graph.addVertex(rtrname, group="AS{}".format(self.__asn), shape="diamond")
             for iface in router.getInterfaces():
                 net = iface.getNet()
-                netname = 'Network: {}'.format(net.getName())
+                netname = "Network: {}".format(net.getName())
                 if net.getType() == NetworkType.InternetExchange:
-                    netname = 'Exchange: {}...'.format(net.getName())
-                    l2graph.addVertex(netname, shape = 'rectangle')
+                    netname = "Exchange: {}...".format(net.getName())
+                    l2graph.addVertex(netname, shape="rectangle")
                 if net.getType() == NetworkType.CrossConnect:
-                    netname = 'CrossConnect: {}...'.format(net.getName())
-                    l2graph.addVertex(netname, shape = 'rectangle')
+                    netname = "CrossConnect: {}...".format(net.getName())
+                    l2graph.addVertex(netname, shape="rectangle")
                 l2graph.addEdge(rtrname, netname)
 
         for obj in self.__hosts.values():
             router: Node = obj
-            rtrname = 'Host: {}'.format(router.getName(), group = 'AS{}'.format(self.__asn))
-            l2graph.addVertex(rtrname, group = 'AS{}'.format(self.__asn))
+            rtrname = "Host: {}".format(
+                router.getName(), group="AS{}".format(self.__asn)
+            )
+            l2graph.addVertex(rtrname, group="AS{}".format(self.__asn))
             for iface in router.getInterfaces():
                 net = iface.getNet()
-                netname = 'Network: {}'.format(net.getName())
+                netname = "Network: {}".format(net.getName())
                 l2graph.addEdge(rtrname, netname)
 
         # todo: better xc graphs?
@@ -328,24 +362,24 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         @returns printable string.
         """
 
-        out = ' ' * indent
-        out += 'AutonomousSystem {}:\n'.format(self.__asn)
+        out = " " * indent
+        out += "AutonomousSystem {}:\n".format(self.__asn)
 
         indent += 4
-        out += ' ' * indent
-        out += 'Networks:\n'
+        out += " " * indent
+        out += "Networks:\n"
 
         for net in self.__nets.values():
             out += net.print(indent + 4)
 
-        out += ' ' * indent
-        out += 'Routers:\n'
+        out += " " * indent
+        out += "Routers:\n"
 
         for node in self.__routers.values():
             out += node.print(indent + 4)
 
-        out += ' ' * indent
-        out += 'Hosts:\n'
+        out += " " * indent
+        out += "Hosts:\n"
 
         for host in self.__hosts.values():
             out += host.print(indent + 4)
