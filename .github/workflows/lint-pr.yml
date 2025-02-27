@@ -1,0 +1,21 @@
+name: Comment PR with linter errors
+
+on: [pull_request]
+
+jobs:
+  flake8-lint:
+    permissions:
+      pull-requests: write
+    runs-on: ubuntu-latest
+    name: Linter
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@v3
+      - name: Set up Python environment
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Run linter and comment PR
+        uses: matias-martini/flake8-pr-comments-action@main
+        with:
+          github_token: ${{ github.token }}
