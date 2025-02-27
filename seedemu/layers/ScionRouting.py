@@ -16,19 +16,13 @@ from seedemu.layers.Scion import Scion, ScionBuilder, SetupSpecification, Checko
 from seedemu.core.ScionAutonomousSystem import IA
 
 
-class ScionStackFlags(BaseOptionGroup):
-
-    def __new__(cls, name, bases, class_dict):
-        
-        print(f'{name} __new__')
-        new_cls = super().__new__(cls, name, bases, class_dict)
-        return new_cls 
+class ScionStackOpts(BaseOptionGroup):
+# NOTE: the classname is dynamically changed to just 'scion' so the 
+# nested option names don't become too lengthy...
     
     # TODO: add CS tracing
     # TODO: add dispatchable port range
     # make installation of test-tools optional (bwtester etc.)
-    def __init__(self):
-        super().__init__()
 
     class ROTATE_LOGS(Option):
         @classmethod
@@ -88,7 +82,7 @@ class ScionStackFlags(BaseOptionGroup):
         def supportedModes(cls) -> OptionMode:
             return OptionMode.BUILD_TIME
         @classmethod
-        def default():
+        def default(cls):
             return SetupSpecification.LOCAL_BUILD(CheckoutSpecification())
 
 
@@ -218,17 +212,8 @@ class ScionRouting(Routing):
     # so that not all options are set on all nodes (who might not need it for anything i.e. Host the DisableBFD option)
     # >> Maybe include 'NodeType that the option applies to' into the Option itself
     def getAvailableOptions(self):
-        '''
-        return [ScionRouting._disable_bfd,
-                ScionRouting._serve_metrics,
-                ScionRouting._rotate_logs,
-                ScionRouting._appropriate_digest,
-                ScionRouting._experimental_scmp,
-                ScionRouting._loglevel,
-                ScionRouting._use_envsubst,
-                ScionRouting._setup_spec ]
-        '''
-        return ScionStackFlags().components()
+      
+        return [ o() for o in ScionStackOpts().components()]
 
     def __init__(self, loopback_range: str = '10.0.0.0/16',
                  static_routing: bool = True,
@@ -263,7 +248,7 @@ class ScionRouting(Routing):
         option_names = [name for name in args 
                         if (vals[name] is not None) and 
                         name not in ['self', 'static_routing', 'loopback_range'] ]
-        assert not any([ vals[name].name != name for name in option_names]), 'option-parameter mismatch!'
+        assert not any([ vals[name].name() != name for name in option_names]), 'option-parameter mismatch!'
         ScionRouting._static_routing = static_routing
         
         # set the global default options here if not overriden by user

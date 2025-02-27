@@ -44,29 +44,36 @@ class OptionRegistry(metaclass=SingletonMeta):
 
         opt_name = option.__name__
         if opt_name in ['BaseOption', 'Option', 'BaseComponent', 'BaseOptionGroup'] : return
+        opt_name = opt_name.lower()
+        register_name = opt_name
+        if prefix != None:
+            register_name = f'{prefix}_' + opt_name
 
-        cls._options[opt_name] = option
+        cls._options[register_name] = option
+
         if prefix != None: prefix += '_'
         else: prefix = ''
         # Dynamically add a factory method to the registry class
-        factory_name = f"{prefix}{opt_name.lower()}"
+        factory_name = f"{prefix}{opt_name}"
         if not hasattr(cls, factory_name):
             # setattr(cls, factory_name, lambda: option ) # option.__class__()
 
-            setattr(cls, factory_name, lambda **kwargs: cls.create_option(opt_name, **kwargs))
+            #setattr(cls, factory_name, lambda *args, **kwargs: cls.create_option(opt_name, *args, **kwargs))
+            setattr(cls, factory_name, lambda *args, **kwargs: cls.create_option(factory_name, *args, **kwargs))
 
         # also register any children
         if (components := option.components()) != None:
             for c in components:
-                cls.register(c, prefix + option.name)
+                cls.register(c, prefix + option.name().lower())
 
     @classmethod
-    def create_option(cls, name: str, **kwargs) -> 'Option':
+    def create_option(cls, name: str, *args, **kwargs) -> 'Option':
         """Creates an option instance if it's registered."""
-        option_cls = cls._registry.get(name)
+        option_cls = cls._options.get(name)
         if not option_cls:
             raise ValueError(f"Option '{name}' is not registered.")
-        return option_cls(**kwargs)  # Instantiate with given arguments
+        # Instantiate with given arguments
+        return option_cls(*args[1:], **kwargs) 
 
 
     @classmethod
