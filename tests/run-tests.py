@@ -28,6 +28,7 @@ test_case_list = [
     EthereumPOWTestCase,
     ChainlinkPOATestCase,
     EthUtilityPOATestCase,
+    ScionLargeASNTestCase,
     ScionBgpMixedTestCase,
     ScionBwtesterTestCase,
     KuboTestCase,
