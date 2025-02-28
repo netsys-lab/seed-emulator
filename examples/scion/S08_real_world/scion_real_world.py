@@ -4,7 +4,6 @@
 
 from seedemu.services import GolangDevService, AccessMode
 from seedemu.core import Emulator, Binding, Filter
-#from seedemu.raps import OpenVpnRemoteAccessProvider
   
 from seedemu.compiler import Docker
 from seedemu.core import Emulator
@@ -41,9 +40,9 @@ def run(dumpfile = None):
     scion_isd = ScionIsd()
     scion = Scion()
 
-    devsvc = GolangDevService( 'amdfxlucas', 'saculolissat@gmx.de' )
-    repo_url = 'https://github.com/amdfxlucas/scion'
-    repo_branch = 'mcast-dev'
+    devsvc = GolangDevService('jane.doe', 'jane.doe@example.com')
+    repo_url = 'https://github.com/scionproto/scion.git'
+    repo_branch = 'v0.12.0'
     repo_path = '/home/root/repos/scion'
                  
 
@@ -57,7 +56,7 @@ def run(dumpfile = None):
     # AS-150
     as150 = base.createAutonomousSystem(150)
     scion_isd.addIsdAs(1, 150, is_core=True)
-    as150.createNetwork('net0')# .enableRealWorld() ^^ thats we'd like to do . . .
+    as150.createNetwork('net0')
     as150.createControlService('cs1').joinNetwork('net0')
     as150_router = as150.createRealWorldRouter('br0', prefixes=['10.150.0.0/24'])# the 'auto' gen prefix of net0
     # expectation: hosts from within AS150 can ping outside world i.e. 8.8.8.8
@@ -85,7 +84,7 @@ def run(dumpfile = None):
     scion_isd.setCertIssuer((1, 153), issuer=150)
     as153.createNetwork('net0')
     as153_cs1 = as153.createControlService('cs1').joinNetwork('net0') 
-    # TODO: install DevService on as153_cs1 and see if it is automatically externally connected
+    
     as153_router = as153.createRouter('br0')
     as153_router.joinNetwork('net0')
     as153_router.crossConnect(150, 'br0', '10.50.0.3/29')

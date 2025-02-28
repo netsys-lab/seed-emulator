@@ -3,7 +3,7 @@ from typing import Dict
 import re
 
 from  seedemu.core.enums import NodeRole, NetworkType
-from seedemu.core import Node, Server, Service, Emulator, Network, ExternalConnectivityProvider
+from seedemu.core import Node, Server, Service, Emulator, Network, ExternalConnectivityProvider, promote_to_real_world_router
 from typing import List, Tuple, Dict, Set
 from enum import Enum
 from  urllib.parse import urlparse,unquote
@@ -144,10 +144,10 @@ class DevServer(Server):
                 #else:
                 node.addDockerCommand(ServerTemplates['repo'].format(repourl=u, branch=b, dir=p ) )
 
-            node.addPersistentStorage(p) # TODO: name: to volname
+            node.addPersistentStorage(p, volname)
 
             # this should share the installed extensions among all DevServers
-            node.addPersistentStorage('/root/.vscode-server') # TODO: name: 'vscodeserver'
+            node.addPersistentStorage('/root/.vscode-server', 'vscodeserver')
               
         node.appendStartCommand(ServerTemplates['command'])
         node.appendClassName("DevServer")
@@ -174,8 +174,6 @@ class ContainerDevelopmentService(Service):
     __dev_cnt: int =0   
     __gituname: str = 'John Doe'
     __gitmail: str = 'john.doe@mail.com'
-    candidates = set()
-    _connProvider: ExternalConnectivityProvider
 
     #_shared_checkouts: dict(Pair,List)
 
@@ -199,12 +197,11 @@ class ContainerDevelopmentService(Service):
 
 
     def gitUser(self) -> str:
-        """
-        return the name of the Git user
-        """
+        """ return the name of the Git user """
         return self.__gituname
     
     def gitMail(self) -> str:
+        """return the email address of the Git User"""
         return self.__gitmail
 
     def checkoutShared(self, repourl: str, branch: str, node ):
@@ -248,8 +245,8 @@ class ContainerDevelopmentService(Service):
 
         pnode.addSoftware('openssh-client')
 
-        pnode.addPersistentStorage('/root/.ssh') #TODO: name: 'sshkeys' # not /home/root/ . . ?!
-        pnode.addPersistentStorage('/root/.config/git') #TODO: name: 'gitconf'
+        pnode.addPersistentStorage('/root/.ssh', 'sshkeys') # not /home/root/ . . ?!
+        pnode.addPersistentStorage('/root/.config/git', 'gitconf')
         
         # initialize the git config volume
         # --global -> /root/.gitconfig
@@ -268,37 +265,25 @@ class ContainerDevelopmentService(Service):
             node.addSoftware('openssh-client')
             node.appendStartCommand('eval "$(ssh-agent -s)"')
             node.appendStartCommand('ssh-add /root/.ssh/id_ed25519')
-            node.addPersistentStorage('/root/.ssh') #TODO: name: 'sshkeys'
-            node.addPersistentStorage('/root/.config/git') #TODO: name: 'gitconf'
-            
-            #node.addStartUpDependency(pnode)
-
-
-    def configure(self, emulator: Emulator):
-
-        self._configureGit(emulator)
-
-        # for all vnodes in self.__server find their local net/s  , uniqueify them
-        # find of all the associated nodes with the net the routers
-        # and finally create custom bridge DockerNetworks and register them 
-        # with the emulators registry in order for them to be retrieved by the DockerRenderer later on
-
-        
- 
-        grouped_candidates = dict() # routers grouped by their net 
-        # ideally there is for each local net, which contains at least one host with a DevService configured
-        # exactly one Router which is also the hosts default gateway
-
+            node.addPersistentStorage('/root/.ssh', 'sshkeys')
+            node.addPersistentStorage('/root/.config/git', 'gitconf')
+    
+    def _configureRealWorldAccess(self, emulator: Emulator):
+        """ in order to able to git-push any changes made on the build/dev-container checkouts
+            the nodes with a DevServer installation need external 'RealWorld' connectivity
+            on their local net (out of the simulation).
+            This function takes care of that by making the node's default gateway a 'RealWorldRouter'
+        """
         # ATTENTION: this means names of virtual hosts with DevServices must be globally unique :| !!
         for vnode in self.getPendingTargets().keys():
             pnode = emulator.getBindingFor(vnode) # or resolvVnode(vnode) ?!
 
-            '''
+            
             # a router with DevService installed on it -> (is its own gateway to service net / real world)
             if pnode.getRole() == NodeRole.Router or pnode.getRole() == NodeRole.BorderRouter:
-                ContainerDevelopmentService.candidates.add(pnode)
-                continue
-            '''
+                pnode = promote_to_real_world_router(pnode, False)
+                # continue
+            
 
             allnets_of_pnode: Set[Network] = set() # note: hosts can be in at most one local-net (have single interface)
             for inf in pnode.getInterfaces():
@@ -314,28 +299,19 @@ class ContainerDevelopmentService(Service):
             
             #  It would be nice if i could just call 'net.enableRealWorldAccess()' or sth here and be done with it
 
-            '''
-            for  net in allnets_of_pnode:
-                for node in net.getAssociations():
-                    if node.getRole() == NodeRole.Router or node.getRole() == NodeRole.BorderRouter:
-                        if net in grouped_candidates:
-                            grouped_candidates[net].add(node)
-                        else:
-                            grouped_candidates[net] = set([node])
-                        ContainerDevelopmentService.candidates.add(node)
-                        # continue # actually one (realWorld)router per network is enough !
-
-            # mark the router as external connected -> it'll become a real world router
-            for c in ContainerDevelopmentService.candidates:
-                c.setConnectedExternal()
-            '''
-
             # only routers will be in more than one net
             for  net in allnets_of_pnode:
                 p = emulator.getExternalConnectivityProvider()
                 net.enableExternalConnectivity(p)
                 # p = net.getExternalConnectivityProvider()
                 p.requestExternalLink(pnode, net)
+
+
+    def configure(self, emulator: Emulator):
+
+        self._configureGit(emulator)
+
+        self._configureRealWorldAccess(emulator)
 
         super().configure(emulator)
         
@@ -375,12 +351,14 @@ class GolangDevService(ContainerDevelopmentService):
 
     """
 
-    def __init__(self, uname: str, mail: str): # maybe add golang-version argument here
+    def __init__(self, uname: str, mail: str): # TODO: maybe add golang-version argument here
         """!
         @brief 
+        @param uname github user name
+        @param mail github email
         """
 
-        super().__init__(uname,mail)
+        super().__init__(uname, mail)
 
         self.addDependency('Base', False, False)     
         self.addDependency('Scion', False, True)
@@ -390,24 +368,28 @@ class GolangDevService(ContainerDevelopmentService):
         targets = list(self.getPendingTargets().keys())
         if len(targets) ==0:
             return
+        # where to download Golang
+        go_url = 'https://go.dev/dl/go1.24.0.linux-amd64.tar.gz'
+
         pnode = emulator.getBindingFor( targets[0] )
+        # pnode has to initialize the named docker volumes with the Go installation
         pnode.addSoftware("wget ca-certificates unzip findutils ") #  protobuf-compiler"
 
         # contains the protobuf installation        
-        pnode.addPersistentStorage('/root/.local') #TODO: name: 'protobuf'
+        pnode.addPersistentStorage('/root/.local', 'protobuf')
         # contains GOROOT (actual installation)
-        pnode.addPersistentStorage('/usr/local/go') #TODO: name: 'usrlocalgo'
+        pnode.addPersistentStorage('/usr/local/go', 'usrlocalgo')
         # contains GOPATH  - downloaded modules, installed tools/executables
-        pnode.addPersistentStorage('/go') #TODO: name: 'gopath'
+        pnode.addPersistentStorage('/go', 'gopath')
         # contains GOENV 
-        pnode.addPersistentStorage('/root/.config/go') #TODO: name: 'goenv'
+        pnode.addPersistentStorage('/root/.config/go', 'goenv')
         # contains GOCACHE 
-        pnode.addPersistentStorage('/root/.cache/go-build') #TODO: name: 'gocache' 
+        pnode.addPersistentStorage('/root/.cache/go-build', 'gocache') 
 
-        pnode.addDockerCommand('RUN mkdir /root/.local && wget https://github.com/protocolbuffers/protobuf/releases/download/v26.1/protoc-26.1-linux-x86_64.zip && unzip protoc-26.1-linux-x86_64.zip -d /root/.local ')
+        pnode.addDockerCommand('RUN mkdir /root/.local && wget https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-linux-x86_64.zip && unzip protoc-29.3-linux-x86_64.zip -d /root/.local ')
 
-        pnode.addDockerCommand('RUN wget -O- "https://go.dev/dl/go1.22.2.linux-amd64.tar.gz" --connect-timeout 1.5 | tar  -xz -C /usr/local ')
-        pnode.addDockerCommand('ENV PATH=$PATH:/usr/local/go/bin:/go/bin:/root/.local/protoc-26.1-linux-x86_64/bin')
+        pnode.addDockerCommand(f'RUN wget -O- "{go_url}" --connect-timeout 1.5 | tar  -xz -C /usr/local ')
+        pnode.addDockerCommand('ENV PATH=$PATH:/usr/local/go/bin:/go/bin:/root/.local/protoc-29.3-linux-x86_64/bin')
 
         pnode.addDockerCommand('RUN go env -w GOPATH=/go')
         # language server for IDE
@@ -418,26 +400,24 @@ class GolangDevService(ContainerDevelopmentService):
         # Go debugger
         pnode.addDockerCommand('RUN go install github.com/go-delve/delve/cmd/dlv@latest' )
 
+
         for vnode in targets[1:]:
             node = emulator.getBindingFor(vnode)
-
-            # pnode has to initialize the named docker volumes with the Go installation
-            # node.addStartUpDependency(pnode)
 
             # required for 'go install' to verify TLS certs  
             node.addSoftware("ca-certificates ") #protobuf-compiler
             
-            node.addDockerCommand('ENV PATH=$PATH:/usr/local/go/bin:/go/bin:/root/.local/protoc-26.1-linux-x86_64/bin')
+            node.addDockerCommand('ENV PATH=$PATH:/usr/local/go/bin:/go/bin:/root/.local/protoc-29.3-linux-x86_64/bin')
             # contains the protobuf installation        
-            node.addPersistentStorage('/root/.local') #TODO: name: 'protobuf'
+            node.addPersistentStorage('/root/.local', 'protobuf',volume={'nocopy':True})
             # contains GOROOT (actual installation)
-            node.addPersistentStorage('/usr/local/go') #TODO: name: 'usrlocalgo'
+            node.addPersistentStorage('/usr/local/go', 'usrlocalgo',volume={'nocopy':True})
             # contains GOPATH  - downloaded modules, installed tools/executables
-            node.addPersistentStorage('/go') #TODO: name: 'gopath'
+            node.addPersistentStorage('/go', 'gopath',volume={'nocopy':True})
             # contains GOENV
-            node.addPersistentStorage('/root/.config/go')  #TODO: name: 'goenv' 
+            node.addPersistentStorage('/root/.config/go', 'goenv',volume={'nocopy':True}) 
             # contains GOCACHE 
-            node.addPersistentStorage('/root/.cache/go-build') #TODO: name: 'gocache'
+            node.addPersistentStorage('/root/.cache/go-build', 'gocache',volume={'nocopy':True})
 
     def getName(self) -> str:
         return 'GolangDevService'
