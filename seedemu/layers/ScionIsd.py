@@ -140,7 +140,7 @@ class ScionIsd(Layer):
                     asn = node.getAsn()
                     as_: ScionAutonomousSystem = base_layer.getAutonomousSystem(asn)
                     isds = self.getAsIsds(asn)
-                    
+
                     assert len(isds) == 1, f"AS {hex(asn) if asn>65536 else asn} must be a member of exactly one ISD"
                     self.__provision_crypto(as_, *isds[0], node, tempdir)
 
