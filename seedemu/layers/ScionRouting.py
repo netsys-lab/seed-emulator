@@ -215,8 +215,10 @@ class ScionRouting(Routing):
     # so that not all options are set on all nodes (who might not need it for anything i.e. Host the DisableBFD option)
     # >> Maybe include 'NodeType that the option applies to' into the Option itself
     def getAvailableOptions(self):
-      
-        return [ o() for o in ScionStackOpts().components()]
+        from seedemu.core.OptionRegistry import OptionRegistry
+        opt_keys = [ o.name for o in ScionStackOpts().components()]
+        opt_cls = [OptionRegistry().get(o, 'scion') for o in opt_keys]
+        return [o() for o in opt_cls]
 
     def __init__(self, loopback_range: str = '10.0.0.0/16',
                  static_routing: bool = True,
@@ -244,6 +246,7 @@ class ScionRouting(Routing):
         @param loglevel LogLevel of SCION distributables
         @param serve_metrics enable collection of Prometheus metrics by SCION distributables
         """
+        from seedemu.core.OptionRegistry import OptionRegistry
         super().__init__(loopback_range)
         self.__default_builder = ScionBuilder()
         args = inspect.signature(ScionRouting.__init__).parameters.keys()
@@ -254,17 +257,24 @@ class ScionRouting(Routing):
         assert not any([ vals[name].name != name for name in option_names]), 'option-parameter mismatch!'
         ScionRouting._static_routing = static_routing
         
-        # set the global default options here if not overriden by user
-
-
-        '''
+        # let user override the global default options
+        
         for n in option_names:
-        def new_default(cls):
-            return "New method"
+        # Replace the 'defaults' class methods dynamically
+            v = vals[n]
+            opt_cls = type(v)
+            # Capture 'new_value' as default argument (forces a snapshot of the current value)
+            opt_cls.default = classmethod(lambda cls, new_value=v.value: new_value)
+            # new_mode = v.mode
+            opt_cls.defaultMode = classmethod(lambda cls, newmode=v.mode: newmode)
+            #if new_mode == OptionMode.BUILD_TIME:
+            #    opt_cls.defaultMode = classmethod(lambda cls: OptionMode.BUILD_TIME)
+            #else:
+            #    opt_cls.defaultMode = classmethod(lambda cls: OptionMode.RUN_TIME)
 
-        # Replace the class method dynamically
-        MyClass.default = classmethod(new_default)
-        '''
+            prefix = getattr(opt_cls, '__prefix') if hasattr(opt_cls, '__prefix') else None
+            OptionRegistry().register(opt_cls, prefix)
+        
 
 
 

@@ -31,6 +31,12 @@ class ClassProperty:
 
 class BaseComponent(): # metaclass=OptionGroupMeta
 
+    @classmethod
+    def prefix(cls) -> Optional[str]:
+        if hasattr(cls, '__prefix'):
+            return cls.__prefix
+        else:
+            return None
     
     @ClassProperty
     def name(cls) -> str:
@@ -144,7 +150,7 @@ class Option(BaseOption):
         self._mutable_mode = None
         if not mode in [ OptionMode.BUILD_TIME, None]:
             assert mode in self.supportedModes(), f'unsupported mode for option {key.upper()}'
-        self._mutable_mode = mode
+            self._mutable_mode = mode
 
     def __repr__(self):
         return f"Option(key={self.name()}, value={self._mutable_value})"
@@ -158,7 +164,12 @@ class Option(BaseOption):
     
     @classmethod
     def default(cls):
+        """ default option value if unspecified by user"""
         return None
+
+    @classmethod
+    def defaultMode(cls):
+        return OptionMode.BUILD_TIME
     
     @value.setter
     def value(self, new_value: str):
@@ -167,7 +178,10 @@ class Option(BaseOption):
 
     @property
     def mode(self):
-        return self._mutable_mode
+        if (mode := self._mutable_mode) != None:
+            return mode
+        else:
+            return self.defaultMode()
     
     @mode.setter
     def mode(self, new_mode):

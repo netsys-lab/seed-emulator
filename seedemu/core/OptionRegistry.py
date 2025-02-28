@@ -26,6 +26,7 @@ class OptionRegistry(metaclass=SingletonMeta):
         register_name = opt_name
         if prefix != None:
             register_name = f'{prefix}_' + opt_name
+            setattr(option, '__prefix', prefix)
 
         cls._options[register_name] = option
 
