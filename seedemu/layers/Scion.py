@@ -110,7 +110,7 @@ def handleScionConfFile( node, filename: str, filecontent: str, subdir: str = No
                             file.write(filecontent)
                     case _:
                     #case ScionConfigMode.BAKED_IN:
-                        node.setFile(f"/etc/scion/{filename}", filecontent)
+                        node.setFile(f"/etc/scion{suffix}/{filename}", filecontent)
                     #case ScionConfigMode.NAMED_VOLUME: will be populated on fst mount
     else:
         assert False, 'implementation error - lacking global default for option'
