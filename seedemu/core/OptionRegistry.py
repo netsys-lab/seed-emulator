@@ -35,8 +35,6 @@ class OptionRegistry(metaclass=SingletonMeta):
         # Dynamically add a factory method to the registry class
         factory_name = f"{prefix}{opt_name}"
         if not hasattr(cls, factory_name):
-
-            #setattr(cls, factory_name, lambda *args, **kwargs: cls.create_option(opt_name, *args, **kwargs))
             setattr(cls, factory_name, lambda *args, **kwargs: cls.create_option(factory_name, *args, **kwargs))
 
         # also register any children

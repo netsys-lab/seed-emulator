@@ -1,5 +1,5 @@
 from enum import Flag, auto
-from typing import List, Optional
+from typing import List, Optional, Type, Any
 
 
 
@@ -126,14 +126,12 @@ class BaseOption(BaseComponent, metaclass=OptionGroupMeta):
 
     # def __eq__(self, other: Option):
 
-    # TODO: add description(self)->str: here
-    # options really should be self-describing/explanatory
-
-
 # simple option
 class Option(BaseOption):
+    # Immutable class variable to be defined in subclasses
+    value_type: Type[Any]
  
-    def __init__(self, value = None, mode: OptionMode = None):
+    def __init__(self, value: Optional[Any] = None, mode: OptionMode = None):
         cls = self.__class__
         key = cls.getName().lower()
         # TODO: ONLY REGISTRY IS ALLOWED TO INSTANTIATE ME !!
@@ -145,6 +143,9 @@ class Option(BaseOption):
         assert caller_name in valid_keys or caller_name in [ 'getAvailableOptions', '__init__'], 'constructor of ScionRouting.Option is private'
         
         '''
+        # Ensure default matches the class-level type
+        if value is not None and not isinstance(value, self.value_type):
+            raise TypeError(f"Expected {self.value_type.__name__} for '{self.name}', got {type(value).__name__}")
 
         self._mutable_value = value if value != None else cls.default()
         self._mutable_mode = None
@@ -155,6 +156,11 @@ class Option(BaseOption):
     def __repr__(self):
         return f"Option(key={self.name()}, value={self._mutable_value})"
     
+    @classmethod
+    def getType(cls) -> Type:
+        """return this option's value type"""
+        return cls.value_type
+
     @property
     def value(self) -> str:
         if (val := self._mutable_value) != None:
@@ -169,11 +175,15 @@ class Option(BaseOption):
 
     @classmethod
     def defaultMode(cls):
+        """ default mode if unspecified by user"""
         return OptionMode.BUILD_TIME
     
     @value.setter
-    def value(self, new_value: str):
+    def value(self, new_value: Any):
         """Allow updating the value attribute."""
+        if not isinstance(new_value, self.value_type):
+            raise TypeError(f"Expected {self.value_type.__name__} for '{self.name}', got {type(new_value).__name__}")
+        assert new_value != None, 'Logic Error - option value cannot be None!'
         self._mutable_value = new_value
 
     @property
@@ -186,6 +196,10 @@ class Option(BaseOption):
     @mode.setter
     def mode(self, new_mode):
         self._mutable_mode = new_mode
+
+    @classmethod
+    def description(cls) -> str:
+        return cls.__doc__ or "No documentation available."
 
 
 # class ScopedOption:

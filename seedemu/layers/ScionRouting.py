@@ -25,6 +25,9 @@ class ScionStackOpts(BaseOptionGroup):
     # make installation of test-tools optional (bwtester etc.)
 
     class ROTATE_LOGS(Option):
+        """prevent excessive growth of log files for longer running simulations
+        by rotating log files """
+        value_type = str
         @classmethod
         def supportedModes(cls) -> OptionMode:
             return OptionMode.BUILD_TIME
@@ -33,6 +36,9 @@ class ScionStackOpts(BaseOptionGroup):
             return "false"
 
     class APPROPRIATE_DIGEST(Option):
+        """ Enables the CA module to sign issued certificates
+           with the appropriate digest algorithm instead of always using ECDSAWithSHA512."""
+        value_type = str
         @classmethod
         def supportedModes() -> OptionMode:
             return OptionMode.BUILD_TIME | OptionMode.RUN_TIME
@@ -41,6 +47,11 @@ class ScionStackOpts(BaseOptionGroup):
             return "true"
 
     class DISABLE_BFD(Option):
+        """Bidirectional Forwarding Detection (BFD) is a network protocol that is used to detect faults
+          between two forwarding engines connected by a link.[ RFC 5880, RFC 5881]
+          In SCION, BFD is used to determine the liveness of the link
+          between two border routers and trigger SCMP error messages."""
+        value_type = str
         @classmethod
         def supportedModes(self) -> OptionMode:
             return  OptionMode.BUILD_TIME | OptionMode.RUN_TIME
@@ -49,6 +60,11 @@ class ScionStackOpts(BaseOptionGroup):
             return "true"
 
     class EXPERIMENTAL_SCMP(Option):
+        """Enable the DRKey-based authentication of SCMPs in the router,
+          which is experimental and currently incomplete.
+          When enabled, the router inserts the SCION Packet Authenticator Option(SPAO) for SCMP messages.
+          For now, the MAC is computed based on a dummy key, and consequently is not practically useful."""
+        value_type = str
         @classmethod
         def supportedModes(cls) -> OptionMode:
             return OptionMode.BUILD_TIME | OptionMode.RUN_TIME
@@ -56,7 +72,9 @@ class ScionStackOpts(BaseOptionGroup):
         def default(cls):
             return "false"
 
-    class LOGLEVEL(Option):
+    class LOGLEVEL(Option): # TODO allow different values per distributable
+        """loglevel of the SCION distributables"""
+        value_type = str
         @classmethod
         def supportedModes(cls) -> OptionMode:
             return OptionMode.BUILD_TIME | OptionMode.RUN_TIME
@@ -64,7 +82,9 @@ class ScionStackOpts(BaseOptionGroup):
         def default(cls):
             return "error"
 
-    class SERVE_METRICS(Option):
+    class SERVE_METRICS(Option): # TODO allow setting per distributable
+        """enable collection of Prometheus metrics by SCION distributables"""
+        value_type = str
         @classmethod
         def supportedModes(cls) -> OptionMode:
             return OptionMode.BUILD_TIME | OptionMode.RUN_TIME
@@ -72,7 +92,14 @@ class ScionStackOpts(BaseOptionGroup):
         def default(cls):
             return "false"            
 
+    # FIXME: what to do about this ?! actually it can be derived from OptionModes of all available options
+    # If any of them has RUN_TIME mode -> this implies USE_ENVSUBST==True
     class USE_ENVSUBST(Option):
+        """wheter to pipe the config files of SCION distributables
+        through envsubst before passing to application.
+        This allows for dynamic configuration / substitution of ENV variables in the config.
+        """
+        value_type = str
         @classmethod
         def supportedModes(cls) -> OptionMode:
             return OptionMode.BUILD_TIME
@@ -81,6 +108,8 @@ class ScionStackOpts(BaseOptionGroup):
             return "true"
 
     class SETUP_SPEC(Option):
+        """ which SCION stack to deploy in the simulation """
+        value_type = SetupSpecification
         @classmethod
         def supportedModes(cls) -> OptionMode:
             return OptionMode.BUILD_TIME
@@ -245,6 +274,7 @@ class ScionRouting(Routing):
           In SCION, BFD is used to determine the liveness of the link between two border routers and trigger SCMP error messages.
         @param loglevel LogLevel of SCION distributables
         @param serve_metrics enable collection of Prometheus metrics by SCION distributables
+        @param setup_spec which SCION stack to deploy in the simulation
         """
         from seedemu.core.OptionRegistry import OptionRegistry
         super().__init__(loopback_range)
@@ -265,18 +295,9 @@ class ScionRouting(Routing):
             opt_cls = type(v)
             # Capture 'new_value' as default argument (forces a snapshot of the current value)
             opt_cls.default = classmethod(lambda cls, new_value=v.value: new_value)
-            # new_mode = v.mode
             opt_cls.defaultMode = classmethod(lambda cls, newmode=v.mode: newmode)
-            #if new_mode == OptionMode.BUILD_TIME:
-            #    opt_cls.defaultMode = classmethod(lambda cls: OptionMode.BUILD_TIME)
-            #else:
-            #    opt_cls.defaultMode = classmethod(lambda cls: OptionMode.RUN_TIME)
-
             prefix = getattr(opt_cls, '__prefix') if hasattr(opt_cls, '__prefix') else None
-            OptionRegistry().register(opt_cls, prefix)
-        
-
-
+            OptionRegistry().register(opt_cls, prefix)    
 
     @staticmethod
     def _resolveFlag(flag: str, node: Node = None) -> str:
