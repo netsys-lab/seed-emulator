@@ -68,6 +68,7 @@ class DynamicConfigurable(Configurable):
         ]
         for n in all_nodes:
             for o in self.getAvailableOptions():
+                assert o, 'implementation error'
                 n.setOption(o, Scope(ScopeTier.Global))
 
     def configure(self, emulator: Emulator):
