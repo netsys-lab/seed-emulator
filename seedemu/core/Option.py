@@ -12,11 +12,8 @@ class AutoRegister():
 
         from .OptionRegistry import OptionRegistry
         super().__init_subclass__(**kwargs)
-        #instance = cls()  # Create an instance
         #  Auto-register & create factory method
-        #OptionRegistry().register(instance)
         OptionRegistry().register(cls)
-        # registry.register(instance)  
         '''
         if issubclass(cls, BaseComponent):
             if (children := cls.components()) != None:
@@ -36,10 +33,9 @@ class BaseComponent(): # metaclass=OptionGroupMeta
 
     
     @ClassProperty
-    #@classmethod
     def name(cls) -> str:
         # some old code expects a property (no '()' call operator )
-        return cls.__name__.lower() # self.__class__.__name__
+        return cls.__name__.lower()
 
     @classmethod
     def getName(cls) -> str:
@@ -75,9 +71,6 @@ class OptionGroupMeta(type): # or BaseComponentMeta ..
             for attr_name, attr_value in class_dict.items():
                 if issubclass(type(attr_value), OptionGroupMeta):
                     hit = True
-                    #option_instance = attr_value()  # Instantiate option
-                    #prefixed_name = f"{name}.{option_instance.get_name()}"
-                    #new_cls._options[prefixed_name] = option_instance
 
                     # prefixed_name = f"{name}_{attr_value.name()}"
                     # better call new_cls.add() # here
@@ -102,13 +95,6 @@ class BaseOption(BaseComponent, metaclass=OptionGroupMeta):
         else:
             raise NotImplementedError
 
-    '''
-    @property
-    def name(self) -> str:
-        """Should return the name of the option."""
-        pass
-    '''
-
     @property
     def value(self) -> str:
         """Should return the value of the option."""
@@ -128,7 +114,6 @@ class BaseOption(BaseComponent, metaclass=OptionGroupMeta):
     def mode(self, new_mode: OptionMode):
         pass
 
-    # def defaultValue(self)
     @classmethod
     def supportedModes(cls) -> OptionMode:
         pass
@@ -199,38 +184,6 @@ class Option(BaseOption):
 class BaseOptionGroup(BaseComponent , metaclass=OptionGroupMeta):
     _children = {}
     
-    '''
-    def __new__(cls, name, bases, class_dict):
-        from .OptionRegistry import OptionRegistry
-
-        print(f'{name} __new__')
-       # OptionRegistry().register(cls)
-
-        new_cls = super().__new__(cls, name, bases, class_dict)
-        # if (cls == OptionGroupMeta): return new_cls
-        new_cls._children = {}
-
-        # Auto-register nested Option classes
-        for attr_name, attr_value in class_dict.items():
-            if isinstance(attr_value, type) and issubclass(attr_value, Option):
-                #option_instance = attr_value()  # Instantiate option
-                #prefixed_name = f"{name}.{option_instance.get_name()}"
-                #new_cls._options[prefixed_name] = option_instance
-
-                # prefixed_name = f"{name}_{attr_value.name()}"
-                # better call new_cls.add() # here
-                new_cls._children[attr_value.name()] = attr_value
-
-        #OptionRegistry().register(cls)
-        return new_cls
-    '''
-
-    '''
-    def __init__(self):
-        super().__init__()
-        self._children = {}
-        self.__class__._children = {}
-    '''
 
     def describe(self) -> str:
         return f"OptionGroup {self.__class__.__name__}:\n" + "\n".join(
@@ -249,4 +202,3 @@ class BaseOptionGroup(BaseComponent , metaclass=OptionGroupMeta):
     @classmethod
     def components(cls):
         return [v for _, v in cls._children.items()]
-        #return self._children

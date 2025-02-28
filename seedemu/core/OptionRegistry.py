@@ -10,31 +10,9 @@ class SingletonMeta(type):
         return cls._instances[cls]
 
 
-'''
-# @singleton Decorator for option registry
-
-def singleton(cls):
-    instances = {}
-
-    def get_instance(*args, **kwargs):
-        if cls not in instances:
-            instances[cls] = cls(*args, **kwargs)
-        return instances[cls]
-
-    return get_instance
-'''
-
 class OptionRegistry(metaclass=SingletonMeta):
     _options: Dict[str, Type['Option']]  = {}
 
-    '''
-    _instance = None  # Class-level storage for the single instance
-
-    def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-    '''
 
     @classmethod
     def register(cls, option: Type['BaseComponent'], prefix: str = None):
@@ -56,7 +34,6 @@ class OptionRegistry(metaclass=SingletonMeta):
         # Dynamically add a factory method to the registry class
         factory_name = f"{prefix}{opt_name}"
         if not hasattr(cls, factory_name):
-            # setattr(cls, factory_name, lambda: option ) # option.__class__()
 
             #setattr(cls, factory_name, lambda *args, **kwargs: cls.create_option(opt_name, *args, **kwargs))
             setattr(cls, factory_name, lambda *args, **kwargs: cls.create_option(factory_name, *args, **kwargs))
@@ -88,6 +65,3 @@ class OptionRegistry(metaclass=SingletonMeta):
     def list_options(cls):
         """Lists all registered options."""
         return list(cls._options.keys())
-
-# module level singleton instance
-# registry = OptionRegistry()
