@@ -1270,23 +1270,7 @@ class Docker(Compiler):
                 dirName = image.getDirName()
             )
 
-        toplevelvolumes = '' 
-        if len(topvols := self._getVolumes()) > 0:
-            toplevelvolumes += 'volumes:\n'
-            #topvols = set(map( lambda vol: TopLvlVolume(vol), pool.getVolumes() ))
-
-            for v in  topvols:
-                v.mode = 'toplevel'
-
-            #toplevelvolumes += '\n'.join(map( lambda line: '        ' + line ,dump( topvols ).split('\n') ) ) 
-
-            # sharedFolders/bind mounts do not belong in the top-level volumes section
-            for v in [vv  for  vv in topvols if vv.asDict()['type'] == 'volume' ]: 
-                toplevelvolumes += '  {}:\n'.format(v.asDict()['source']) # why not 'name'
-                lines = dump( v ).rstrip('\n').split('\n')
-                toplevelvolumes += '\n'.join( map( lambda x: '        ' if x[0] != 0 else '        ' + x[1] if x[1] != ''else '' , enumerate(lines ) ) )
-                toplevelvolumes += '\n'
-
+        toplevelvolumes = self._computeComposeTopLvlVolumes()
 
         self._log('creating docker-compose.yml...'.format(scope, name))
         print(DockerCompilerFileTemplates['compose'].format(
@@ -1297,3 +1281,28 @@ class Docker(Compiler):
         ), file=open('docker-compose.yml', 'w'))
 
         self.generateEnvFile(Scope(ScopeTier.Global),'')
+
+    def _computeComposeTopLvlVolumes(self) -> str:
+        """ render the 'volumes:' section of the docker-compose.yml file 
+        It contains named volumes but not bind-mounts.
+        """
+        toplevelvolumes = '' 
+        if len(topvols := self._getVolumes()) > 0:
+            hit = False
+            #topvols = set(map( lambda vol: TopLvlVolume(vol), pool.getVolumes() ))
+
+            for v in  topvols:
+                v.mode = 'toplevel'
+
+            #toplevelvolumes += '\n'.join(map( lambda line: '        ' + line ,dump( topvols ).split('\n') ) ) 
+
+            # sharedFolders/bind mounts do not belong in the top-level volumes section
+            for v in [vv  for  vv in topvols if vv.asDict()['type'] == 'volume' ]:
+                hit = True
+                toplevelvolumes += '  {}:\n'.format(v.asDict()['source']) # why not 'name'
+                lines = dump( v ).rstrip('\n').split('\n')
+                toplevelvolumes += '\n'.join( map( lambda x: '        ' if x[0] != 0 else '        ' + x[1] if x[1] != ''else '' , enumerate(lines ) ) )
+                toplevelvolumes += '\n'
+        
+        if hit: toplevelvolumes = 'volumes:\n' + toplevelvolumes
+        return toplevelvolumes
