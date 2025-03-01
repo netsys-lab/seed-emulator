@@ -6,10 +6,12 @@ import unittest as ut
 from seedemu.core.ScionAutonomousSystem import IA, ScionASN
 from tests.scion import ScionTestCase
 
+
 class ScionLargeASNTestCase(ScionTestCase):
     """!
     @brief Test the S02-scion-bgp-mixed example.
     """
+
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
@@ -23,12 +25,13 @@ class ScionLargeASNTestCase(ScionTestCase):
         self.cses = {}
         for cntr in self.containers:
             if "cs" in cntr.name:
-                asn, _, ip = cntr.name.split('-')
-                asn = ScionASN(int(asn.lstrip('as').rstrip('h')))
+                asn, _, ip = cntr.name.split("-")
+                asn = ScionASN(int(asn.lstrip("as").rstrip("h")))
                 self.cses[cntr.name] = (f"1-{asn}", ip, cntr)
 
     def test_scion_connections(self):
-        """Test whether all control services can reach each other using their SCION addresses.
+        """Test whether all control services can reach each other using their
+        SCION addresses.
         """
         for name, (_, _, cntr) in self.cses.items():
             self.printLog(f"\n-------- Test SCION reachability from {name} --------")
@@ -40,7 +43,7 @@ class ScionLargeASNTestCase(ScionTestCase):
     @classmethod
     def get_test_suite(cls):
         test_suite = ut.TestSuite()
-        test_suite.addTest(cls('test_scion_connections'))
+        test_suite.addTest(cls("test_scion_connections"))
         return test_suite
 
 
@@ -50,4 +53,7 @@ if __name__ == "__main__":
 
     ScionLargeASNTestCase.printLog("==========Test=========")
     num, errs, fails = res.testsRun, len(res.errors), len(res.failures)
-    ScionLargeASNTestCase.printLog("score: %d of %d (%d errors, %d failures)" % (num - (errs+fails), num, errs, fails))
+    ScionLargeASNTestCase.printLog(
+        "score: %d of %d (%d errors, %d failures)"
+        % (num - (errs + fails), num, errs, fails)
+    )
