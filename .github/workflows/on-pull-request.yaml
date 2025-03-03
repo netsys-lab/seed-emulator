@@ -6,22 +6,22 @@ on:
       - workflow
 
 jobs:
-  # flake8-lint:
-  #   permissions:
-  #     pull-requests: write
-  #   runs-on: ubuntu-latest
-  #   name: Lint
-  #   steps:
-  #     - name: Check out source repository
-  #       uses: actions/checkout@v3
-  #     - name: Set up Python environment
-  #       uses: actions/setup-python@v4
-  #       with:
-  #         python-version: "3.10"
-  #     - name: Run linter and comment PR
-  #       uses: matias-martini/flake8-pr-comments-action@main
-  #       with:
-  #         github_token: ${{ github.token }}
+  flake8-lint:
+    permissions:
+      pull-requests: write
+    runs-on: ubuntu-latest
+    name: Lint
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@v3
+      - name: Set up Python environment
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Run linter and comment PR
+        uses: matias-martini/flake8-pr-comments-action@main
+        with:
+          github_token: ${{ github.token }}
 
   run-tests:
     name: Run Tests
@@ -30,9 +30,9 @@ jobs:
       contents: read
     steps:
       - name: Check out the source repository
-        uses: actions/checkout@4.2.2
+        uses: actions/checkout@4
       - name: Set up Python
-        uses: actions/setup-python@5.4.0
+        uses: actions/setup-python@5
         with:
           python-version: "3.10"
           cache: 'pip'
@@ -56,9 +56,9 @@ jobs:
       contents: read
     steps:
       - name: Check out the source repository
-        uses: actions/checkout@4.2.2
+        uses: actions/checkout@4
       - name: Set up Python
-        uses: actions/setup-python@5.4.0
+        uses: actions/setup-python@5
         with:
           python-version: "3.10"
           cache: 'pip'
