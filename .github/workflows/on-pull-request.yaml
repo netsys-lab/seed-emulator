@@ -1,6 +1,9 @@
 name: Comment PR with linter errors
 
-on: [pull_request]
+on:
+  pull_request:
+    branches:
+      - workflow
 
 jobs:
   flake8-lint:
