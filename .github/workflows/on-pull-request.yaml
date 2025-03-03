@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Run linter and comment PR
-        uses: matias-martini/flake8-pr-comments-action@main
+        uses: netsys-lab/flake8-pr-comments-action@main
         with:
           github_token: ${{ github.token }}
           plugins: "pep8-naming flake8-functions"
