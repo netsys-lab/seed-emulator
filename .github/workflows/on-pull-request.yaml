@@ -7,24 +7,22 @@ on:
 
 jobs:
   flake8-lint:
-    name: Lint
-    runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pull-request: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    name: Lint
     steps:
-      - name: Check out the source repository
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Check out source repository
+        uses: actions/checkout@v3
+      - name: Set up Python environment
+        uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
-          cache: 'pip'
-          cache-dependency-path: "**/requirements.txt"
+          python-version: "3.11"
       - name: Run linter and comment PR
         uses: matias-martini/flake8-pr-comments-action@main
         with:
           github_token: ${{ github.token }}
+          plugins: "pep8-naming flake8-functions"
 
   # run-tests:
   #   name: Run Tests
