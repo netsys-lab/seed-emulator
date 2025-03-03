@@ -12,7 +12,6 @@ from ipaddress import IPv4Network
 from typing import Dict, List
 import requests
 
-
 RIS_PREFIXLIST_URL = "https://stat.ripe.net/data/announced-prefixes/data.json"
 
 class AutonomousSystem(Printable, Graphable, Configurable):
