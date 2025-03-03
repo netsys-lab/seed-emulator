@@ -22,7 +22,7 @@ jobs:
           cache: 'pip'
           cache-dependency-path: "**/requirements.txt"
       - name: Run linter and comment PR
-        uses: netsys-lab/flake8-pr-comments-action@test
+        uses: matias-martini/flake8-pr-comments-action@main
         with:
           github_token: ${{ github.token }}
 
