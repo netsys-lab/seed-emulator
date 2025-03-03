@@ -24,15 +24,15 @@ jobs:
   #         github_token: ${{ github.token }}
 
   run-tests:
-    name: Run Test
+    name: Run Tests
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - name: Check out the source repository
-        uses: actions/checkout@4
+        uses: actions/checkout@4.2.2
       - name: Set up Python
-        uses: actions/setup-python@5
+        uses: actions/setup-python@5.4.0
         with:
           python-version: "3.10"
           cache: 'pip'
@@ -56,9 +56,9 @@ jobs:
       contents: read
     steps:
       - name: Check out the source repository
-        uses: actions/checkout@4
+        uses: actions/checkout@4.2.2
       - name: Set up Python
-        uses: actions/setup-python@5
+        uses: actions/setup-python@5.4.0
         with:
           python-version: "3.10"
           cache: 'pip'
