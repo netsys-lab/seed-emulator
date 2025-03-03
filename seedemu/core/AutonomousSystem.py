@@ -13,10 +13,8 @@ from typing import Dict, List
 import requests
 
 
-
-
-
 RIS_PREFIXLIST_URL = "https://stat.ripe.net/data/announced-prefixes/data.json"
+
 
 class AutonomousSystem(Printable, Graphable, Configurable):
     """!
@@ -144,9 +142,7 @@ class AutonomousSystem(Printable, Graphable, Configurable):
 
             router.configure(emulator)
             if router.isBorderRouter():
-                emulator.getRegistry().register(
-                    str(self.__asn), "brdnode", name, router
-                )
+                emulator.getRegistry().register(str(self.__asn), "brdnode", name, router)
 
     def getAsn(self) -> int:
         """!
@@ -181,9 +177,7 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         assert prefix != "auto" or self.__asn <= 255, "can't use auto: asn > 255"
 
         network = IPv4Network(prefix) if prefix != "auto" else self.__subnets.pop(0)
-        assert name not in self.__nets, "Network with name {} already exist.".format(
-            name
-        )
+        assert name not in self.__nets, "Network with name {} already exist.".format(name)
         self.__nets[name] = Network(name, NetworkType.Local, network, aac, direct)
 
         return self.__nets[name]
@@ -212,9 +206,7 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         @param name name of the new node.
         @returns Node.
         """
-        assert name not in self.__routers, "Router with name {} already exists.".format(
-            name
-        )
+        assert name not in self.__routers, "Router with name {} already exists.".format(name)
         self.__routers[name] = Router(name, NodeRole.Router, self.__asn)
 
         return self.__routers[name]
@@ -237,9 +229,7 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         RIS)
         @returns new node.
         """
-        assert name not in self.__routers, "Router with name {} already exists.".format(
-            name
-        )
+        assert name not in self.__routers, "Router with name {} already exists.".format(name)
 
         router: RealWorldRouter = Node(name, NodeRole.Router, self.__asn)
         router.__class__ = RealWorldRouter
@@ -267,9 +257,7 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         """
         @brief return the subset of all routers that participate in inter-domain routing
         """
-        return [
-            router for name, router in self.__routers.items() if router.isBorderRouter()
-        ]
+        return [router for name, router in self.__routers.items() if router.isBorderRouter()]
 
     def getRouter(self, name: str) -> Node:
         """!
@@ -287,9 +275,7 @@ class AutonomousSystem(Printable, Graphable, Configurable):
         @param name name of the new node.
         @returns Node.
         """
-        assert name not in self.__hosts, "Host with name {} already exists.".format(
-            name
-        )
+        assert name not in self.__hosts, "Host with name {} already exists.".format(name)
         self.__hosts[name] = Node(name, NodeRole.Host, self.__asn)
 
         return self.__hosts[name]
@@ -328,9 +314,7 @@ class AutonomousSystem(Printable, Graphable, Configurable):
 
         for obj in self.__routers.values():
             router: Node = obj
-            rtrname = "Router: {}".format(
-                router.getName(), group="AS{}".format(self.__asn)
-            )
+            rtrname = "Router: {}".format(router.getName(), group="AS{}".format(self.__asn))
             l2graph.addVertex(rtrname, group="AS{}".format(self.__asn), shape="diamond")
             for iface in router.getInterfaces():
                 net = iface.getNet()
@@ -345,9 +329,7 @@ class AutonomousSystem(Printable, Graphable, Configurable):
 
         for obj in self.__hosts.values():
             router: Node = obj
-            rtrname = "Host: {}".format(
-                router.getName(), group="AS{}".format(self.__asn)
-            )
+            rtrname = "Host: {}".format(router.getName(), group="AS{}".format(self.__asn))
             l2graph.addVertex(rtrname, group="AS{}".format(self.__asn))
             for iface in router.getInterfaces():
                 net = iface.getNet()
