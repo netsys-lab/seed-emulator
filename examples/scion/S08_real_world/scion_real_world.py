@@ -4,7 +4,7 @@
 
 from seedemu.services import GolangDevService, AccessMode
 from seedemu.core import Emulator, Binding, Filter
-  
+
 from seedemu.compiler import Docker
 from seedemu.core import Emulator
 from seedemu.layers import ScionBase, ScionRouting, ScionIsd, Scion
@@ -32,7 +32,7 @@ def run(dumpfile = None):
         else:
             print(f"Usage:  {script_name} amd|arm")
             sys.exit(1)
-    
+
     # Initialize
     emu = Emulator()
     base = ScionBase()
@@ -44,7 +44,7 @@ def run(dumpfile = None):
     repo_url = 'https://github.com/scionproto/scion.git'
     repo_branch = 'v0.12.0'
     repo_path = '/home/root/repos/scion'
-                 
+
 
 
     # SCION ISDs
@@ -83,8 +83,8 @@ def run(dumpfile = None):
     scion_isd.addIsdAs(1, 153, is_core=False)
     scion_isd.setCertIssuer((1, 153), issuer=150)
     as153.createNetwork('net0')
-    as153_cs1 = as153.createControlService('cs1').joinNetwork('net0') 
-    
+    as153_cs1 = as153.createControlService('cs1').joinNetwork('net0')
+
     as153_router = as153.createRouter('br0')
     as153_router.joinNetwork('net0')
     as153_router.crossConnect(150, 'br0', '10.50.0.3/29')
@@ -117,7 +117,7 @@ def run(dumpfile = None):
         emu.render()
 
         ###############################################################################
-        # Compilation 
+        # Compilation
 
         emu.compile(Docker(platform=platform), './output', override=True)
 

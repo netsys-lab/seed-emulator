@@ -100,7 +100,7 @@ class AutonomousSystem(Printable, Graphable, Configurable, Customizable):
 
         for val in list(self.__nets.values()):
             net: Network = val
-            # Rap creates a new node for the provider and thus has to be set up 
+            # Rap creates a new node for the provider and thus has to be set up
             # before node registration
             if net.getRemoteAccessProvider() != None:
                 rap = net.getRemoteAccessProvider()
@@ -140,7 +140,7 @@ class AutonomousSystem(Printable, Graphable, Configurable, Customizable):
 
     def scope(self)-> Scope:
         """return a scope specific to this AS"""
-        return Scope(ScopeTier.AS, as_id=self.getAsn())    
+        return Scope(ScopeTier.AS, as_id=self.getAsn())
 
     def configure(self, emulator: Emulator):
         """!

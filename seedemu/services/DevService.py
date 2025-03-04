@@ -28,7 +28,7 @@ RUN git clone {repourl} -b {branch} {dir}
 
 #RUN wget -qO- "https://github.com/Kitware/CMake/releases/download/v3.28.1/cmake-3.28.1-linux-x86_64.tar.gz" | \
 #  tar --strip-components=1 -xz -C /usr/local && export PATH=$PATH:/usr/local/bin
-#RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y 
+#RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 #RUN export PATH=$PATH:~/.cargo/bin
 #RUN ~/.cargo/bin/rustup default nightly
 
@@ -36,7 +36,7 @@ RUN git clone {repourl} -b {branch} {dir}
 #RUN mkdir /home/root
 
 # install VSCode CLI
-#RUN curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64' --output /home/root/vscodecli.tar.gz 
+#RUN curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64' --output /home/root/vscodecli.tar.gz
 #RUN cd /home/root/ && tar -xf vscodecli.tar.gz
 #https://go.microsoft.com/fwlink/?LinkID=760868
 '''
@@ -67,27 +67,27 @@ class DevServer(Server):
 
     __id: int
     # maybe add custom build command here and custom software
-    #[( dir-to-clone-into, branch-to-checkout, repo-url, access-modifier )]  
+    #[( dir-to-clone-into, branch-to-checkout, repo-url, access-modifier )]
     __repos: List[(str,str,str,AccessMode)]
-    #  repos that have to be checked out will most likely vary by node 
+    #  repos that have to be checked out will most likely vary by node
     # and so do the software stacks required for each project
-    
+
     # VSCode extensions that shall be installed in the service
     __vscode_extensions: List[str]
-    
+
     def checkoutRepo(self, url: str, path: str, branch: str ,mode: AccessMode = AccessMode.private ):
         """!
         @brief  checks out the git repository with the given URL and branch in a Docker Volume
         @param path an absolute path to the directory where you want the repo to reside in the container
         @param mode  if you want to share the checkout(actually the containing docker volume)
-          with other DevServer instances or rather have your own separate copy 
+          with other DevServer instances or rather have your own separate copy
           in a dedicated docker volume only mounted into this DevServer instance
         """
 
         self.__repos.append( (url,path,branch,mode) )
 
         return self
-    
+
     def __init__(self,service, id: int):
         """!
         @brief constructor.
@@ -97,11 +97,11 @@ class DevServer(Server):
         self.__id = id
         self.__vscode_extensions = []
         self.__repos = []
-      
+
     def addVSCodeExtension(self, ext: str):
         self.__vscode_extensions.append(ext)
         return self
-    
+
     def getVSCodeExtensions(self):
         return self.__vscode_extensions
 
@@ -109,25 +109,25 @@ class DevServer(Server):
         """!
         @brief Install the service.
         """
-         # Developing Software requires Internet connection 
+         # Developing Software requires Internet connection
          # for i.e. git, go get, cargo build, pip install etc. ..
         # node.requestReachOutside()
-              
+
         node.addSoftware("git") # wget curl build-essential clang gpg
-  
+
         extens = ''
         for e in self.getVSCodeExtensions():
             extens += 'RUN code --no-sandbox --user-data-dir /home/root/.vscode --install-extension %s\n' % e
         # code doesnt like to be run as super user -> maybe useradd here ?!
-        # if only vscode cli is installed gives error: 
+        # if only vscode cli is installed gives error:
         #   No installation of Visual Studio Code stable was found.
-        #   Install it from your system's package manager or https://code.visualstudio.com, restart your shell, and try again. 
+        #   Install it from your system's package manager or https://code.visualstudio.com, restart your shell, and try again.
         #   f you already installed Visual Studio Code and we didn't detect it, run `code version use stable --install-dir /path/to/installation`
 
         # node.addDockerCommand(ServerTemplates['build'].format(extensions=extens))
 
-        for (u,p,b,m) in self.__repos:         
-            
+        for (u,p,b,m) in self.__repos:
+
             path = urlparse(u).path
             parts = PurePosixPath(    unquote(path)).parts
             volname = parts[-2] + '-' + parts[-1] # gituser-repo
@@ -148,7 +148,7 @@ class DevServer(Server):
 
             # this should share the installed extensions among all DevServers
             node.addPersistentStorage('/root/.vscode-server', 'vscodeserver')
-              
+
         node.appendStartCommand(ServerTemplates['command'])
         node.appendClassName("DevServer")
 
@@ -171,15 +171,15 @@ class ContainerDevelopmentService(Service):
     , build cache and downloaded dependencies.
 
     """
-    __dev_cnt: int =0   
+    __dev_cnt: int = 0
     __gituname: str = 'John Doe'
     __gitmail: str = 'john.doe@mail.com'
 
     #_shared_checkouts: dict(Pair,List)
 
-    def __init__(self, gitusrname: str, gitusrmail: str): 
+    def __init__(self, gitusrname: str, gitusrmail: str):
         """!
-        @brief 
+        @brief
         """
         self.__gituname = gitusrname
         self.__gitmail = gitusrmail
@@ -187,7 +187,7 @@ class ContainerDevelopmentService(Service):
         self._shared_checkouts = dict()
         super().__init__()
 
-        self.addDependency('Base', False, False)     
+        self.addDependency('Base', False, False)
         self.addDependency('Scion', False, True)
 
         # in the course of configuring the DevService layer
@@ -199,7 +199,7 @@ class ContainerDevelopmentService(Service):
     def gitUser(self) -> str:
         """ return the name of the Git user """
         return self.__gituname
-    
+
     def gitMail(self) -> str:
         """return the email address of the Git User"""
         return self.__gitmail
@@ -208,7 +208,7 @@ class ContainerDevelopmentService(Service):
         """
         for a given shared repo checkout identified by (url,branch)
         returns the node, which is responsible for the initial initialization
-        of the named volume or none if there is none 
+        of the named volume or none if there is none
         """
         if (repourl, branch) in self._shared_checkouts.keys():
             return self._shared_checkouts[(repourl, branch)]
@@ -217,11 +217,11 @@ class ContainerDevelopmentService(Service):
             return None
 
 
-    def _createServer(self) -> Server:    
+    def _createServer(self) -> Server:
         d = DevServer(self, self.__dev_cnt)
-        ContainerDevelopmentService.__dev_cnt += 1 
+        ContainerDevelopmentService.__dev_cnt += 1
         return d
-    
+
     def install(self, vnode: str) -> Server:
 
         return super().install(vnode)
@@ -229,8 +229,8 @@ class ContainerDevelopmentService(Service):
     def _configureGit(self, emu: Emulator):
         """
         to be able to push changes made in the DevServer build containers,
-        the node has to have a keypair in ~/.ssh 
-        
+        the node has to have a keypair in ~/.ssh
+
         There is one node that initializes the shared volume.
         Therefore it needs to have some additional software installed: ssh-keygen
 
@@ -247,14 +247,14 @@ class ContainerDevelopmentService(Service):
 
         pnode.addPersistentStorage('/root/.ssh', 'sshkeys') # not /home/root/ . . ?!
         pnode.addPersistentStorage('/root/.config/git', 'gitconf')
-        
+
         # initialize the git config volume
         # --global -> /root/.gitconfig
         pnode.addDockerCommand('RUN mkdir -p /root/.config/git/')
         pnode.addDockerCommand('RUN git config -f /root/.config/git/config  user.name {}'.format( self.gitUser()) )
         pnode.addDockerCommand('RUN git config -f /root/.config/git/config  user.email {}'.format(self.gitMail()) )
 
-        pnode.addDockerCommand('RUN echo $(ssh-keygen -t ed25519 -C "{}" -f /root/.ssh/id_ed25519 -N "" | grep -E ":(.*) ")'.format(self.gitMail() ) ) 
+        pnode.addDockerCommand('RUN echo $(ssh-keygen -t ed25519 -C "{}" -f /root/.ssh/id_ed25519 -N "" | grep -E ":(.*) ")'.format(self.gitMail() ) )
         #TODO: print the pub key to console somehow during build, so that user can add  key to GitHub, before 'docker-compose up'
         # only visible with --progress=plain option passed to docker-compose build
         pnode.appendStartCommand('eval "$(ssh-agent -s)"')
@@ -267,7 +267,7 @@ class ContainerDevelopmentService(Service):
             node.appendStartCommand('ssh-add /root/.ssh/id_ed25519')
             node.addPersistentStorage('/root/.ssh', 'sshkeys')
             node.addPersistentStorage('/root/.config/git', 'gitconf')
-    
+
     def _configureRealWorldAccess(self, emulator: Emulator):
         """ in order to able to git-push any changes made on the build/dev-container checkouts
             the nodes with a DevServer installation need external 'RealWorld' connectivity
@@ -278,12 +278,12 @@ class ContainerDevelopmentService(Service):
         for vnode in self.getPendingTargets().keys():
             pnode = emulator.getBindingFor(vnode) # or resolvVnode(vnode) ?!
 
-            
+
             # a router with DevService installed on it -> (is its own gateway to service net / real world)
             if pnode.getRole() == NodeRole.Router or pnode.getRole() == NodeRole.BorderRouter:
                 pnode = promote_to_real_world_router(pnode, False)
                 # continue
-            
+
 
             allnets_of_pnode: Set[Network] = set() # note: hosts can be in at most one local-net (have single interface)
             for inf in pnode.getInterfaces():
@@ -294,9 +294,9 @@ class ContainerDevelopmentService(Service):
                 if net.getType() == NetworkType.Local:
                     if net in allnets_of_pnode:
                         print("multihomed host: %s" % vnode ) # this should be impossible
-                    
+
                     allnets_of_pnode.add(net)
-            
+
             #  It would be nice if i could just call 'net.enableRealWorldAccess()' or sth here and be done with it
 
             # only routers will be in more than one net
@@ -314,7 +314,7 @@ class ContainerDevelopmentService(Service):
         self._configureRealWorldAccess(emulator)
 
         super().configure(emulator)
-        
+
     def getName(self) -> str:
         return 'ContainerDevelopmentService'
 
@@ -339,11 +339,11 @@ devsvc.install('dev150_0').checkoutRepo(url= "https://github.com/your-username/y
 
 class GolangDevService(ContainerDevelopmentService):
     """!
-    @brief Container Development service that provides 
+    @brief Container Development service that provides
     a shared Go installation to all its DevServers it creates.
 
     A manual Go installation is done on the fst DevServer that is created by this service,
-    into a directory that points to a named docker volume, 
+    into a directory that points to a named docker volume,
     which is then mounted into all other DevServer instances under the same path.
     This way, they share modules downloaded into GOMODCACHE,
     tools/executables installed into GOBIN,
@@ -353,17 +353,17 @@ class GolangDevService(ContainerDevelopmentService):
 
     def __init__(self, uname: str, mail: str): # TODO: maybe add golang-version argument here
         """!
-        @brief 
+        @brief
         @param uname github user name
         @param mail github email
         """
 
         super().__init__(uname, mail)
 
-        self.addDependency('Base', False, False)     
+        self.addDependency('Base', False, False)
         self.addDependency('Scion', False, True)
 
-    def configure(self, emulator: Emulator):        
+    def configure(self, emulator: Emulator):
         super().configure(emulator)
         targets = list(self.getPendingTargets().keys())
         if len(targets) ==0:
@@ -375,16 +375,16 @@ class GolangDevService(ContainerDevelopmentService):
         # pnode has to initialize the named docker volumes with the Go installation
         pnode.addSoftware("wget ca-certificates unzip findutils ") #  protobuf-compiler"
 
-        # contains the protobuf installation        
+        # contains the protobuf installation
         pnode.addPersistentStorage('/root/.local', 'protobuf')
         # contains GOROOT (actual installation)
         pnode.addPersistentStorage('/usr/local/go', 'usrlocalgo')
         # contains GOPATH  - downloaded modules, installed tools/executables
         pnode.addPersistentStorage('/go', 'gopath')
-        # contains GOENV 
+        # contains GOENV
         pnode.addPersistentStorage('/root/.config/go', 'goenv')
-        # contains GOCACHE 
-        pnode.addPersistentStorage('/root/.cache/go-build', 'gocache') 
+        # contains GOCACHE
+        pnode.addPersistentStorage('/root/.cache/go-build', 'gocache')
 
         pnode.addDockerCommand('RUN mkdir /root/.local && wget https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-linux-x86_64.zip && unzip protoc-29.3-linux-x86_64.zip -d /root/.local ')
 
@@ -396,7 +396,7 @@ class GolangDevService(ContainerDevelopmentService):
         pnode.addDockerCommand('RUN go install golang.org/x/tools/gopls@latest' )
         # protobuf compiler
         pnode.addDockerCommand('RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest' )
-        pnode.addDockerCommand('RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest')    
+        pnode.addDockerCommand('RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest')
         # Go debugger
         pnode.addDockerCommand('RUN go install github.com/go-delve/delve/cmd/dlv@latest' )
 
@@ -404,19 +404,19 @@ class GolangDevService(ContainerDevelopmentService):
         for vnode in targets[1:]:
             node = emulator.getBindingFor(vnode)
 
-            # required for 'go install' to verify TLS certs  
+            # required for 'go install' to verify TLS certs
             node.addSoftware("ca-certificates ") #protobuf-compiler
-            
+
             node.addDockerCommand('ENV PATH=$PATH:/usr/local/go/bin:/go/bin:/root/.local/protoc-29.3-linux-x86_64/bin')
-            # contains the protobuf installation        
+            # contains the protobuf installation
             node.addPersistentStorage('/root/.local', 'protobuf',volume={'nocopy':True})
             # contains GOROOT (actual installation)
             node.addPersistentStorage('/usr/local/go', 'usrlocalgo',volume={'nocopy':True})
             # contains GOPATH  - downloaded modules, installed tools/executables
             node.addPersistentStorage('/go', 'gopath',volume={'nocopy':True})
             # contains GOENV
-            node.addPersistentStorage('/root/.config/go', 'goenv',volume={'nocopy':True}) 
-            # contains GOCACHE 
+            node.addPersistentStorage('/root/.config/go', 'goenv',volume={'nocopy':True})
+            # contains GOCACHE
             node.addPersistentStorage('/root/.cache/go-build', 'gocache',volume={'nocopy':True})
 
     def getName(self) -> str:
@@ -425,4 +425,4 @@ class GolangDevService(ContainerDevelopmentService):
     def print(self, indent: int) -> str:
         out = ' ' * indent
         out += 'GolangDevService\n'
-        return out    
+        return out
