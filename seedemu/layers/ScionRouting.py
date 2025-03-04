@@ -10,7 +10,7 @@ import yaml
 import inspect
 
 from seedemu.core import ( Emulator, Node, ScionAutonomousSystem,
-                          ScionRouterMixin, promote_to_scion_router, 
+                          ScionRouterMixin, promote_to_scion_router,
                           Network, Router, BaseOption, OptionMode, Layer,
                           BaseOptionGroup, Option)
 from seedemu.core.enums import NetworkType
@@ -21,9 +21,9 @@ from seedemu.core.ScionAutonomousSystem import IA
 
 
 class ScionStackOpts(BaseOptionGroup):
-# NOTE: the classname is dynamically changed to just 'scion' so the 
+# NOTE: the classname is dynamically changed to just 'scion' so the
 # nested option names don't become too lengthy...
-    
+
     # TODO: add CS tracing
     # TODO: add dispatchable port range
     # make installation of test-tools optional (bwtester etc.)
@@ -94,7 +94,7 @@ class ScionStackOpts(BaseOptionGroup):
             return OptionMode.BUILD_TIME | OptionMode.RUN_TIME
         @classmethod
         def default(cls):
-            return "false"            
+            return "false"
 
     # FIXME: what to do about this ?! actually it can be derived from OptionModes of all available options
     # If any of them has RUN_TIME mode -> this implies USE_ENVSUBST==True
@@ -286,14 +286,14 @@ class ScionRouting(Routing):
         self.__default_builder = ScionBuilder()
         args = inspect.signature(ScionRouting.__init__).parameters.keys()
         vals = locals()
-        option_names = [name for name in args 
-                        if (vals[name] is not None) and 
+        option_names = [name for name in args
+                        if (vals[name] is not None) and
                         name not in ['self', 'static_routing', 'loopback_range'] ]
         assert not any([ vals[name].name != name and not vals[name].name.endswith(name) for name in option_names]), 'option-parameter mismatch!'
         ScionRouting._static_routing = static_routing
-        
+
         # let user override the global default options
-        
+
         for n in option_names:
         # Replace the 'defaults' class methods dynamically
             v = vals[n]
@@ -302,7 +302,7 @@ class ScionRouting(Routing):
             opt_cls.default = classmethod(lambda cls, new_value=v.value: new_value)
             opt_cls.defaultMode = classmethod(lambda cls, newmode=v.mode: newmode)
             prefix = getattr(opt_cls, '__prefix') if hasattr(opt_cls, '__prefix') else None
-            OptionRegistry().register(opt_cls, prefix)    
+            OptionRegistry().register(opt_cls, prefix)
 
     @staticmethod
     def _resolveFlag(flag: str, node: Node = None) -> str:
@@ -447,7 +447,7 @@ class ScionRouting(Routing):
                 hnode: Node = obj
                 self.__install_scion(hnode)
                 self.__append_scion_command(hnode)
-            
+
             if (cfg_vol := obj.getOption('scion_etc_config_vol')) != None:
                 node: Node = obj
                 match cfg_vol.value:
@@ -462,7 +462,7 @@ class ScionRouting(Routing):
 
     def __install_scion(self, node: Node):
         """Install SCION stack on the node."""
-  
+
         self.getBuilder().installSCION(node)
 
     def getBuilder(self) -> ScionBuilder:
@@ -544,7 +544,7 @@ class ScionRouting(Routing):
             elif type == "hnode":
                 hnode: Node = obj
                 self.__provision_dispatcher_config(hnode, isds[0][0], as_)
-    
+
     @staticmethod
     def _provision_base_config(node: Node):
         """Set configuration for sciond and dispatcher."""
@@ -608,7 +608,7 @@ class ScionRouting(Routing):
 
         if router.getOption('serve_metrics').value == 'true' and (local_ip:=router.getLocalIPAddress()) != None:
             config_content += _Templates["metrics"].format(local_ip, 30442)
-        
+
         handleScionConfFile(router, name + ".toml", config_content)
 
     @staticmethod

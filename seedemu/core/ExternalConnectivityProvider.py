@@ -8,7 +8,7 @@ from typing import List, Tuple, Dict
 #   ExitPointProvider, LocalNetworkGateway, SimulationExitProvider, OutboundConnectivityProvider
 class ExternalConnectivityProvider():
     """!
-    @brief this class provides connectivity for emulated nodes 
+    @brief this class provides connectivity for emulated nodes
     from within an emulated network to the external 'real' Internet
     via the hosts network.
     It mediates between hosts who might a service installed that requires realWorldConnectivity (i.e. DevService (git,go,cargo etc.))
@@ -16,7 +16,7 @@ class ExternalConnectivityProvider():
     This is the exact opposite of what the RemoteAccessProvider does.
 
     It achieves this, by making the host's default gateway router into a RealWorldRouter.
-    The user need not bother with minding this himself(can keep using AS::createRouter() 
+    The user need not bother with minding this himself(can keep using AS::createRouter()
     and any extra functionality will be 'mixed'in on demand later automatically).
 
     """
@@ -24,7 +24,7 @@ class ExternalConnectivityProvider():
         self.__requesters_per_net = {}
 
 
-    # this is probably not the right signature anymore !! 
+    # this is probably not the right signature anymore !!
     # brNet is actually only required for brnode.seal() in Routing::render()
     # where it is already available through emulator.getServiceNetwork()
     # configureSimulationExit()
@@ -36,7 +36,7 @@ class ExternalConnectivityProvider():
             The configureExternalLink method will join the brNet/netObject networks.
             Do not join them manually on the brNode.
         @param brNet reference to a network that is not part of the emulation. (service net)
-        This network will have access NAT to the real internet. 
+        This network will have access NAT to the real internet.
         """
         from seedemu.core import Node, Router, Network, promote_to_real_world_router
         from seedemu.core.enums import NodeRole, NetworkType
@@ -70,8 +70,8 @@ class ExternalConnectivityProvider():
         else:
             self.__requesters_per_net[net] = set([pnode]) # set([pnode.getName()])
 
-    # since Networks are Registrable we can call getRegistryInfo() and obtain the scope -> 
-    # which will be the AS -> so the node name is enough info to uniquely identify it 
+    # since Networks are Registrable we can call getRegistryInfo() and obtain the scope ->
+    # which will be the AS -> so the node name is enough info to uniquely identify it
     # (because node and net will have the same ASN)
 
     def getExternalNodesForNet(self, net: 'Network') -> List[str]:

@@ -384,12 +384,12 @@ class Node(Printable, Registrable, Configurable, Vertex, Customizable):
         self.__name_servers = servers
 
         return self
-        
+
     def addDockerVolume(self, vol: BaseVolume ):
         """adds the docker volume to this node's container"""
         self.__custom_vols.append(vol )
         return self
-    
+
     def getDockerVolumes(self):
         """!@brief retrieve any volumes mounted on this node's container"""
         return self.__custom_vols
@@ -920,7 +920,7 @@ class Node(Printable, Registrable, Configurable, Vertex, Customizable):
 
         @returns self, for chaining API calls.
         """
-        
+
         if name == None: # generate random name for anonymus volume
             name = ''.join(random.choice(string.ascii_lowercase) for i in range(6))
 
@@ -1220,7 +1220,7 @@ class RealWorldRouterMixin():
         return self.__realworld_routes
 
     # called in RoutingLayer::render() - That is AFTER ::configure() :)
-    # where its been decided if this node has to run BIRD routing daemon 
+    # where its been decided if this node has to run BIRD routing daemon
     # because it is connected to more than one local(direct) network
     def seal(self, svc_net: Network):
         """!
@@ -1236,7 +1236,7 @@ class RealWorldRouterMixin():
         # position 0-1 is '/interface_setup' (and chmod +x)
         self.insertStartCommand(2, '/rw_configure_script')
         self.insertStartCommand(2, 'chmod +x /rw_configure_script')
-        
+
         for prefix in self.__realworld_routes:
             # nat matched only
             self.appendFile('/rw_configure_script', 'iptables -t nat -A POSTROUTING -d {} -j MASQUERADE\n'.format(prefix))
@@ -1302,7 +1302,7 @@ class ScionRouterMixin():
 
     __interfaces: Dict[int, Dict]  # IFID to interface
     __next_port: int               # Next free UDP port
-    
+
     # Never been used anyway
     #def __init__(self):
     #   super().__init__()
@@ -1355,7 +1355,7 @@ class ScionRouterMixin():
         out += ' ' * indent
         out += 'SCION border router'
         return out
-    
+
 def promote_to_scion_router(node: Node):
     """Dynamically inject ScionRouterMixin into a Node instance"""
     if not isinstance(node, ScionRouterMixin):  # Prevent double-mixing

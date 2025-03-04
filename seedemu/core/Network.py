@@ -200,11 +200,11 @@ class Network(Printable, Registrable, Vertex):
         self.__assigners[NodeRole.Host] = self.__aac.getOffsetAssigner(NodeRole.Host)
 
         return self
-        
+
     def setDhcpIpRange(self, dhcpStart:int, dhcpEnd: int):
         """!
         @brief Set IP Range for DHCP Server to use
-        
+
         @param dhcpStart start address offset of dhcp clients.
         @param dhcpEnd end address offset of dhcp clients.
         """
@@ -213,7 +213,7 @@ class Network(Printable, Registrable, Vertex):
 
 
     def setRouterIpRange(self, routerStart:int, routerEnd:int, routerStep: int):
-        
+
         """!
         @brief Set IP Range for router nodes
 
@@ -221,7 +221,7 @@ class Network(Printable, Registrable, Vertex):
         @param routerEnd end address offset of router nodes.
         @param routerStep end step of router address.
         """
-        
+
         self.__aac.setRouterIpRange(routerStart, routerEnd, routerStep)
         self.__assigners[NodeRole.Router] = self.__aac.getOffsetAssigner(NodeRole.Router)
         return self
@@ -300,7 +300,10 @@ class Network(Printable, Registrable, Vertex):
         @returns RAP, or None.
         """
         return self.__rap
-    
+
+    def getExternalConnectivityProvider(self) -> ExternalConnectivityProvider:
+        return self.__ecp
+
     def getExternalConnectivityProvider(self) -> ExternalConnectivityProvider:
         return self.__ecp
 

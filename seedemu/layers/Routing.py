@@ -163,7 +163,7 @@ class Routing(Layer):
         hit: bool = False
         for ((scope, type, name), obj) in reg.getAll().items():
             # make sure that on each externaly connected net (those with at least one host who requested it)
-            #  (I):  there is at least one RealWorldRouter 
+            #  (I):  there is at least one RealWorldRouter
             #  (II): the RWR is the default gateway of the requesters on this net
             if type == 'net' and obj.getType() == NetworkType.Local:
                 if (p := obj.getExternalConnectivityProvider() ):
@@ -187,7 +187,6 @@ class Routing(Layer):
             if type == 'rnode':
                 rnode: Router = obj
                 if issubclass(rnode.__class__, RealWorldRouterMixin): # could also be ScionRouter which needs RealWorldAccess
-                    
                     # this is an exception - Only for service net (not part of simulation)
                     rnode._Node__joinNetwork(svc_net)
                     [l, b, d] = svc_net.getDefaultLinkProperties()
@@ -210,7 +209,7 @@ class Routing(Layer):
                 else:
                     cur_scope = ScopedRegistry(scope, reg)
                     candidates = cur_scope.getByType('rnode')
-                
+
 
                 for router in candidates:
                     if rif != None: break
