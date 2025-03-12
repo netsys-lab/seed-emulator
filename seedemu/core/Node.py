@@ -1335,14 +1335,15 @@ class RealWorldRouter(RouterExtension):
         return out
     '''
 
-def promote_to_real_world_router(node: Node, hideHops: bool):
+def promote_to_real_world_router(node: Router, hideHops: bool):
     """!@brief Dynamically inject RealWorldRouterMixin into a Node instance
                 to augment it by RealWorld routing capabilities
     """
-    extn = RealWorldRouter()
+    if not node.hasExtension('RealWorldRouter'):# Prevent double-mixing
+        extn = RealWorldRouter()
 
-    node.installExtension(extn)
-    extn.initRealWorld(hideHops)
+        node.installExtension(extn)
+        extn.initRealWorld(hideHops)
     return node
 
 class ScionRouter(RouterExtension):
@@ -1410,7 +1411,7 @@ class ScionRouter(RouterExtension):
         out += 'SCION border router'
         return out
 
-def promote_to_scion_router(node: Node):
+def promote_to_scion_router(node: Router):
     """!@brief Dynamically inject ScionRouterMixin into a Node instance"""
 
     if not node.hasExtension('ScionRouter'):# Prevent double-mixing

@@ -44,9 +44,11 @@ def run(dumpfile = None):
         repo_branch: str
         repo_path: str
 
-    devsvc = GolangDevService( 'amdfxlucas', 'saculolissat@gmx.de' )
-    repo = GitRepo( repo_url = 'https://github.com/amdfxlucas/scion',
-                    repo_branch = 'mcast-dev',
+    # your git credentials go here
+    devsvc = GolangDevService( 'johndoe', 'john.doe@gmx.de' )
+    # your repo ...
+    repo = GitRepo( repo_url = 'https://github.com/johndoe/scion',
+                    repo_branch = 'feature-dev',
                     repo_path = '/home/root/repos/scion' )
     def install_dev_svc(emu: Emulator, node: Node, devsvc, repos: List[GitRepo] ):
 
@@ -421,6 +423,7 @@ def run(dumpfile = None):
     scion.addIxLink(11, (1, 113), (1, 163), ScLinkType.Transit)
     scion.addIxLink(12, (1, 122), (1, 163), ScLinkType.Transit)
 
+    # comment out, if you don't want to do development in the simulator
     from seedemu.utilities import createHostsOnNetwork
     client_ases = [ 150, 151, 152,
                    160, 161, 162, 163,
