@@ -63,6 +63,12 @@ def generate_scripts(topo):
     for i in range(1, len(topo["ASes"])):
         bash_script += '''
     brs+=("as{}r-br0-10.{}.0.254")'''.format(topo["ASes"][i]["asn"], topo["ASes"][i]["asn"])
+        
+
+    bash_script += '''
+    echo "getting paths"
+    python3 ../get_paths.py
+    '''
 
     # Add the for loop to start the brs
     bash_script += '''
@@ -195,3 +201,7 @@ def generate_scripts(topo):
     make_files_executable("helper_scripts")
     make_files_executable("sender")
     make_files_executable("receiver")
+
+if __name__ == "__main__":
+    topo = json.load(open("topo/topo.json"))
+    generate_scripts(topo)

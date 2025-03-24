@@ -50,7 +50,7 @@ def get_paths_from_host(dst_isd, dst_asn, container_name):
 
 
 if __name__ == "__main__":
-    topo = json.load(open("./topo/topo.json"))
+    topo = json.load(open("../topo/topo.json"))
     receiver_asn = topo['receiver_asn']
     receiver_isd = get_isd(receiver_asn, topo)
     sender_asn = topo['sender_asn']
@@ -109,6 +109,6 @@ if __name__ == "__main__":
         path_id = path_id + 1
 
     # save to json file
-    with open('./topo/paths.json', 'w') as f:
+    with open('../topo/paths.json', 'w') as f:
         json.dump(paths_links, f, indent=4)
 
