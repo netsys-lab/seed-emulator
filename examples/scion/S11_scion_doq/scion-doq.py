@@ -2,7 +2,7 @@
 # encoding: utf-8
 
 
-from seedemu.services import GolangDevService, AccessMode
+from seedemu.services import GolangDevService, AccessMode, DomainNameService
 from dataclasses import dataclass
 from typing import List
 from seedemu.core import Emulator, Binding, Filter, Node, OptionRegistry
@@ -130,6 +130,8 @@ def run(dumpfile = None):
     ases = {}
     brs = defaultdict()
     cses = defaultdict()
+
+    dns_svc = DomainNameService()
 
     def create_as(isd, asn, is_core=False, issuer=None):
         as_ = base.createAutonomousSystem(asn)
@@ -339,13 +341,37 @@ def run(dumpfile = None):
     from seedemu.utilities import createHostsOnNetwork
     # nodes who should have a DevService installed
     dev_targets = []
-    client_ases = [ 173, 231]
+    client_ases = [102,172, 173, 231, 234, 203, 235]
     for asn in client_ases:
         as_ = base.getAutonomousSystem(asn)
         createHostsOnNetwork(emu, as_, 'net0', [])
         hnode = as_.getHost('host_0')
         dev_targets.append(hnode)
 
+    # HTTP FWD proxy and sdns rec. resolver
+    # 'entrypoint' into the simulation for browser-extension
+    host_a = base.getAutonomousSystem(102).getHost('host_0')
+    host_a.addPortForwarding(8888,8888, 'tcp')
+
+    # HTTP web server and HTTP reverse proxy ...........................
+
+    host_web_1 = base.getAutonomousSystem(172).getHost('host_0')
+
+    host_web_2 = base.getAutonomousSystem(173).getHost('host_0')
+
+
+    # coredns DoQ nameservers ..........................................
+    # root '.'
+    host_ns_1 = base.getAutonomousSystem(235).getHost('host_0')
+
+    # 'com.' zone
+    host_ns_2 = base.getAutonomousSystem(234).getHost('host_0')
+
+    # 'net.'
+    host_ns_3 = base.getAutonomousSystem(203).getHost('host_0')
+
+    # 'edu.'
+    host_ns_4 = base.getAutonomousSystem(231).getHost('host_0')
 
     for node in dev_targets:
         install_dev_svc(emu, node, devsvc, repos )
@@ -356,6 +382,7 @@ def run(dumpfile = None):
     emu.addLayer(routing)
     emu.addLayer(scion_isd)
     emu.addLayer(scion)
+    emu.addLayer(dns_svc)
     emu.addLayer(devsvc)
 
 

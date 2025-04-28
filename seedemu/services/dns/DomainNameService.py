@@ -1,10 +1,12 @@
 from __future__ import annotations
-from seedemu.core import Node, Printable, Emulator, Service, Server
+from seedemu.core import Node, Printable, Emulator, Service, Server, BaseOption
 from seedemu.core.enums import NetworkType
 from typing import List, Dict, Tuple, Set
 from re import sub
-from random import randint
+import inspect
 import requests
+from .DNSCommon import  ResourceRecord, _getRRforNode, _getNsAddrRecord, _getSoaRR , NS_RR, DNSStack
+
 
 DomainNameServiceFileTemplates: Dict[str, str] = {}
 ROOT_ZONE_URL = 'https://www.internic.net/domain/root.zone'
@@ -20,21 +22,23 @@ options {
 };
 '''
 
+
+
 class Zone(Printable):
     """!
     @brief Domain name zone.
     """
     __zonename: str
     __subzones: Dict[str, Zone]
-    __records: List[str]
-    __gules: List[str]
+    __records: List[ResourceRecord]
+    __gules: List[ResourceRecord]
     # TODO: maybe make it a Dict[str, List[str]], so a name can point to multiple vnodes?
     __pending_records: Dict[str, str]
 
     def __init__(self, name: str):
         """!
         @brief Zone constructor.
-        
+
         @param name full zonename.
         """
         self.__zonename = name
@@ -68,7 +72,7 @@ class Zone(Printable):
         if name in self.__subzones: return self.__subzones[name]
         self.__subzones[name] = Zone('{}.{}'.format(name, self.__zonename if self.__zonename != '.' else ''))
         return self.__subzones[name]
-    
+
     def getSubZones(self) -> Dict[str, Zone]:
         """!
         @brief Get all subzones.
@@ -77,24 +81,24 @@ class Zone(Printable):
         """
         return self.__subzones
 
-    def addRecord(self, record: str) -> Zone:
+    def addRecord(self, record: ResourceRecord) -> Zone:
         """!
         @brief Add a new record to zone.
 
         @todo NS?
-        
+
         @returns self, for chaining API calls.
         """
         self.__records.append(record)
 
         return self
-    
-    def deleteRecord(self, record: str) -> Zone:
+
+    def deleteRecord(self, record: ResourceRecord) -> Zone:
         """!
         @brief Delete the record from zone.
 
         @todo NS?
-        
+
         @returns self, for chaining API calls.
         """
         self.__records.remove(record)
@@ -113,9 +117,10 @@ class Zone(Printable):
         @returns self, for chaining API calls.
         """
         if fqdn[-1] != '.': fqdn += '.'
-        zonename = self.__zonename if self.__zonename != '' else '.' 
-        self.__gules.append('{} A {}'.format(fqdn, addr))
-        self.__gules.append('{} NS {}'.format(zonename, fqdn))
+        zonename = self.__zonename if self.__zonename != '' else '.'
+        self.__gules.append(_getRRforNode(fqdn, addr))
+        #self.__gules.append('{} NS {}'.format(zonename, fqdn))
+        self.__gules.append( NS_RR(zonename=zonename, nsname=fqdn) )
 
         return self
 
@@ -141,13 +146,14 @@ class Zone(Printable):
                 break
 
         assert address != None, 'Node has no valid interfaces.'
-        self.__records.append('{} A {}'.format(name, address))
+        self.__records.append(_getRRforNode(name, address, node))
 
         return self
 
     def resolveToVnode(self, name: str, vnode: str) -> Zone:
         """!
-        @brief Add a new A record, pointing to the given virtual node name.
+        @brief Add a new resource record (A or TXT record),
+                pointing to the given virtual node name.
 
         @param name name.
         @param vnode  virtual node name.
@@ -171,7 +177,7 @@ class Zone(Printable):
             assert len(ifaces) > 0, 'resolvePendingRecords(): node as{}/{} has no interfaces'.format(pnode.getAsn(), pnode.getName())
             addr = ifaces[0].getAddress()
 
-            self.addRecord('{} A {}'.format(domain_name, addr))
+            self.addRecord(_getRRforNode(domain_name, addr, pnode))
 
     def getPendingRecords(self) -> Dict[str, str]:
         """!
@@ -181,7 +187,7 @@ class Zone(Printable):
         """
         return self.__pending_records
 
-    def getRecords(self) -> List[str]:
+    def getRecords(self) -> List[ResourceRecord]:
         """!
         @brief Get all records.
 
@@ -189,7 +195,7 @@ class Zone(Printable):
         """
         return self.__records
 
-    def getGuleRecords(self) -> List[str]:
+    def getGuleRecords(self) -> List[ResourceRecord]:
         """!
         @brief Get all gule records.
 
@@ -197,7 +203,7 @@ class Zone(Printable):
         """
         return self.__gules
 
-    def findRecords(self, keyword: str) -> List[str]:
+    def findRecords(self, keyword: str) -> List[ResourceRecord]:
         """!
         @brief Find a record.
 
@@ -205,7 +211,7 @@ class Zone(Printable):
 
         @return list of records.
         """
-        return [ r for r in self.__records if keyword in r ]
+        return [ r for r in self.__records if keyword in str(r) ]
 
     def print(self, indent: int) -> str:
         out = ' ' * indent
@@ -224,7 +230,7 @@ class Zone(Printable):
         indent -= 4
         out += ' ' * indent
         out += 'Subzones:\n'
-        
+
         indent += 4
         for subzone in self.__subzones.values():
             out += subzone.print(indent)
@@ -246,17 +252,18 @@ class DomainNameServer(Server):
         @brief DomainNameServer constructor.
         """
         super().__init__()
-        
+
         self.__zones = set()
         self.__is_master = False
         self.__is_real_root = False
+
 
     def addZone(self, zonename: str, createNsAndSoa: bool = True) -> DomainNameServer:
         """!
         @brief Add a zone to this node.
 
         @param zonename name of zone to host.
-        @param createNsAndSoa add NS and SOA (if doesn't already exist) to zone. 
+        @param createNsAndSoa add NS and SOA (if doesn't already exist) to zone.
 
         You should use DomainNameService.hostZoneOn to host zone on node if you
         want the automated NS record to work.
@@ -316,7 +323,7 @@ class DomainNameServer(Server):
 
         return out
 
-        
+
     def __getRealRootRecords(self):
         """!
         @brief Helper tool, get real-world root zone records list by
@@ -328,14 +335,14 @@ class DomainNameServer(Server):
         rslt = requests.get(ROOT_ZONE_URL)
 
         assert rslt.status_code == 200, 'RIPEstat API returned non-200'
-        
+
         rules_byte = rslt.iter_lines()
-        
+
         for rule_byte in rules_byte:
             line_str:str = rule_byte.decode('utf-8')
             if not line_str.startswith('.'):
                 rules.append(line_str)
-        
+
         return rules
 
 
@@ -361,62 +368,77 @@ class DomainNameServer(Server):
                 if zonename == '.': zonename = ''
 
                 if len(zone.findRecords('SOA')) == 0:
-                    zone.addRecord('@ SOA {} {} {} 900 900 1800 60'.format('ns1.{}'.format(zonename), 'admin.{}'.format(zonename), randint(1, 0xffffffff)))
+                    zone.addRecord(_getSoaRR(zonename))
 
+                ns_name=f'ns{str(ns_number)}.{zonename}'
                 #If there are multiple zone servers, increase the NS number for ns name.
                 ns_number = 1
                 while (True):
-                    if len(zone.findRecords('ns{}.{} A '.format(str(ns_number), zonename))) > 0:
+                    if len(zone.findRecords(f'{ns_name} A ')) > 0:
                         ns_number +=1
                     else:
                         break
 
-                zone.addGuleRecord('ns{}.{}'.format(str(ns_number), zonename), addr)
-                zone.addRecord('ns{}.{} A {}'.format(str(ns_number), zonename, addr))
-                zone.addRecord('@ NS ns{}.{}'.format(str(ns_number), zonename))
-                
+                zone.addGuleRecord(ns_name, addr)
+                zone.addRecord(_getNsAddrRecord(node, ns_number, zonename, addr ))
+                #zone.addRecord('@ NS ns{}.{}'.format(str(ns_number), zonename))
+                zone.addRecord( NS_RR(zonename='@', nsname=ns_name) )
+
             if zone.getName() == "." and self.__is_real_root:
                 for record in self.__getRealRootRecords():
                     zone.addRecord(record)
+
+
 
     def install(self, node: Node, dns: DomainNameService):
         """!
         @brief Handle the installation.
         """
-        assert node == self.__node, 'configured node differs from install node. Please check if there are conflict bindings'
+        assert node == self.__node, 'configured node differs from install node.\
+                                     Please check if there are conflict bindings'
 
-        node.addSoftware('bind9')
-        node.appendStartCommand('echo "include \\"/etc/bind/named.conf.zones\\";" >> /etc/bind/named.conf.local')
-        node.setFile('/etc/bind/named.conf.options', DomainNameServiceFileTemplates['named_options'])
-        node.setFile('/etc/bind/named.conf.zones', '')
+        if (val:=node.getOption('dns_setup').value) == DNSStack.DEFAULT:
+            self._do_install_bind9(node, dns)
+        elif val == DNSStack.SCION:
+            # TODO:
+            pass
 
-        for (_zonename, auto_ns_soa) in self.__zones:
-            zone = dns.getZone(_zonename)
-            zonename = filename = zone.getName()
+    def _do_install_bind9(self, node: Node, dns: DomainNameService):
+            """
+                installs the default bind9 DNS stack onto the given node
+            """
+            node.addSoftware('bind9')
+            node.appendStartCommand('echo "include \\"/etc/bind/named.conf.zones\\";" >> /etc/bind/named.conf.local')
+            node.setFile('/etc/bind/named.conf.options', DomainNameServiceFileTemplates['named_options'])
+            node.setFile('/etc/bind/named.conf.zones', '')
 
-            if zonename == '' or zonename == '.':
-                filename = 'root'
-                zonename = '.'
-            zonepath = '/etc/bind/zones/{}'.format(filename)
-            node.setFile(zonepath, '\n'.join(zone.getRecords()))
+            for (_zonename, auto_ns_soa) in self.__zones:
+                zone = dns.getZone(_zonename)
+                zonename = filename = zone.getName()
 
-            if self.__is_master:
-                node.appendFile('/etc/bind/named.conf.zones',
-                        'zone "{}" {{ type master; notify yes; allow-transfer {{ any; }}; file "{}"; allow-update {{ any; }}; }};\n'.format(zonename, zonepath)
+                if zonename == '' or zonename == '.':
+                    filename = 'root'
+                    zonename = '.'
+                zonepath = '/etc/bind/zones/{}'.format(filename)
+                node.setFile(zonepath, '\n'.join(zone.getRecords()))
+
+                if self.__is_master:
+                    node.appendFile('/etc/bind/named.conf.zones',
+                            'zone "{}" {{ type master; notify yes; allow-transfer {{ any; }}; file "{}"; allow-update {{ any; }}; }};\n'.format(zonename, zonepath)
+                        )
+                elif zone.getName() in dns.getMasterIp().keys(): # Check if there are some master servers
+                    master_ips = ';'.join(dns.getMasterIp()[zone.getName()])
+                    node.appendFile('/etc/bind/named.conf.zones',
+                        'zone "{}" {{ type slave; masters {{ {}; }}; file "{}"; }};\n'.format(zonename, master_ips, zonepath)
                     )
-            elif zone.getName() in dns.getMasterIp().keys(): # Check if there are some master servers
-                master_ips = ';'.join(dns.getMasterIp()[zone.getName()])
-                node.appendFile('/etc/bind/named.conf.zones',
-                    'zone "{}" {{ type slave; masters {{ {}; }}; file "{}"; }};\n'.format(zonename, master_ips, zonepath)
-                )
-            else:
-                node.appendFile('/etc/bind/named.conf.zones',
-                    'zone "{}" {{ type master; file "{}"; allow-update {{ any; }}; }};\n'.format(zonename, zonepath)
-                )
+                else:
+                    node.appendFile('/etc/bind/named.conf.zones',
+                        'zone "{}" {{ type master; file "{}"; allow-update {{ any; }}; }};\n'.format(zonename, zonepath)
+                    )
 
-        node.appendStartCommand('chown -R bind:bind /etc/bind/zones')
-        node.appendStartCommand('service named start')
-    
+            node.appendStartCommand('chown -R bind:bind /etc/bind/zones')
+            node.appendStartCommand('service named start')
+
 class DomainNameService(Service):
     """!
     @brief The domain name service.
@@ -426,18 +448,44 @@ class DomainNameService(Service):
     __autoNs: bool
     __masters: Dict [str, List[str]]
 
-    def __init__(self, autoNameServer: bool = True):
+    def getAvailableOptions(self):
+        from seedemu.core import OptionRegistry
+        return [OptionRegistry().dns_setup()]
+
+    def __init__(self, autoNameServer: bool = True, dns_setup: BaseOption = None):
         """!
         @brief DomainNameService constructor.
-        
+
         @param autoNameServer add gule records to parents automatically.
         """
+        from seedemu.core.OptionRegistry import OptionRegistry
         super().__init__()
         self.__autoNs = autoNameServer
         self.__rootZone = Zone('.')
         self.__masters = {}
         self.addDependency('Base', False, False)
-    
+
+        args = inspect.signature(DomainNameServer.__init__).parameters.keys()
+        vals = locals()
+        option_names = [name for name in args
+                        if (vals[name] is not None) and
+                        name not in ['self', 'autoNameServer'] ]
+        assert not any([ vals[name].name != name and
+                        not vals[name].name.endswith(name) for name in option_names]), 'option-parameter mismatch!'
+
+
+        # let user override the global default options
+
+        for n in option_names:
+        # Replace the 'defaults' class methods dynamically
+            v = vals[n]
+            opt_cls = type(v)
+            # Capture 'new_value' as default argument (forces a snapshot of the current value)
+            opt_cls.default = classmethod(lambda cls, new_value=v.value: new_value)
+            opt_cls.defaultMode = classmethod(lambda cls, newmode=v.mode: newmode)
+            prefix = getattr(opt_cls, '__prefix') if hasattr(opt_cls, '__prefix') else None
+            OptionRegistry().register(opt_cls, prefix)
+
     def __autoNameServer(self, zone: Zone):
         """!
         @brief Try to automatically add NS records of children to parent zones.
@@ -474,7 +522,7 @@ class DomainNameService(Service):
 
     def getConflicts(self) -> List[str]:
         return ['DomainNameCachingService']
-    
+
     def getZone(self, domain: str) -> Zone:
         """!
         @brief Get a zone, create it if not exist.
@@ -524,9 +572,9 @@ class DomainNameService(Service):
                     info.append(vnode)
                     hit = True
                     break
-            
+
             if hit: continue
-        
+
         return info
 
     def addMasterIp(self, zone: str, addr: str) -> DomainNameService:
@@ -577,3 +625,4 @@ class DomainNameService(Service):
         out += self.__rootZone.print(indent)
 
         return out
+

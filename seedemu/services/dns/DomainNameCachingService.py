@@ -94,7 +94,7 @@ class DomainNameCachingServer(Server, Configurable):
         self.__pending_forward_zones[zone] = vnode
 
         return self
-    
+
     def setNameServerOnNodesByAsns(self, asns: List[int]):
         self.__asn_range.extend(asns)
 
@@ -113,7 +113,7 @@ class DomainNameCachingServer(Server, Configurable):
             if net.getType() == NetworkType.Local:
                 address = iface.getAddress()
                 break
-        
+
         assert address != "", 'address is not configured.'
 
         for ((scope, type, name), node) in reg.getAll().items():
@@ -122,7 +122,7 @@ class DomainNameCachingServer(Server, Configurable):
                     if not any(command[0] == ': > /etc/resolv.conf' for command in node.getStartCommands()):
                         node.insertStartCommand(0,': > /etc/resolv.conf')
                     node.insertStartCommand(1, 'echo "nameserver {}" >> /etc/resolv.conf'.format(address))
-    
+
     def install(self, node: Node):
         node.addSoftware('bind9')
         node.setFile('/etc/bind/named.conf.options', DomainNameCachingServiceFileTemplates['named_options'])
@@ -201,9 +201,9 @@ class DomainNameCachingService(Service):
             if net.getType() == NetworkType.Local:
                 address = iface.getAddress()
                 return address
-            
+
         return ""
-    
+
     def configure(self, emulator: Emulator):
         super().configure(emulator)
 
@@ -232,7 +232,7 @@ class DomainNameCachingService(Service):
             for (server, node) in targets:
                 server.setRootServers(root_servers)
 
- 
+
     def print(self, indent: int) -> str:
         out = ' ' * indent
         out += 'DomainNameCachingService:\n'
