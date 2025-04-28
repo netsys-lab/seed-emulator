@@ -1,5 +1,6 @@
 from seedemu.layers import Base, Routing, Ebgp, Ibgp, Ospf, Reality, PeerRelationship, Dnssec
 from seedemu.services import WebService, DomainNameService, DomainNameCachingService
+from seedemu.services.dns.DNSCommon import *
 from seedemu.services import CymruIpOriginService, ReverseDomainNameService
 from seedemu.compiler import Docker, Graphviz
 from seedemu.hooks import ResolvConfHook
@@ -41,7 +42,7 @@ def make_service_as(asn: int, services: List[Service], exchange: int):
 
     net = service_as.createNetwork('net0')
 
-    
+
 
     router.joinNetwork('net0')
 
@@ -67,7 +68,7 @@ def make_dns_as(asn: int, zones: List[str], exchange: int):
 
     net = dns_as.createNetwork('net0')
 
-    
+
 
     router.joinNetwork('net0')
 
@@ -92,7 +93,7 @@ def make_user_as(asn: int, exchange: str):
 
     net = user_as.createNetwork('net0')
 
-    
+
 
     real.enableRealWorldAccess(user_as, 'net0')
 
@@ -115,7 +116,7 @@ def make_transit_as(asn: int, exchanges: List[int], intra_ix_links: List[Tuple[i
 
         net = transit_as.createNetwork(name)
 
-        
+
 
         routers[a].joinNetwork(name)
         routers[b].joinNetwork(name)
@@ -179,9 +180,9 @@ make_dns_as(161, ['net.', 'com.', 'arpa.'], 103)
 
 ###############################################################################
 
-dns.getZone('as150.net.').addRecord('@ A 10.150.0.71')
-dns.getZone('as151.net.').addRecord('@ A 10.151.0.71')
-dns.getZone('as152.net.').addRecord('@ A 10.152.0.71')
+dns.getZone('as150.net.').addRecord(A_RR(address='10.150.0.71'))
+dns.getZone('as151.net.').addRecord(A_RR(address='10.151.0.71'))
+dns.getZone('as152.net.').addRecord(A_RR(address='10.152.0.71'))
 
 make_dns_as(162, ['as150.net.', 'as151.net.', 'as152.net.'], 103)
 

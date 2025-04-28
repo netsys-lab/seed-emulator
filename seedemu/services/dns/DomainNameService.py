@@ -187,7 +187,10 @@ class Zone(Printable):
         """
         return self.__pending_records
 
-    def getRecords(self) -> List[ResourceRecord]:
+    def getRecords(self) -> List[str]:
+        return [ str(r) for r in self.getRRecords()]
+
+    def getRRecords(self) -> List[ResourceRecord]:
         """!
         @brief Get all records.
 
@@ -195,13 +198,16 @@ class Zone(Printable):
         """
         return self.__records
 
-    def getGuleRecords(self) -> List[ResourceRecord]:
+    def getGuleRRecords(self) -> List[ResourceRecord]:
+        return self.__gules
+
+    def getGuleRecords(self) -> List[str]:
         """!
         @brief Get all gule records.
 
         @return list of records.
         """
-        return self.__gules
+        return [str(r) for r in self.__gules]
 
     def findRecords(self, keyword: str) -> List[ResourceRecord]:
         """!
@@ -370,17 +376,18 @@ class DomainNameServer(Server):
                 if len(zone.findRecords('SOA')) == 0:
                     zone.addRecord(_getSoaRR(zonename))
 
-                ns_name=f'ns{str(ns_number)}.{zonename}'
+
                 #If there are multiple zone servers, increase the NS number for ns name.
                 ns_number = 1
                 while (True):
-                    if len(zone.findRecords(f'{ns_name} A ')) > 0:
+                    if len(zone.findRecords('ns{}.{} A '.format(str(ns_number), zonename))) > 0:
                         ns_number +=1
                     else:
                         break
 
-                zone.addGuleRecord(ns_name, addr)
-                zone.addRecord(_getNsAddrRecord(node, ns_number, zonename, addr ))
+                ns_name=f'ns{str(ns_number)}.{zonename}'
+                zone.addGuleRecord(ns_name, str(addr))
+                zone.addRecord(_getNsAddrRecord(node, ns_number, zonename, str(addr) ))
                 #zone.addRecord('@ NS ns{}.{}'.format(str(ns_number), zonename))
                 zone.addRecord( NS_RR(zonename='@', nsname=ns_name) )
 
@@ -396,7 +403,10 @@ class DomainNameServer(Server):
         """
         assert node == self.__node, 'configured node differs from install node.\
                                      Please check if there are conflict bindings'
-
+        opt = node.getOption('dns_setup')
+        if opt == None:
+            for o in dns.getAvailableOptions():
+                node.setOption(o)
         if (val:=node.getOption('dns_setup').value) == DNSStack.DEFAULT:
             self._do_install_bind9(node, dns)
         elif val == DNSStack.SCION:
@@ -448,6 +458,7 @@ class DomainNameService(Service):
     __autoNs: bool
     __masters: Dict [str, List[str]]
 
+    @classmethod
     def getAvailableOptions(self):
         from seedemu.core import OptionRegistry
         return [OptionRegistry().dns_setup()]

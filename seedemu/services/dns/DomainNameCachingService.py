@@ -2,6 +2,7 @@ from __future__ import annotations
 from seedemu.core import Configurable, Service, Server
 from seedemu.core import Node, ScopedRegistry, Emulator
 from .DomainNameService import DomainNameService
+from .DNSCommon import *
 from typing import List, Dict
 from seedemu.core.enums import NetworkType
 
@@ -124,6 +125,18 @@ class DomainNameCachingServer(Server, Configurable):
                     node.insertStartCommand(1, 'echo "nameserver {}" >> /etc/resolv.conf'.format(address))
 
     def install(self, node: Node):
+
+        opt = node.getOption('dns_setup')
+        if opt == None:
+            for o in DomainNameService.getAvailableOptions():
+                node.setOption(o)
+        if (val:=node.getOption('dns_setup').value) == DNSStack.DEFAULT:
+            self._do_install_bind9(node)
+        elif val == DNSStack.SCION:
+            # TODO:
+            pass
+
+    def _do_install_bind9(self, node: Node):
         node.addSoftware('bind9')
         node.setFile('/etc/bind/named.conf.options', DomainNameCachingServiceFileTemplates['named_options'])
         node.setFile('/etc/bind/named.conf.local','')
@@ -216,14 +229,7 @@ class DomainNameCachingService(Service):
             assert address != "", 'address is not configured.'
             ipaddrs.append(address)
 
-        # For the nodes that are not covered, all the local DNS servers will be added to them (the default behavior).
-        reg = emulator.getRegistry()
-        for ((scope, type, name), node) in reg.getAll().items():
-            if type in ['hnode', 'rnode']:
-                if not any(command[0] == ': > /etc/resolv.conf' for command in node.getStartCommands()):
-                    node.insertStartCommand(0,': > /etc/resolv.conf')
-                    for s in (ipaddrs):
-                        node.insertStartCommand(1, 'echo "nameserver {}" >> /etc/resolv.conf'.format(s))
+        self._init_etc_resolv_conf(ipaddrs, emulator)
 
         if self.__auto_root:
             dns_layer: DomainNameService = emulator.getRegistry().get('seedemu', 'layer', 'DomainNameService')
@@ -232,6 +238,16 @@ class DomainNameCachingService(Service):
             for (server, node) in targets:
                 server.setRootServers(root_servers)
 
+    def _init_etc_resolv_conf(self, ipaddrs: List[str], emulator: Emulator):
+
+        # For the nodes that are not covered, all the local DNS servers will be added to them (the default behavior).
+        reg = emulator.getRegistry()
+        for ((scope, type, name), node) in reg.getAll().items():
+            if type in ['hnode', 'rnode']:
+                if not any(command[0] == ': > /etc/resolv.conf' for command in node.getStartCommands()):
+                    node.insertStartCommand(0,': > /etc/resolv.conf')
+                    for s in (ipaddrs):
+                        node.insertStartCommand(1, 'echo "nameserver {}" >> /etc/resolv.conf'.format(s))
 
     def print(self, indent: int) -> str:
         out = ' ' * indent

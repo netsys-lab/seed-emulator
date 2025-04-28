@@ -4,6 +4,7 @@ from .dns.DomainRegistrarService import DomainRegistrarService, DomainRegistrarS
 from .dns.DomainNameService import DomainNameServer, DomainNameService, Zone
 from .TorService import TorService, TorServer, TorNodeType
 from .dns.DomainNameCachingService import DomainNameCachingServer, DomainNameCachingService
+from .dns.DNSCommon import *
 from .CymruIpOrigin import CymruIpOriginService, CymruIpOriginServer
 from .ReverseDomainNameService import ReverseDomainNameService, ReverseDomainNameServer
 from .BgpLookingGlassService import BgpLookingGlassServer, BgpLookingGlassService

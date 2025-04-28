@@ -9,30 +9,33 @@ _default_name = '@'
 class ResourceRecord:
     # TODO: maybe move the 'name' here . .
     #       default value could be '@'
-    ttl: int = 9999999
+    #ttl: int = 9999999
     # class: str = 'IN' #internet
     # type
+    pass
 
 @dataclass
 class A_RR(ResourceRecord):
-    name: str # fqn whose address is given by this record (zonename)
     address: str # an IPv4 or IPv6 address
+    name: str = _default_name # fqn whose address is given by this record (zonename)
     # length: int = 4
     def __str__(self):
         return f'{self.name} IN A {self.address}'
 
 @dataclass
 class NS_RR(ResourceRecord):
-    zonename: str # names the domain/zone
+
     nsname: str # names the authoritative nameserver
+    zonename: str = _default_name # names the domain/zone
     def __str__(self):
         return f'{self.zonename} IN NS {self.nsname}'
 
 @dataclass
 class SOA_RR(ResourceRecord):
-    zonename: str
+
     mname: str
     rname: str
+    zonename: str = _default_name
     serial: int = randint(1, 0xffffffff)
     refresh: int = 86400
     retry: int = 7200
@@ -55,8 +58,9 @@ class SOA_RR(ResourceRecord):
 
 @dataclass
 class TXT_RR(ResourceRecord):
-    name: str # domainname for which this TXT record is
+
     text: str # i.e. a SCION-RR
+    name: str = _default_name# domainname for which this TXT record is
     def __str__(self):
         #return f'{self.name} {self.ttl} {self.text}'
         return f'{self.name} IN TXT {self.text}'
@@ -85,7 +89,7 @@ class DNS_Setup(Option):
     def default(cls):
         return DNSStack.DEFAULT
 
-def _getRRforNode(domain_name: str , addr: str, node: Node=None) -> ResourceRecord:
+def _getRRforNode(domain_name: str, addr: str, node: Node=None) -> ResourceRecord:
     """
         return the right resource record for this node
     """

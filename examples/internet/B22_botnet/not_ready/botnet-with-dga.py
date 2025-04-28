@@ -3,6 +3,7 @@
 
 from seedemu.core import Emulator, Binding, Filter, Action
 from seedemu.services import BotnetService, BotnetClientService, DomainNameService, DomainNameCachingService
+from seedemu.services.dns.DNSCommon import *
 from seedemu.compiler import Docker
 
 emu = Emulator()
@@ -29,7 +30,7 @@ for i in {1..10}; do echo "$RANDOM.attacker.com:446"; done
 '''
 
 # points *.attacker.com to botnet controller - our "DGA" generates xxxx.attacker.com.
-dns.getZone('attacker.com').addRecord('* A {}'.format(controllerIp))
+dns.getZone('attacker.com').addRecord( A_RR(name='*', address=controllerIp) )
 
 # build a mini dns infrastructure: step 1: create zones
 dns.install('root').addZone('.')

@@ -3,6 +3,7 @@
 
 from seedemu.core import Emulator
 from seedemu.services import DomainNameService, DomainNameCachingService
+from seedemu.services.dns.DNSCommon import A_RR
 
 
 def run(dumpfile = None):
@@ -17,8 +18,8 @@ def run(dumpfile = None):
     dns.install('b-root-server').addZone('.')               # Slave server
 
     # Create nameservers for TLD and ccTLD zones
-    dns.install('a-com-server').addZone('com.').setMaster()  
-    dns.install('b-com-server').addZone('com.')  
+    dns.install('a-com-server').addZone('com.').setMaster()
+    dns.install('b-com-server').addZone('com.')
     dns.install('a-net-server').addZone('net.')
     dns.install('a-edu-server').addZone('edu.')
 
@@ -28,11 +29,11 @@ def run(dumpfile = None):
     dns.install('ns-example-net').addZone('example.net.')
     dns.install('ns-syr-edu').addZone('syr.edu.')
 
-    # Add records to zones 
-    dns.getZone('twitter.com.').addRecord('@ A 1.1.1.1')  
-    dns.getZone('google.com.').addRecord('@ A 2.2.2.2') 
-    dns.getZone('example.net.').addRecord('@ A 3.3.3.3') 
-    dns.getZone('syr.edu.').addRecord('@ A 128.230.18.63') 
+    # Add records to zones
+    dns.getZone('twitter.com.').addRecord(A_RR(address='1.1.1.1'))
+    dns.getZone('google.com.').addRecord(A_RR('2.2.2.2'))
+    dns.getZone('example.net.').addRecord(A_RR('3.3.3.3'))
+    dns.getZone('syr.edu.').addRecord(A_RR('128.230.18.63'))
 
     # Customize the display names (for visualization purpose)
     emu.getVirtualNode('a-root-server').setDisplayName('Root-A')
@@ -49,11 +50,11 @@ def run(dumpfile = None):
 
     ###########################################################
     emu.addLayer(dns)
-    
+
     if dumpfile is not None:
         emu.dump(dumpfile)
     else:
         emu.dump('dns_component.bin')
-        
+
 if __name__ == "__main__":
     run()

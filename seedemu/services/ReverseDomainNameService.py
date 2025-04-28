@@ -1,4 +1,4 @@
-from .DomainNameService import DomainNameService, DomainNameServer
+from .dns.DomainNameService import DomainNameService, DomainNameServer
 from seedemu.core import Node, Emulator, Service, Server
 
 class ReverseDomainNameServer(Server):
@@ -65,4 +65,3 @@ class ReverseDomainNameService(Service):
         out += 'ReverseDomainNameService\n'
 
         return out
-    

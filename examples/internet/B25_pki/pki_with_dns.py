@@ -5,6 +5,7 @@ from seedemu.compiler import Docker, Platform
 from seedemu.core import Binding, Emulator, Filter, Action
 from seedemu.layers import Base
 from seedemu.services import DomainNameService, CAService, CAServer, WebService, WebServer, RootCAStore
+from seedemu.services.dns.DNSCommon import *
 import base_internet_with_dns
 import os, sys
 
@@ -41,10 +42,10 @@ ca = CAService()
 web = WebService()
 
 # Add records to zones
-dns.getZone('seedCA.net.').addRecord('@ A 10.150.0.7')
-dns.getZone('seedCA.com.').addRecord('@ A 10.150.0.8')
-dns.getZone('example32.com.').addRecord('@ A 10.151.0.7')
-dns.getZone('bank32.com.').addRecord('@ A 10.151.0.8')
+dns.getZone('seedCA.net.').addRecord(A_RR(address='10.150.0.7'))
+dns.getZone('seedCA.com.').addRecord(A_RR(address='10.150.0.8'))
+dns.getZone('example32.com.').addRecord(A_RR(address='10.151.0.7'))
+dns.getZone('bank32.com.').addRecord(A_RR(address='10.151.0.8'))
 
 caServer1: CAServer = ca.install('ca1-vnode')
 caServer1.setCAStore(caStore1)

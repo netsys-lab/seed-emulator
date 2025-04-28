@@ -5,7 +5,7 @@ from seedemu.compiler import Docker
 from seedemu.core import Binding, Emulator, Filter, Action
 from seedemu.layers import Base, Ebgp, Ibgp, Ospf, Routing, PeerRelationship
 from seedemu.services import DomainNameCachingService, DomainNameService, CAService, CAServer, WebService, WebServer, RootCAStore
-
+from seedemu.services.dns.DNSCommon import *
 emu = Emulator()
 base = Base()
 routing = Routing()
@@ -97,17 +97,17 @@ dns.install('b-root-server').addZone('.')               # Slave server
 
 # Create nameservers for TLD and ccTLD zones
 # https://itp.cdn.icann.org/en/files/root-system/identification-tld-private-use-24-01-2024-en.pdf
-dns.install('a-internal-server').addZone('internal.').setMaster()  
+dns.install('a-internal-server').addZone('internal.').setMaster()
 dns.install('b-internal-server').addZone('internal.')
 
 dns.install('ns-ca-internal').addZone('ca1.internal.').addZone('ca2.internal.')
 dns.install('ns-user-internal').addZone('user1.internal.').addZone('user2.internal')
 
 # Add records to zones
-dns.getZone('ca1.internal.').addRecord('@ A 10.150.0.7')
-dns.getZone('ca2.internal.').addRecord('@ A 10.150.0.8')
-dns.getZone('user1.internal.').addRecord('@ A 10.150.0.9')
-dns.getZone('user2.internal.').addRecord('@ A 10.151.0.7')
+dns.getZone('ca1.internal.').addRecord(A_RR(address='10.150.0.7'))
+dns.getZone('ca2.internal.').addRecord(A_RR(address='10.150.0.8'))
+dns.getZone('user1.internal.').addRecord(A_RR(address='10.150.0.9'))
+dns.getZone('user2.internal.').addRecord(A_RR(address='10.151.0.7'))
 
 emu.addLayer(dns)
 
