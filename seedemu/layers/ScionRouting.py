@@ -371,6 +371,8 @@ class ScionRouting(Routing):
         else:
             super().configure(emulator)
         reg = emulator.getRegistry()
+        scisd = emulator.getLayer('ScionIsd')
+
 
         for ((scope, type, name), obj) in reg.getAll().items():
 
@@ -378,13 +380,15 @@ class ScionRouting(Routing):
             nologrotate = obj.getOption('rotate_logs', prefix='scion').value == "false"
             useenvsubst = obj.getOption('use_envsubst', prefix='scion').value == 'true'
 
+            _ia = IA(scisd.getAsIsds(int(scope))[0][0], int(scope))
+
             # SCION inter-domain routing affects only border-routers
             if type == "brdnode":
                 rnode = obj
                 if not rnode.hasExtension('ScionRouter'):
                     rnode = promote_to_scion_router(rnode)
 
-                self.__install_scion(rnode)
+                self.__install_scion(rnode, _ia)
                 br_log = (">> /var/log/scion-border-router.log 2>&1"
                            if nologrotate
                            else "2>&1 | rotatelogs -n 2 /var/log/scion-border-router.log 1M ")
@@ -403,7 +407,7 @@ class ScionRouting(Routing):
 
             elif type == 'csnode':
                 csnode: Node = obj
-                self.__install_scion(csnode)
+                self.__install_scion(csnode, _ia)
                 self.__append_scion_command(csnode)
                 name = csnode.getName()
                 ctrl_log = (">> /var/log/scion-control-service.log 2>&1"
@@ -417,7 +421,7 @@ class ScionRouting(Routing):
 
             elif type == 'hnode':
                 hnode: Node = obj
-                self.__install_scion(hnode)
+                self.__install_scion(hnode, _ia)
                 self.__append_scion_command(hnode)
 
             if (cfg_vol := obj.getOption('scion_etc_config_vol')) != None:
@@ -432,9 +436,10 @@ class ScionRouting(Routing):
                         node.addPersistentStorage('/etc/scion',
                                                    f'etcscion_{node.getAsn()}-{node.getName()}')
 
-    def __install_scion(self, node: Node):
+    def __install_scion(self, node: Node, ia: IA):
         """Install SCION stack on the node."""
-
+        host_addr = node.getLocalIPAddress()
+        node.setLabel('scion_address', f'{ia},{host_addr}')
         self.getBuilder().installSCION(node)
 
     def getBuilder(self) -> ScionBuilder:
