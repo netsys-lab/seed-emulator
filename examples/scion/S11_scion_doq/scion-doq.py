@@ -3,6 +3,7 @@
 
 
 from seedemu.services import GolangDevService, AccessMode, DomainNameService
+from seedemu.services.dns.DNSCommon import *
 from dataclasses import dataclass
 from typing import List
 from seedemu.core import Emulator, Binding, Filter, Node, OptionRegistry
@@ -44,7 +45,7 @@ def run(dumpfile = None):
         repo_url: str
         repo_branch: str
         repo_path: str
-        notes: str
+        notes: str = ''
 
     devsvc = GolangDevService( 'amdfxlucas', 'saculolissat@gmx.de' )
     repos = [
@@ -121,11 +122,11 @@ def run(dumpfile = None):
         svc = devsvc.install(vnodename)
 
         for r in repos:
-
             svc.checkoutRepo(r.repo_url,r.repo_path, r.repo_branch, AccessMode.shared)
-        emu.addBinding(Binding(vnodename,
-                               filter=Filter(nodeName=node.getName(),
-                                             asn=node.getAsn())))
+
+        emu.addBinding(Binding(vnodename, filter=Filter(nodeName=node.getName(),
+                                                        asn=node.getAsn(),
+                                                        allowBound=True)))
 
     ases = {}
     brs = defaultdict()
@@ -341,8 +342,8 @@ def run(dumpfile = None):
     from seedemu.utilities import createHostsOnNetwork
     # nodes who should have a DevService installed
     dev_targets = []
-    client_ases = [102,172, 173, 231, 234, 203, 235]
-    for asn in client_ases:
+    ases_with_hosts = [102, 172, 173, 231, 234, 203, 235, 150, 240 , 242, 241]
+    for asn in ases_with_hosts:
         as_ = base.getAutonomousSystem(asn)
         createHostsOnNetwork(emu, as_, 'net0', [])
         hnode = as_.getHost('host_0')
@@ -355,23 +356,76 @@ def run(dumpfile = None):
 
     # HTTP web server and HTTP reverse proxy ...........................
 
+    # 'www.example.com'
     host_web_1 = base.getAutonomousSystem(172).getHost('host_0')
 
+    # 'www.example.net'
     host_web_2 = base.getAutonomousSystem(173).getHost('host_0')
+
+    # 'www.example.edu'
+    host_web_3 = base.getAutonomousSystem(241).getHost('host_0')
 
 
     # coredns DoQ nameservers ..........................................
     # root '.'
     host_ns_1 = base.getAutonomousSystem(235).getHost('host_0')
 
+    root_a = dns_svc.install('root-a')
+    root_a.addZone('.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('root-a', filter=Filter(asn=235, nodeName='host_0')))
+
+    #dns_svc.hostZoneOn()
+
     # 'com.' zone
     host_ns_2 = base.getAutonomousSystem(234).getHost('host_0')
+
+    ns_com = dns_svc.install('ns-com') # actually 'ns1-com' to be precise
+    ns_com.addZone('com.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('ns-com', filter=Filter(asn=234, nodeName='host_0')))
+
 
     # 'net.'
     host_ns_3 = base.getAutonomousSystem(203).getHost('host_0')
 
+    ns_net = dns_svc.install('ns-net')
+    ns_net.addZone('net.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('ns-net', filter=Filter(asn=203, nodeName='host_0')))
+
     # 'edu.'
     host_ns_4 = base.getAutonomousSystem(231).getHost('host_0')
+
+    ns_edu = dns_svc.install('ns-edu')
+    ns_edu.addZone('edu.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('ns-edu', filter=Filter(asn=231, nodeName='host_0')))
+
+    # second level zones name servers
+
+    # 'example.com.'
+    host_ns_5 = base.getAutonomousSystem(150).getHost('host_0')
+
+    ns_example_com = dns_svc.install('ns-example.com')
+    ns_example_com.addZone('example.com.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('ns-example.com', filter=Filter(asn=150, nodeName='host_0')))
+
+    dns_svc.getZone('example.com.').addRecord(TXT_RR(text='scion=1-172,10.172.0.71', name='www.example.com.'))
+
+    # 'example.net.'
+    host_ns_6 = base.getAutonomousSystem(240).getHost('host_0')
+
+    ns_example_net = dns_svc.install('ns-example.net')
+    ns_example_net.addZone('example.net.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('ns-example.net', filter=Filter(asn=240, nodeName='host_0')))
+
+    dns_svc.getZone('example.net.').addRecord(TXT_RR(text='scion=1-173,10.173.0.71', name='www.example.net.'))
+
+    # 'example.edu.'
+    host_ns_7 = base.getAutonomousSystem(242).getHost('host_0')
+
+    ns_example_edu = dns_svc.install('ns-example.edu')
+    ns_example_edu.addZone('example.edu.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('ns-example.edu', filter=Filter(asn=242, nodeName='host_0')))
+
+    dns_svc.getZone('example.edu.').addRecord(TXT_RR(text='scion=2-241,10.241.0.71', name='www.example.edu.'))
 
     for node in dev_targets:
         install_dev_svc(emu, node, devsvc, repos )

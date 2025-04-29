@@ -13,7 +13,7 @@ class PKITestCase(SeedEmuTestCase):
         super().setUpClass()
         cls.wait_until_all_containers_up(19)
         cls.containers: List[Container] = cls.containers
-        
+
     def test_root_cert_installed(self):
         for container in self.containers:
             if container.labels.get('org.seedsecuritylabs.seedemu.meta.nodename') is None:
@@ -44,6 +44,14 @@ class PKITestCase(SeedEmuTestCase):
                 self.assertEqual(code, 0)
                 continue
 
+    def do_tests(self, container, domain):
+                code, _ = container.exec_run(f"dig +short A {domain} | grep -q . && exit 0 || exit 1")
+                self.assertEqual(code, 0, 'name resolution failed')
+                code, _ = container.exec_run(f"curl http://{domain}")
+                self.assertEqual(code, 0, 'requesting web page failed')
+                code, _ = container.exec_run(f"curl https://{domain}")
+                self.assertEqual(code, 0, 'secure connection failed')
+
     def test_web_cert_issued(self):
         for container in self.containers:
             if container.labels.get('org.seedsecuritylabs.seedemu.meta.nodename') is None:
@@ -54,28 +62,20 @@ class PKITestCase(SeedEmuTestCase):
                 continue
             # CA will install its own root cert
             if container.labels.get('org.seedsecuritylabs.seedemu.meta.nodename') == "ca1":
-                code, _ = container.exec_run("curl https://user1.internal")
-                self.assertEqual(code, 0)
-                code, _ = container.exec_run("curl https://user2.internal")
-                self.assertNotEqual(code, 0)
+                self.do_tests(container, 'user1.internal')
+                self.do_tests(container, 'user2.internal')
                 continue
             if container.labels.get('org.seedsecuritylabs.seedemu.meta.nodename') == "ca2":
-                code, _ = container.exec_run("curl https://user1.internal")
-                self.assertEqual(code, 0)
-                code, _ = container.exec_run("curl https://user2.internal")
-                self.assertEqual(code, 0)
+                self.do_tests(container, 'user1.internal')
+                self.do_tests(container, 'user2.internal')
                 continue
             if container.labels.get('org.seedsecuritylabs.seedemu.meta.asn') == "150":
-                code, _ = container.exec_run("curl https://user1.internal")
-                self.assertEqual(code, 0)
-                code, _ = container.exec_run("curl https://user2.internal")
-                self.assertNotEqual(code, 0)
+                self.do_tests(container, 'user1.internal')
+                self.do_tests(container, 'user2.internal')
                 continue
             if container.labels.get('org.seedsecuritylabs.seedemu.meta.asn') == "151":
-                code, _ = container.exec_run("curl https://user1.internal")
-                self.assertNotEqual(code, 0)
-                code, _ = container.exec_run("curl https://user2.internal")
-                self.assertEqual(code, 0)
+                self.do_tests(container, 'user1.internal')
+                self.do_tests(container, 'user2.internal')
                 continue
 
     @classmethod

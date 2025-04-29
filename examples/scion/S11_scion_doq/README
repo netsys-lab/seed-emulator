@@ -1,0 +1,56 @@
+## DNS Support for SCION
+
+To achieve backward compatibility and low overheads, the
+TXT format was simply chosen as the Resource Record (RR)
+format for SCION addresses (instead of A/AAAA for IP).
+The  textual representation is of the form `Isolation Domain (ISD)-Autonomous System (AS), IP address`.
+An example is:
+```
+perrig.inf.ethz.ch. 273 IN TXT "scion=17-ffaa:0:1102,129.132.121.164"
+```
+the SCION record of the Internet site of the NetSec working
+group at ETH Zurich. This allows a domain to retain its
+existing IPv4/IPv6 reachability in the conventional Internet
+and at the same time already migrate independently into the
+new Internet architecture. This is important in order to be
+able to bootstrap SCION on a large scale.
+End hosts could prefer SCION services/Internet sites over conventional ones,
+if already offered, to benefit from their advantages.
+
+
+
+### Library Support
+As of now, the most convenient way to resolve SCION
+addresses for domain names is to use the function
+`pan.ResolveUDPAddress()`.
+
+This function first checks `/etc/hosts` and `/etc/scion/hosts` (steps 1 & 2) and
+then falls back to the `net.Resolver` to search for a `TXT RR`
+with a SCION address for the domain name (step 3).
+However, this is done without any privacy via UDP.
+
+Depending on the option chosen in VI-E, additional
+steps can be inserted between steps 2 and 3.
+These steps can either query the locally running SDNS resolver at
+`127.0.0.1:5553` via UDP or
+(if it’s not running/accessible there) as a fallback,
+query the central remote resolver via SCION DoQ under its SCION address,
+ which could be configured by default, for instance, in `/etc/scion/hosts`.
+This approach would at least attempt to ensure DNS privacy before
+resorting to the `net.Resolver`.
+
+This has been implemented for Option 1 from VI-E.
+
+### Resolving SCION Addresses
+
+retrieve the SCION address (TXT RR) for the domain name `dummy.luki.test.home.`.
+```
+sdig @19-ffaa:1:1094,[127.0.0.1] -p 8853 IN TXT dummy.luki.test.home.
+```
+
+## Resolving IP addresses over SCION
+retrieve the IP address (A RR) of the domain name `dummy.luki.test.home.` from
+a NS that listens on a SCION address `@19-ffaa:1:1094,[127.0.0.1]`.
+```
+sdig @19-ffaa:1:1094,[127.0.0.1] -p 8853 IN A dummy.luki.test.home.
+```

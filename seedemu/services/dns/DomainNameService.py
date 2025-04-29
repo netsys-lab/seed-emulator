@@ -105,7 +105,7 @@ class Zone(Printable):
 
         return self
 
-    def addGuleRecord(self, fqdn: str, addr: str) -> Zone:
+    def addGuleRecord(self, fqdn: str, addr: str, node: Node = None) -> Zone:
         """!
         @brief Add a new gule record.
 
@@ -118,7 +118,7 @@ class Zone(Printable):
         """
         if fqdn[-1] != '.': fqdn += '.'
         zonename = self.__zonename if self.__zonename != '' else '.'
-        self.__gules.append(_getRRforNode(fqdn, addr))
+        self.__gules.append(_getRRforNode(fqdn, addr, node))
         #self.__gules.append('{} NS {}'.format(zonename, fqdn))
         self.__gules.append( NS_RR(zonename=zonename, nsname=fqdn) )
 
@@ -378,6 +378,13 @@ class DomainNameServer(Server):
 
         return rules
 
+    def getHostAddr(self, node: Node) -> str:
+        ifaces = node.getInterfaces()
+        assert len(ifaces) > 0, 'node has no interfaces'
+        assert len(ifaces) == 1, 'node is not a host'
+        addr = ifaces[0].getAddress()
+        return addr
+
 
     def configure(self, node: Node, dns: DomainNameService):
         """!
@@ -390,16 +397,16 @@ class DomainNameServer(Server):
             zonename = zone.getName()
 
             if auto_ns_soa:
-                ifaces = node.getInterfaces()
-                assert len(ifaces) > 0, 'node has not interfaces'
-                addr = ifaces[0].getAddress()
+                addr = self.getHostAddr(node)
 
                 if self.__is_master:
                     dns.addMasterIp(zonename, str(addr))
 
                 if zonename[-1] != '.': zonename += '.'
+                # handle special '.' rootnameserver case
                 if zonename == '.': zonename = ''
 
+                # (auto) generate a SOA record, if the zone doesn't already has one
                 if len(zone.findRecordsKey('SOA')) == 0:
                     zone.addRecord(_getSoaRR(zonename))
 
@@ -407,15 +414,17 @@ class DomainNameServer(Server):
                 #If there are multiple zone servers, increase the NS number for ns name.
                 ns_number = 1
                 while (True):
-                    #if len(zone.findRecords('ns{}.{} A '.format(str(ns_number), zonename))) > 0:
-                    if len(zone.findRecords( keys= { 'name': f'ns{ns_number}.{zonename}',
-                                                      'type': 'A'  } )) > 0:
+
+                    if ( (len(zone.findRecords( keys= { 'name': f'ns{ns_number}.{zonename}',
+                                                      'type': 'A'  } )) > 0)
+                        or len(zone.findRecords( keys= { 'name': f'ns{ns_number}.{zonename}',
+                                                      'type': 'TXT'  } )) > 0):
                         ns_number +=1
                     else:
                         break
 
                 ns_name=f'ns{str(ns_number)}.{zonename}'
-                zone.addGuleRecord(ns_name, str(addr))
+                zone.addGuleRecord(ns_name, str(addr), node)
                 zone.addRecord(_getNsAddrRecord(node, ns_number, zonename, str(addr) ))
                 #zone.addRecord('@ NS ns{}.{}'.format(str(ns_number), zonename))
                 zone.addRecord( NS_RR(zonename='@', nsname=ns_name) )
@@ -443,9 +452,18 @@ class DomainNameServer(Server):
             pass
 
     def _do_install_bind9(self, node: Node, dns: DomainNameService):
+            """!@brief installs the default bind9 DNS stack onto the given node
+                @details the node will run 'named' service
             """
-                installs the default bind9 DNS stack onto the given node
-            """
+
+            '''
+            # sets the contents of the following config files:
+              - /etc/bind/named.conf.local    --includes-->   /etc/bind/named.conf.zones
+              - /etc/bind/named.conf.zones    contains pointers to  zonefiles from /etc/bind/zones/*
+              - /etc/bind/zones/*             directory with actual zone files
+              - /etc/bind/named.conf.options   general options for 'named'
+            '''
+
             node.addSoftware('bind9')
             node.appendStartCommand('echo "include \\"/etc/bind/named.conf.zones\\";" >> /etc/bind/named.conf.local')
             node.setFile('/etc/bind/named.conf.options', DomainNameServiceFileTemplates['named_options'])
