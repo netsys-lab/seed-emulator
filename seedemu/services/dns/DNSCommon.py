@@ -5,6 +5,17 @@ from random import randint
 
 _default_name = '@'
 
+def rrname2Type(rrtype: str):
+    match rrtype:
+        case 'A':
+            return A_RR
+        case 'NS':
+            return NS_RR
+        case 'SOA':
+            return SOA_RR
+        case 'TXT':
+            return TXT_RR
+
 @dataclass
 class ResourceRecord:
     # TODO: maybe move the 'name' here . .
@@ -16,23 +27,25 @@ class ResourceRecord:
 
 @dataclass
 class A_RR(ResourceRecord):
+    """Maps a domain name to a single IPv4 address
+    """
     address: str # an IPv4 or IPv6 address
     name: str = _default_name # fqn whose address is given by this record (zonename)
     # length: int = 4
     def __str__(self):
-        return f'{self.name} IN A {self.address}'
+        return f'{self.name} A {self.address}'
 
 @dataclass
 class NS_RR(ResourceRecord):
-
+    """Names a name server (NS) (or DNS server) for a zone"""
     nsname: str # names the authoritative nameserver
     zonename: str = _default_name # names the domain/zone
     def __str__(self):
-        return f'{self.zonename} IN NS {self.nsname}'
+        return f'{self.zonename} NS {self.nsname}'
 
 @dataclass
 class SOA_RR(ResourceRecord):
-
+    """SOA (start of authority) Provides parameters for a zone"""
     mname: str
     rname: str
     zonename: str = _default_name
@@ -52,18 +65,25 @@ class SOA_RR(ResourceRecord):
         #                                            )
 
 
+'''
+CNAME (alias) Maps a domain name (the alias) to another
+domain name (the canonical name)
+'''
 # CNAME
 
 # PTR
 
 @dataclass
 class TXT_RR(ResourceRecord):
+    """
+    i.e.:      perrig.inf.ethz.ch. 273 IN TXT "scion=17-ffaa:0:1102,129.132.121.164"
+    """
 
     text: str # i.e. a SCION-RR
     name: str = _default_name# domainname for which this TXT record is
     def __str__(self):
         #return f'{self.name} {self.ttl} {self.text}'
-        return f'{self.name} IN TXT {self.text}'
+        return f'{self.name} TXT "{self.text}"'
 
 #ORIGIN
 
@@ -95,7 +115,7 @@ def _getRRforNode(domain_name: str, addr: str, node: Node=None) -> ResourceRecor
     """
     if node != None:
         if 'scion_address' in  node.getLabel():
-            return TXT_RR(name=domain_name, text=node.getLabel()['scion_address'])
+            return TXT_RR(name=domain_name, text=f'scion={node.getLabel()['scion_address']}')
         else:
             return A_RR(name=domain_name, address=addr)
     else:

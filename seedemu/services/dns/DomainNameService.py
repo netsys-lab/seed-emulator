@@ -5,7 +5,7 @@ from typing import List, Dict, Tuple, Set
 from re import sub
 import inspect
 import requests
-from .DNSCommon import  ResourceRecord, _getRRforNode, _getNsAddrRecord, _getSoaRR , NS_RR, DNSStack
+from .DNSCommon import  ResourceRecord, _getRRforNode, _getNsAddrRecord, _getSoaRR , NS_RR, DNSStack, A_RR, TXT_RR, rrname2Type
 
 
 DomainNameServiceFileTemplates: Dict[str, str] = {}
@@ -209,7 +209,34 @@ class Zone(Printable):
         """
         return [str(r) for r in self.__gules]
 
-    def findRecords(self, keyword: str) -> List[ResourceRecord]:
+    def findRecords(self, keys: Dict[str,str]) -> List[ResourceRecord]:
+
+        assert 'type' in keys, 'search key requires RR type! i.e. A, NS, SOA, TXT etc. '
+
+        def cmp_search_key(rr: ResourceRecord, keys: Dict[str, str]) -> bool:
+            result = True # by default only the RR type is matched against
+                          # (all RRs of this type are returned)
+            match rr:
+                case A_RR(address, name):
+                    if rrname2Type(keys['type']) == A_RR:
+                        if 'address' in keys:
+                            if keys['address'] != address:
+                                return False
+                        if 'name' in keys:
+                            if keys['name'] != name:
+                                return False
+                        return result
+
+                    else:
+                        return False
+
+
+
+
+
+        return list(filter(lambda x: cmp_search_key(x,keys) , self.__records))
+
+    def findRecordsKey(self, keyword: str) -> List[ResourceRecord]:
         """!
         @brief Find a record.
 
@@ -373,14 +400,16 @@ class DomainNameServer(Server):
                 if zonename[-1] != '.': zonename += '.'
                 if zonename == '.': zonename = ''
 
-                if len(zone.findRecords('SOA')) == 0:
+                if len(zone.findRecordsKey('SOA')) == 0:
                     zone.addRecord(_getSoaRR(zonename))
 
 
                 #If there are multiple zone servers, increase the NS number for ns name.
                 ns_number = 1
                 while (True):
-                    if len(zone.findRecords('ns{}.{} A '.format(str(ns_number), zonename))) > 0:
+                    #if len(zone.findRecords('ns{}.{} A '.format(str(ns_number), zonename))) > 0:
+                    if len(zone.findRecords( keys= { 'name': f'ns{ns_number}.{zonename}',
+                                                      'type': 'A'  } )) > 0:
                         ns_number +=1
                     else:
                         break
