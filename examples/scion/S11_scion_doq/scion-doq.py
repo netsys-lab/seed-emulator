@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import List
 from seedemu.core import Emulator, Binding, Filter, Node, OptionRegistry
 from seedemu.layers import (
-    ScionBase, ScionRouting, ScionIsd, Scion, SetupSpecification, CheckoutSpecification)
+    ScionBase, ScionRouting, ScionIsd, Scion, SetupSpecification, CheckoutSpecification, EtcHosts)
 from seedemu.layers import ScionBase, ScionRouting, ScionIsd, Scion
 from seedemu.layers.Scion import LinkType as ScLinkType
 from seedemu.compiler import Docker, Platform, Graphviz
@@ -48,13 +48,16 @@ def run(dumpfile = None):
         notes: str = ''
 
     devsvc = GolangDevService( 'amdfxlucas', 'saculolissat@gmx.de' )
-    repos = [
-             GitRepo( repo_url = 'https://github.com/netsys-lab/ngi-search',
-                    repo_branch = 'main',
-                    repo_path = '/repos/ngi-search',
-                    notes='actually only a README and git-submodule pointers' \
-                            'to scion-apps(containing skip), pan-lua and scion-browser-extensions'),
 
+    ''' # seems to be private
+    GitRepo( repo_url = 'https://github.com/netsys-lab/ngi-search',
+           repo_branch = 'main',
+           repo_path = '/repos/ngi-search',
+           notes='actually only a README and git-submodule pointers' \
+                   'to scion-apps(containing skip), pan-lua and scion-browser-extensions'),
+    '''
+
+    repos = [
             GitRepo( repo_url = 'https://github.com/netsys-lab/pan-lua',
                     repo_branch = 'main',
                     repo_path = '/repos/pan-lua' ),
@@ -202,6 +205,7 @@ def run(dumpfile = None):
     routing = ScionRouting()
     scion_isd = ScionIsd()
     scion = Scion()
+    etc_hosts = EtcHosts()
 
     # SCION ISDs
     base.createIsolationDomain(1)
@@ -369,6 +373,7 @@ def run(dumpfile = None):
     # coredns DoQ nameservers ..........................................
     # root '.'
     host_ns_1 = base.getAutonomousSystem(235).getHost('host_0')
+    host_ns_1.addHostName('scion-root-servers-net.') # will be added to /etc/hosts of all nodes ?!
 
     root_a = dns_svc.install('root-a')
     root_a.addZone('.', createNsAndSoa=True).setMaster()
@@ -436,6 +441,7 @@ def run(dumpfile = None):
     emu.addLayer(routing)
     emu.addLayer(scion_isd)
     emu.addLayer(scion)
+    emu.addLayer(etc_hosts)
     emu.addLayer(dns_svc)
     emu.addLayer(devsvc)
 
