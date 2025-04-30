@@ -130,6 +130,8 @@ class CAServer(Server):
         self.__duration = duration
         return self
 
+    # TODO: add enableHTTPsBuildTimeFunc(self, node: Node, ... ) that requires no ACME at runtime
+
     def enableHTTPSFunc(self, node: Node, web: WebServer):
         """!
         @brief Enable HTTPS for the web server.

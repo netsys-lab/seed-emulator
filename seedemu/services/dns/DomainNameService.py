@@ -464,7 +464,7 @@ class DomainNameServer(Server):
         if (val:=node.getOption('dns_setup').value) == DNSStack.DEFAULT:
             self._do_install_bind9(node, dns)
         elif val == DNSStack.SCION:
-            
+
             self._do_install_coredns(node,dns)
 
     def _do_generate_zonefiles(self, node: Node, dns: DomainNameService, zones_path: str):
@@ -503,7 +503,6 @@ class DomainNameServer(Server):
             server_block = DomainNameServiceFileTemplates['coredns_config'].format(
                 schema='squic', # SCION QUIC
                 zonefile=zonefile_path,
-                schema='squic',
                 zone= zonename,
                 port=853,# standard DoQ port,
                 tls_cert=cert_path,
@@ -511,16 +510,16 @@ class DomainNameServer(Server):
             )
             node.appendFile(corefile_path, server_block)
 
-    def _do_install_coredns(self, node: Node, dns: DomainNameService):        
+    def _do_install_coredns(self, node: Node, dns: DomainNameService):
         """!@ installs and configures coredns server on the given node
         @note see https://coredns.io/manual/configuration/
-        """      
+        """
         corefile_path = f'/etc/coredns/Corefile'
         zones_path = '/etc/coredns/zones'
         self._do_generate_zonefiles(node, dns, zones_path)
         self._do_generate_corefile(node, dns, corefile_path, zones_path)
-        
-       
+
+
         node.appendStartCommand(f'coredns -conf {corefile_path}')
 
     def _do_install_bind9(self, node: Node, dns: DomainNameService):
@@ -641,6 +640,10 @@ class DomainNameService(Service):
         server.configure(node, self)
 
     def configure(self, emulator: Emulator):
+        # TODO: install the TLS root certificates on all hosts
+        #       in order for them to verify the certs of the DNS nameservers
+        #  see CAService for this, the WebService also uses it for HTTPS
+
         self.__resolvePendingRecords(emulator, self.__rootZone)
         return super().configure(emulator)
 
