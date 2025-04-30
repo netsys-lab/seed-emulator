@@ -5,6 +5,7 @@ from typing import List, Dict, Tuple, Set
 from re import sub
 import inspect
 import requests
+from seedemu.services import CAService, CAServer
 from .DNSCommon import  ResourceRecord, _getRRforNode, _getNsAddrRecord, _getSoaRR , NS_RR, DNSStack, A_RR, TXT_RR, rrname2Type
 
 
@@ -292,11 +293,12 @@ class DomainNameServer(Server):
     """
 
     __zones: Set[Tuple[str, bool]]
-    __node: Node
+    __node: Node # only known after configure()
+    __ns_server_name: str # only known after configure()
     __is_master: bool
     __is_real_root: bool
 
-    def __init__(self):
+    def __init__(self, do_enc: bool):
         """!
         @brief DomainNameServer constructor.
         """
@@ -305,7 +307,19 @@ class DomainNameServer(Server):
         self.__zones = set()
         self.__is_master = False
         self.__is_real_root = False
+        self.__enable_https_func = None
+        self.__do_enc = do_enc
 
+    def setCAServer(self, ca: CAServer):
+        """
+        DNS over Encrypted Transport requires the nameservers to have TLS certs
+        just like webservers
+        """
+        # once we are configure()'d  and know our 'node' and server-name
+        # we can invoke this callback and pass our node and svc-name as arguments
+        self.__enable_https_func = ca.enableHTTPsBuildTimeFunc
+
+        return self
 
     def addZone(self, zonename: str, createNsAndSoa: bool = True) -> DomainNameServer:
         """!
@@ -440,6 +454,7 @@ class DomainNameServer(Server):
                         break
 
                 ns_name=f'ns{str(ns_number)}.{zonename}'
+                self.__ns_server_name = ns_name
                 zone.addGuleRecord(ns_name, str(addr), node)
                 zone.addRecord(_getNsAddrRecord(node, ns_number, zonename, str(addr) ))
                 #zone.addRecord('@ NS ns{}.{}'.format(str(ns_number), zonename))
@@ -464,7 +479,7 @@ class DomainNameServer(Server):
         if (val:=node.getOption('dns_setup').value) == DNSStack.DEFAULT:
             self._do_install_bind9(node, dns)
         elif val == DNSStack.SCION:
-
+            assert self.__do_enc, 'No support for unencrypted DNS in the Future Next Generation Internet anymore !'
             self._do_install_coredns(node,dns)
 
     def _do_generate_zonefiles(self, node: Node, dns: DomainNameService, zones_path: str):
@@ -501,7 +516,7 @@ class DomainNameServer(Server):
 
             zonefile_path = f'{zones_path}/{filename}'
             server_block = DomainNameServiceFileTemplates['coredns_config'].format(
-                schema='squic', # SCION QUIC
+                schema='squic', # SCION QUIC or change to DoQ sth.
                 zonefile=zonefile_path,
                 zone= zonename,
                 port=853,# standard DoQ port,
@@ -526,6 +541,7 @@ class DomainNameServer(Server):
             """!@brief installs the default bind9 DNS stack onto the given node
                 @details the node will run 'named' service
             """
+            #TODO i bet bind9 is capable of DoE as well... go and implement it
 
             '''
             # sets the contents of the following config files:
@@ -581,10 +597,11 @@ class DomainNameService(Service):
         from seedemu.core import OptionRegistry
         return [OptionRegistry().dns_setup()]
 
-    def __init__(self, autoNameServer: bool = True, dns_setup: BaseOption = None):
+    def __init__(self, autoNameServer: bool = True, dns_setup: BaseOption = None, do_enc: bool = True):
         """!
         @brief DomainNameService constructor.
-
+        @param do_enc enable DNS over Encrypted Transport.
+                (requires DNS nameservers to have TLS certs, and clients to posess the root cert to verify them)
         @param autoNameServer add gule records to parents automatically.
         """
         from seedemu.core.OptionRegistry import OptionRegistry
@@ -592,6 +609,7 @@ class DomainNameService(Service):
         self.__autoNs = autoNameServer
         self.__rootZone = Zone('.')
         self.__masters = {}
+        self.__do_enc = do_enc
         self.addDependency('Base', False, False)
 
         args = inspect.signature(DomainNameServer.__init__).parameters.keys()
@@ -634,7 +652,7 @@ class DomainNameService(Service):
             self.__resolvePendingRecords(emulator, subzone)
 
     def _createServer(self) -> Server:
-        return DomainNameServer()
+        return DomainNameServer(self.__do_enc)
 
     def _doConfigure(self, node: Node, server: DomainNameServer):
         server.configure(node, self)

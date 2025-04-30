@@ -130,7 +130,15 @@ class CAServer(Server):
         self.__duration = duration
         return self
 
-    # TODO: add enableHTTPsBuildTimeFunc(self, node: Node, ... ) that requires no ACME at runtime
+
+    def enableHTTPsBuildTimeFunc(self, node: Node, server_name: str):
+        """
+        unlike enableHTTPSFunc() requires no ACME at runtime,
+        because it copies all required stuff into containers at build time
+        @param node  the Node onto which the Server which requires TLS is installed
+        @param server_name domain-name of the Server for which it needs a certificate
+        """
+        pass
 
     def enableHTTPSFunc(self, node: Node, web: WebServer):
         """!
