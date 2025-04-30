@@ -22,6 +22,22 @@ options {
 };
 '''
 
+# CoreDNS 'server-block'
+DomainNameServiceFileTemplates['coredns_config'] = '''\
+{schema}://{zone}:{port} {
+tls {tls_cert}
+    {tls_key}
+file {zonefile} {zone}
+debug
+log
+errors
+}
+'''
+# for root-ns
+# schema: squic
+# file zones/db. .
+# tls_cert ca/scion-root-servers-net-cert.pem
+# tls_key ca/scion-root-servers-net-key.pem
 
 
 class Zone(Printable):
@@ -448,8 +464,64 @@ class DomainNameServer(Server):
         if (val:=node.getOption('dns_setup').value) == DNSStack.DEFAULT:
             self._do_install_bind9(node, dns)
         elif val == DNSStack.SCION:
-            # TODO:
-            pass
+            
+            self._do_install_coredns(node,dns)
+
+    def _do_generate_zonefiles(self, node: Node, dns: DomainNameService, zones_path: str):
+        """ generate a zonefile for each of the zones under /etc/coredns/zones
+        TODO zonefiles are just a RR-dump and thus the impl could be shared between bind9 and coredns
+        """
+
+        for (_zonename, auto_ns_soa) in self.__zones:
+            zone = dns.getZone(_zonename)
+            zonename = filename = zone.getName()
+            if zonename == '' or zonename == '.':
+                filename = 'root'
+                zonename = '.'
+            zonepath = '{zones_dir}/{}'.format(zones_path,filename)
+            node.setFile(zonepath, '\n'.join(zone.getRecords()))
+
+    def _do_generate_corefile(self, node: Node, dns: DomainNameService, corefile_path: str, zones_path: str):
+        """ add a server-block to Corefile for each zone
+        """
+
+        crypto_path = '/etc/coredns/ca'
+
+        node.setFile(corefile_path, '')
+        for (_zonename, auto_ns_soa) in self.__zones:
+            zone = dns.getZone(_zonename)
+            zonename = filename = zone.getName()
+            if zonename == '' or zonename == '.':
+                filename = 'root'
+                zonename = '.'
+
+            # TODO generate TLS certificate and private key for zone
+            cert_path = f'{crypto_path}/{zonename}-cert.pem'
+            key_path = f'{crypto_path}/{zonename}-key.pem'
+
+            zonefile_path = f'{zones_path}/{filename}'
+            server_block = DomainNameServiceFileTemplates['coredns_config'].format(
+                schema='squic', # SCION QUIC
+                zonefile=zonefile_path,
+                schema='squic',
+                zone= zonename,
+                port=853,# standard DoQ port,
+                tls_cert=cert_path,
+                tls_key=key_path
+            )
+            node.appendFile(corefile_path, server_block)
+
+    def _do_install_coredns(self, node: Node, dns: DomainNameService):        
+        """!@ installs and configures coredns server on the given node
+        @note see https://coredns.io/manual/configuration/
+        """      
+        corefile_path = f'/etc/coredns/Corefile'
+        zones_path = '/etc/coredns/zones'
+        self._do_generate_zonefiles(node, dns, zones_path)
+        self._do_generate_corefile(node, dns, corefile_path, zones_path)
+        
+       
+        node.appendStartCommand(f'coredns -conf {corefile_path}')
 
     def _do_install_bind9(self, node: Node, dns: DomainNameService):
             """!@brief installs the default bind9 DNS stack onto the given node
