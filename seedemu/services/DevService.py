@@ -239,11 +239,17 @@ class ContainerDevelopmentService(Service):
 
         for vnode in list(self.getPendingTargets().keys())[1:]:
             node = emu.getBindingFor(vnode)
+            node.addDockerCommand('RUN mkdir -p /root/.config/git/')
+            node.addDockerCommand('RUN git config -f /root/.config/git/config  user.name {}'.format( self.gitUser()) )
+            node.addDockerCommand('RUN git config -f /root/.config/git/config  user.email {}'.format(self.gitMail()) )
+
             node.addSoftware('openssh-client')
             node.appendStartCommand('eval "$(ssh-agent -s)"')
             node.appendStartCommand('ssh-add /root/.ssh/id_ed25519')
             node.addPersistentStorage('/root/.ssh', 'sshkeys')
             node.addPersistentStorage('/root/.config/git', 'gitconf')
+
+
     def _configureRealWorldAccess(self, emulator: Emulator):
         """ in order to able to git-push any changes made on the build/dev-container checkouts
             the nodes with a DevServer installation need external 'RealWorld' connectivity
