@@ -101,11 +101,14 @@ class WebServer(Server):
         """
         node.addSoftware('nginx-light')
         node.setFile('/var/www/html/index.html', self.__index.format(asn = node.getAsn(), nodeName = node.getName()))
-        node.setFile('/etc/nginx/sites-available/default', WebServerFileTemplates['nginx_site'].format(port = self.__port, serverName = ' '.join(self._server_name)))
+        node.setFile('/etc/nginx/sites-available/default',
+                     WebServerFileTemplates['nginx_site'].format(port = self.__port, serverName = ' '.join(self._server_name)))
         node.appendStartCommand('service nginx start')
         node.appendClassName("WebService")
         if self.__enable_https:
-            self.__enable_https_func(node, self)
+            self.__enable_https_func(node=node, server_names=self._server_name,
+                                     dst_cert_path='/etc/ssl/certs/nginx.crt',
+                                     dst_key_path='/etc/ssl/private/nginx.key')
 
     def print(self, indent: int) -> str:
         out = ' ' * indent

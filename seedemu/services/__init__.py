@@ -13,7 +13,7 @@ from .EthereumService import *
 from .ScionBwtestService import ScionBwtestService
 from .ScionBwtestClientService import ScionBwtestClientService
 from .KuboService import *
-from .CAService import CAServiceBase, StepCAServer, RootStepCAStore, StepCAService
+from .CAService import CAServiceBase, StepCAServer, RootStepCAStore, StepCAService, MiniCAServer, MiniCAService, RootMiniCAStore
 from .ChainlinkService import *
 from .TrafficService import *
 from .DevService import *

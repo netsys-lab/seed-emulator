@@ -50,10 +50,12 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 CaFileTemplates['minica_docker'] = """\
 FROM golang:1.24
 WORKDIR /
-git clone https://github.com/jsha/minica.git
-go build
-## or
-go install
+RUN apt-get update && apt-get install -y git
+RUN git clone https://github.com/jsha/minica.git
+RUN cd minica && go build .
+RUN cd minica && go install .
+RUN mkdir /certs
+WORKDIR /certs
 """
 
 '''
@@ -158,10 +160,16 @@ class CAServerBase(Server):
         self._appendFilter(filter)
         return self
 
-    #def enableHTTPsBuildTimeFunc(self, node: Node, server_name: str, dst_cert_path: str):
-    #    pass
-    def enableHTTPSFunc(self, node: Node, web: WebServer):
-        pass
+
+    def enableHTTPSFunc(self, node: Node, server_names: List[str], dst_cert_path: str = None, dst_key_path: str = None):
+        """
+        a callback that web servers can invoke to equip themselves with a TLS certificate
+        issued by this CAServer
+        @param dst_cert_path path and filename where to place the requested certificate onto 'node'
+              Some CA service implementations might not require this argument or ignore it.
+        @param dst_key_path path and filename where to place the web servers private key corresponding to the certificate.
+        @param node onto which the web server is installed and whose filesystem must contain the servers certificate
+        """
 
     def _installRootCertToClient(self, node: Node):
         """
@@ -303,8 +311,8 @@ class RootCAStoreBase:
 
 class RootMiniCAStore(RootCAStoreBase):
 
-    def __init__(self, ca_domain: str):
-        super().__init__(ca_domain)
+    def __init__(self, caDomain: str):
+        super().__init__(caDomain)
 
         self._dockerfile_contents = CaFileTemplates['minica_docker']
 
@@ -312,15 +320,16 @@ class RootMiniCAStore(RootCAStoreBase):
         self.__caDir = tempfile.mkdtemp(prefix="seedemu-minica-")
 
         with cd(self.__caDir):
-            self.__container = BuildtimeDockerImage("minica").container()
-            self.__container.user(f"{os.getuid()}:{os.getuid()}").mountVolume( self.__caDir, "/minica" )#.entrypoint("step")
+            self.__container = BuildtimeDockerImage("minica").build(BuildtimeDockerFile(self._dockerfile_contents)).container()
+            self.__container.user(f"{os.getuid()}:{os.getuid()}").mountVolume( self.__caDir, "/certs" )#.entrypoint("step")
+            # .user(f"{os.getuid()}:{os.getuid()}")
 
 
-    def generateCert(self, server_name: str):
+    def generateCert(self, server_names: List[str]):
         """
         generates a key pair and certificate for the given domain
         """
-        self.__container.run(f'minica --domains {server_name}') # cert & key is output to ./{domain.name}/
+        self.__container.run(f'minica --domains { ' '.join(server_names)}') # cert & key is output to ./{domain.name}/
 
 
     def getStorePath(self) -> str:
@@ -353,6 +362,15 @@ class MiniCAServer(CAServerBase):
     def __init__(self):
         super().__init__()
 
+    def install(self, node: Node):
+        """!
+        @brief Install the CA Server on the node.
+        @note does nothing - thats the crux of MiniCAService:
+                To do everything at build time !
+                MiniCAservers do not exist at runtime.
+        """
+        return
+
 
     def _installRootCertToClient(self, node):
         """
@@ -374,7 +392,7 @@ class MiniCAServer(CAServerBase):
 
 
 
-    def enableHTTPSFunc(self, node: Node, server_name: str, dst_cert_path: str):
+    def enableHTTPSFunc(self, node: Node, server_names: List[str], dst_cert_path: str, dst_key_path: str):
         """
         unlike StepCA requires no ACME at runtime,
         because it copies all required stuff into containers at build time
@@ -385,11 +403,11 @@ class MiniCAServer(CAServerBase):
 
         store: RootMiniCAStore = self.getCAStore()
         assert isinstance(store, RootMiniCAStore), 'logic error'
-        store.generateCert(server_name)
+        store.generateCert(server_names)
 
         # TODO copy generated certs from caDir to node
 
-        cert_dir = os.path.join(store.getStorePath(),server_name)
+        cert_dir = os.path.join(store.getStorePath(), server_names[0])
         for root, _, files in os.walk(cert_dir):
             for file in files:
                 node.importFile(
@@ -410,7 +428,10 @@ class MiniCAServer(CAServerBase):
 
 class MiniCAService(CAServiceBase):
 
-    pass
+    def _createServer(self) -> Server:
+        server = MiniCAServer()
+        self.addCAServer(server)
+        return server
 
 
 
@@ -438,7 +459,7 @@ class StepCAServer(CAServerBase):
         node.appendStartCommand("update-ca-certificates")
 
 
-    def enableHTTPSFunc(self, node: Node, web: WebServer):
+    def enableHTTPSFunc(self, node: Node, server_names: List[str], dst_cert_path: str = None, dst_key_path:str = None):
         """!
         @brief Enable HTTPS for the web server.
         This is not supposed to be called directly. The WebService will call this function.
@@ -461,7 +482,7 @@ class StepCAServer(CAServerBase):
             'REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
 certbot --server https://{ca_domain}/acme/acme/directory --non-interactive --nginx --no-redirect --agree-tos --email example@example.com \
 -d {server_name} > /dev/null && echo "ACME: cert issued"'.format(
-                server_name=" -d ".join(web._server_name), ca_domain=self.getCADomain()
+                server_name=" -d ".join(server_names), ca_domain=self.getCADomain()
             )
         )
         node.appendStartCommand(
