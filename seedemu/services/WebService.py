@@ -2,7 +2,7 @@ from __future__ import annotations
 from seedemu.core import Node, Service, Server
 from typing import Dict, List
 
-from .CAService import StepCAServer
+from .CAService import CAServerBase
 
 WebServerFileTemplates: Dict[str, str] = {}
 
@@ -75,7 +75,7 @@ class WebServer(Server):
 
         return self
 
-    def setCAServer(self, ca: StepCAServer) -> WebServer:
+    def setCAServer(self, ca: CAServerBase) -> WebServer:
         """!
         @brief Get certificates from a particular CA server.
 

@@ -98,6 +98,7 @@ def ipsInNetwork(ips: Iterable, network: str) -> bool:
 class CAServerBase(Server):
 
     def __init__(self):
+        super().__init__()
         self.__filters: List[Filter | None] = []
         self.__duration = "2160h"
         self.__id: int = None
@@ -164,7 +165,7 @@ class CAServerBase(Server):
 
     def _installRootCertToClient(self, node: Node):
         """
-        install the root certifiate from the CAStore into the node's trust store
+        install the root certifiate from the CAStore into the client node's trust store
         so it can verify certificates issued by the CA
         """
         raise NotImplemented
@@ -245,7 +246,11 @@ class CAServiceBase(Service):
         return self
 
     def configureCAServer(self, server_id: int, caServer: CAServerBase, all_nodes: List[Node]) -> CAServiceBase:
-        caServer._serverConfigure(server_id, all_nodes, all_nodes)
+        """
+        invoked for every caServer of this service
+        @param all_nodes  all (potential) clients  of the CAServer (endhosts)
+        """
+        caServer._serverConfigure(server_id, all_nodes)
 
     def configure(self, emulator: Emulator):
         """
@@ -297,14 +302,77 @@ class RootCAStoreBase:
 
 
 class RootMiniCAStore(RootCAStoreBase):
-    def __init__(self):
+
+    def __init__(self, ca_domain: str):
+        super().__init__(ca_domain)
 
         self._dockerfile_contents = CaFileTemplates['minica_docker']
 
         #self._minica_image = BuildtimeDockerFile("minica") #.build(self.dockerfile_contents).container()
+        self.__caDir = tempfile.mkdtemp(prefix="seedemu-minica-")
+
+        with cd(self.__caDir):
+            self.__container = BuildtimeDockerImage("minica").container()
+            self.__container.user(f"{os.getuid()}:{os.getuid()}").mountVolume( self.__caDir, "/minica" )#.entrypoint("step")
+
+
+    def generateCert(self, server_name: str):
+        """
+        generates a key pair and certificate for the given domain
+        """
+        self.__container.run(f'minica --domains {server_name}') # cert & key is output to ./{domain.name}/
+
+
+    def getStorePath(self) -> str:
+        """!
+        @brief Get the path of the CA store on the docker host.
+        """
+        return self.__caDir
+
+    def initialize(self):
+        """!
+        @brief Initialize the CA store.
+        User can either call it manually or let the CA server to call it.
+        """
+        '''
+        if self.__initialized:
+            return
+        with cd(self.__caDir):
+            initialize_command = "minica --domains '*'"
+            self.__container.run(initialize_command)
+
+        self.__initialized = True
+        '''
+
+
 
 
 class MiniCAServer(CAServerBase):
+
+
+    def __init__(self):
+        super().__init__()
+
+
+    def _installRootCertToClient(self, node):
+        """
+        install the root certifiate from the CAStore into the client node's trust store
+        so it can verify certificates issued by the CA
+        """
+        node.addSoftware("ca-certificates")
+
+        node.importFile(
+            os.path.join(
+                self.getCAStore().getStorePath(), "minica.pem"
+            ),
+            f"/usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA.pem",
+        )
+
+        node.appendStartCommand("update-ca-certificates")
+
+
+
+
 
     def enableHTTPSFunc(self, node: Node, server_name: str, dst_cert_path: str):
         """
@@ -315,36 +383,38 @@ class MiniCAServer(CAServerBase):
         @param dst_cert_path destination path on 'node' where to place the generated cert and key
         """
 
-        # for each server name add 'minica --domain {server_name}' command to buildtime docker file
-        # and 'COPY --from=minica /minica/{server_name} {dst_cert_path}' to the docker file of 'node'
-        # (multi-stage build   is working because 'minica' is build before any nodes )
+        store: RootMiniCAStore = self.getCAStore()
+        assert isinstance(store, RootMiniCAStore), 'logic error'
+        store.generateCert(server_name)
 
-        root_cert_path = "/usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA.pem"
+        # TODO copy generated certs from caDir to node
 
-        self._dockerfile_contents += f'\nminica --domain {server_name}'
-        node.addDockerCommand(f'COPY --from=minica /minica/{server_name} {dst_cert_path}')
-        node.addDockerCommand(f'COPY --from=minica /minica/minica.pem {root_cert_path}')
+        cert_dir = os.path.join(store.getStorePath(),server_name)
+        for root, _, files in os.walk(cert_dir):
+            for file in files:
+                node.importFile(
+                    os.path.join(root, file),
+                    dst_cert_path)
+                '''
+                os.path.join(
+                    "/root",
+                    os.path.relpath(os.path.join(root, file), store.getStorePath()),
+                ),
+                '''
+
+
+
 
         node.addSoftware("ca-certificates")
         node.appendStartCommand("update-ca-certificates")
 
 class MiniCAService(CAServiceBase):
 
+    pass
 
 
 
 
-    def _installRootCertToClient(self, node):
-        node.addSoftware("ca-certificates")
-        '''
-        node.importFile(
-            os.path.join(
-                self.getCAStore().getStorePath(), ".step/certs/root_ca.crt"
-            ),
-            f"/usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA_{id}.crt",
-        )
-        '''
-        node.appendStartCommand("update-ca-certificates")
 
 class StepCAServer(CAServerBase):
 
@@ -354,12 +424,16 @@ class StepCAServer(CAServerBase):
 
 
     def _installRootCertToClient(self, node):
+        """
+        copy the root certificate of this CAServer's RootCAStore to the client 'node'
+        so it can verify certificates issued by this CAServer
+        """
         node.addSoftware("ca-certificates")
         node.importFile(
             os.path.join(
                 self.getCAStore().getStorePath(), ".step/certs/root_ca.crt"
             ),
-            f"/usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA_{id}.crt",
+            f"/usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA_{self.serverID()}.crt",
         )
         node.appendStartCommand("update-ca-certificates")
 

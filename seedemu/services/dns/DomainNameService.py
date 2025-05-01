@@ -5,7 +5,7 @@ from typing import List, Dict, Tuple, Set
 from re import sub
 import inspect
 import requests
-from seedemu.services import CAService, StepCAServer
+#from seedemu.services import CAService, StepCAServer # circular import
 from .DNSCommon import  ResourceRecord, _getRRforNode, _getNsAddrRecord, _getSoaRR , NS_RR, DNSStack, A_RR, TXT_RR, rrname2Type
 
 
@@ -310,6 +310,7 @@ class DomainNameServer(Server):
         self.__enable_https_func = None
         self.__do_enc = do_enc
 
+    '''
     def setCAServer(self, ca: StepCAServer):
         """
         DNS over Encrypted Transport requires the nameservers to have TLS certs
@@ -320,6 +321,7 @@ class DomainNameServer(Server):
         self.__enable_https_func = ca.enableHTTPsBuildTimeFunc
 
         return self
+    '''
 
     def addZone(self, zonename: str, createNsAndSoa: bool = True) -> DomainNameServer:
         """!
@@ -616,7 +618,7 @@ class DomainNameService(Service):
         vals = locals()
         option_names = [name for name in args
                         if (vals[name] is not None) and
-                        name not in ['self', 'autoNameServer'] ]
+                        name not in ['self', 'autoNameServer', 'do_enc'] ]
         assert not any([ vals[name].name != name and
                         not vals[name].name.endswith(name) for name in option_names]), 'option-parameter mismatch!'
 

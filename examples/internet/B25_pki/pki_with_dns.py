@@ -4,7 +4,7 @@
 from seedemu.compiler import Docker, Platform
 from seedemu.core import Binding, Emulator, Filter, Action
 from seedemu.layers import Base
-from seedemu.services import DomainNameService, CAService, StepCAServer, WebService, WebServer, RootStepCAStore
+from seedemu.services import DomainNameService, StepCAService, StepCAServer, WebService, WebServer, RootStepCAStore
 from seedemu.services.dns.DNSCommon import *
 import base_internet_with_dns
 import os, sys
@@ -38,7 +38,7 @@ dns: DomainNameService = emu.getLayer('DomainNameService')
 
 caStore1 = RootStepCAStore(caDomain='seedCA.net')
 caStore2 = RootStepCAStore(caDomain='seedCA.com')
-ca = CAService()
+ca = StepCAService()
 web = WebService()
 
 # Add records to zones
