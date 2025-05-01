@@ -362,6 +362,9 @@ class MiniCAServer(CAServerBase):
     def __init__(self):
         super().__init__()
 
+    def getName(self):
+        return "MinicaCertificateAuthority"
+
     def install(self, node: Node):
         """!
         @brief Install the CA Server on the node.
@@ -547,6 +550,9 @@ class StepCAService(CAServiceBase):
         super().__init__()
 
         self._step_version = self._preset_step_version()
+
+    def getName(self):
+        return "SmallstepCertificateAuthority"
 
     @classmethod
     def _preset_step_version(cls):

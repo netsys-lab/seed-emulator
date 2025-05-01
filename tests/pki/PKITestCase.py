@@ -19,6 +19,8 @@ class PKITestCase(SeedEmuTestCase):
             if container.labels.get('org.seedsecuritylabs.seedemu.meta.nodename') is None:
                 continue
             # CA will install its own root cert
+            # TODO do ls /etc/ssl/certs | grep SEEDEMU_Internal_Root_CA* | wc -l
+            # and assert that its greater than zero
             if container.labels.get('org.seedsecuritylabs.seedemu.meta.nodename') == "ca1":
                 code, _ = container.exec_run("ls /etc/ssl/certs/SEEDEMU_Internal_Root_CA_0.pem")
                 self.assertEqual(code, 0)
