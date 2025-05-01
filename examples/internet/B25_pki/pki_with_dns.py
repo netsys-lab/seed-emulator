@@ -4,7 +4,7 @@
 from seedemu.compiler import Docker, Platform
 from seedemu.core import Binding, Emulator, Filter, Action
 from seedemu.layers import Base
-from seedemu.services import DomainNameService, CAService, CAServer, WebService, WebServer, RootCAStore
+from seedemu.services import DomainNameService, CAService, StepCAServer, WebService, WebServer, RootStepCAStore
 from seedemu.services.dns.DNSCommon import *
 import base_internet_with_dns
 import os, sys
@@ -36,8 +36,8 @@ emu.load('./base_internet_dns.bin')
 base: Base = emu.getLayer('Base')
 dns: DomainNameService = emu.getLayer('DomainNameService')
 
-caStore1 = RootCAStore(caDomain='seedCA.net')
-caStore2 = RootCAStore(caDomain='seedCA.com')
+caStore1 = RootStepCAStore(caDomain='seedCA.net')
+caStore2 = RootStepCAStore(caDomain='seedCA.com')
 ca = CAService()
 web = WebService()
 
@@ -47,12 +47,12 @@ dns.getZone('seedCA.com.').addRecord(A_RR(address='10.150.0.8'))
 dns.getZone('example32.com.').addRecord(A_RR(address='10.151.0.7'))
 dns.getZone('bank32.com.').addRecord(A_RR(address='10.151.0.8'))
 
-caServer1: CAServer = ca.install('ca1-vnode')
+caServer1: StepCAServer = ca.install('ca1-vnode')
 caServer1.setCAStore(caStore1)
 caServer1.setCertDuration("2160h")
 caServer1.installCACert()
 
-caServer2: CAServer = ca.install('ca2-vnode')
+caServer2: StepCAServer = ca.install('ca2-vnode')
 caServer2.setCAStore(caStore2)
 caServer2.setCertDuration("2160h")
 caServer2.installCACert()

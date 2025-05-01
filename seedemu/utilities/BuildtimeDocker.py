@@ -92,6 +92,11 @@ class BuildtimeDockerContainer:
         self.__entrypoint = entrypoint
         return self
 
+    def build(self):
+        code = sh(f'docker build {self.__imageName}')
+        if code != 0:
+            raise Exception("Failed to build docker container:\n")
+
     def run(self, command: str = None):
         run_command = "docker run --rm"
         if self.__user:

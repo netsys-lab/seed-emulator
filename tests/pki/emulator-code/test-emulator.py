@@ -4,7 +4,7 @@
 from seedemu.compiler import Docker
 from seedemu.core import Binding, Emulator, Filter, Action
 from seedemu.layers import Base, Ebgp, Ibgp, Ospf, Routing, PeerRelationship
-from seedemu.services import DomainNameCachingService, DomainNameService, CAService, CAServer, WebService, WebServer, RootCAStore
+from seedemu.services import DomainNameCachingService, DomainNameService, CAService, StepCAServer, WebService, WebServer, RootStepCAStore
 from seedemu.services.dns.DNSCommon import *
 emu = Emulator()
 base = Base()
@@ -33,14 +33,14 @@ as2.createNetwork('net0')
 as2.createRouter('r1').joinNetwork('net0').joinNetwork('ix100')
 as2.createRouter('r2').joinNetwork('net0').joinNetwork('ix101')
 
-caStore1 = RootCAStore(caDomain='ca1.internal')
-caStore2 = RootCAStore(caDomain='ca2.internal')
+caStore1 = RootStepCAStore(caDomain='ca1.internal')
+caStore2 = RootStepCAStore(caDomain='ca2.internal')
 
-caServer1: CAServer = ca.install('ca1-vnode')
+caServer1: StepCAServer = ca.install('ca1-vnode')
 caServer1.setCAStore(caStore1)
 caServer1.installCACert(Filter(asn=150))
 
-caServer2: CAServer = ca.install('ca2-vnode')
+caServer2: StepCAServer = ca.install('ca2-vnode')
 caServer2.setCAStore(caStore2)
 caServer2.installCACert(Filter(asn=151))
 

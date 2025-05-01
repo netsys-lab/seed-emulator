@@ -4,7 +4,7 @@
 from seedemu.compiler import Docker, Platform
 from seedemu.core import Binding, Emulator, Filter, Action
 from seedemu.layers import Base
-from seedemu.services import CAService, CAServer, WebService, WebServer, RootCAStore
+from seedemu.services import CAService, StepCAServer, WebService, WebServer, RootStepCAStore
 import base_internet
 import os, sys
 
@@ -46,15 +46,15 @@ as151.createHost('web2').joinNetwork('net0', address='10.151.0.8') \
                         .addHostName('bank32.com')
 
 # Create and configure CA server vnodes
-caStore1 = RootCAStore(caDomain='seedCA.net')
-caStore2 = RootCAStore(caDomain='seedCA.com')
+caStore1 = RootStepCAStore(caDomain='seedCA.net')
+caStore2 = RootStepCAStore(caDomain='seedCA.com')
 ca  = CAService()
-caServer1: CAServer = ca.install('ca1-vnode')
+caServer1: StepCAServer = ca.install('ca1-vnode')
 caServer1.setCAStore(caStore1)
 caServer1.setCertDuration("2160h")
 caServer1.installCACert()
 
-caServer2: CAServer = ca.install('ca2-vnode')
+caServer2: StepCAServer = ca.install('ca2-vnode')
 caServer2.setCAStore(caStore2)
 caServer2.setCertDuration("2160h")
 caServer2.installCACert()
@@ -78,7 +78,7 @@ emu.addBinding(Binding('web1-vnode', filter=Filter(nodeName='web1'), action=Acti
 emu.addBinding(Binding('web2-vnode', filter=Filter(nodeName='web2'), action=Action.FIRST))
 
 
-# Add layers, render and compile 
+# Add layers, render and compile
 emu.addLayer(ca)
 emu.addLayer(web)
 

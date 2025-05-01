@@ -2,7 +2,7 @@ from __future__ import annotations
 from seedemu.core import Node, Service, Server
 from typing import Dict, List
 
-from .CAService import CAServer
+from .CAService import StepCAServer
 
 WebServerFileTemplates: Dict[str, str] = {}
 
@@ -36,7 +36,7 @@ class WebServer(Server):
         self.__index = '<h1>{nodeName} at {asn}</h1>'
         self.__enable_https = False
         self.__enable_https_func = None
-        
+
 
     def setPort(self, port: int) -> WebServer:
         """!
@@ -62,7 +62,7 @@ class WebServer(Server):
         self.__index = content
 
         return self
-    
+
     def setServerNames(self, serverNames: List[str]) -> WebServer:
         """!
         @brief Set server names.
@@ -74,8 +74,8 @@ class WebServer(Server):
         self._server_name = serverNames
 
         return self
-    
-    def setCAServer(self, ca: CAServer) -> WebServer:
+
+    def setCAServer(self, ca: StepCAServer) -> WebServer:
         """!
         @brief Get certificates from a particular CA server.
 
@@ -85,7 +85,7 @@ class WebServer(Server):
         """
         self.__enable_https_func = ca.enableHTTPSFunc
         return self
-    
+
     def enableHTTPS(self) -> WebServer:
         """!
         @brief Enable TLS.
@@ -94,7 +94,7 @@ class WebServer(Server):
         """
         self.__enable_https = True
         return self
-    
+
     def install(self, node: Node):
         """!
         @brief Install the service.

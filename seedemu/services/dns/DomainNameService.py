@@ -5,7 +5,7 @@ from typing import List, Dict, Tuple, Set
 from re import sub
 import inspect
 import requests
-from seedemu.services import CAService, CAServer
+from seedemu.services import CAService, StepCAServer
 from .DNSCommon import  ResourceRecord, _getRRforNode, _getNsAddrRecord, _getSoaRR , NS_RR, DNSStack, A_RR, TXT_RR, rrname2Type
 
 
@@ -310,7 +310,7 @@ class DomainNameServer(Server):
         self.__enable_https_func = None
         self.__do_enc = do_enc
 
-    def setCAServer(self, ca: CAServer):
+    def setCAServer(self, ca: StepCAServer):
         """
         DNS over Encrypted Transport requires the nameservers to have TLS certs
         just like webservers
