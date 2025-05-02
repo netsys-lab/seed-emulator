@@ -24,7 +24,7 @@ class DomainNameCachingServer(Server, Configurable):
 
     @todo DNSSEC
     """
-
+    __do_enc: bool
     __root_servers: List[str]
     __configure_resolvconf: bool
     __emulator: Emulator
@@ -32,11 +32,12 @@ class DomainNameCachingServer(Server, Configurable):
     __asn_range: List[int]
     __is_range_all: bool
 
-    def __init__(self):
+    def __init__(self, do_enc: bool):
         """!
         @brief DomainNameCachingServer constructor.
         """
         super().__init__()
+        self.__do_enc = do_enc
         self.__root_servers = []
         self.__configure_resolvconf = False
         self.__pending_forward_zones = {}
@@ -131,18 +132,26 @@ class DomainNameCachingServer(Server, Configurable):
             for o in DomainNameService.getAvailableOptions():
                 node.setOption(o)
         if (val:=node.getOption('dns_setup').value) == DNSStack.DEFAULT:
+            if self.__do_enc:
+                raise NotImplementedError
             self._do_install_bind9(node)
         elif val == DNSStack.SCION:
-            # TODO:
-            pass
+            assert self.__do_enc, 'No support for unencrypted DNS (Do53) in the Future Next Generation Internet anymore !'
+            self._do_install_sdns(node)
+
+    def _do_install_sdns(self, node: Node):
+        """
+        install the sdns recursive resolver on the node
+        """
+        pass
 
     def _do_install_bind9(self, node: Node):
         node.addSoftware('bind9')
         node.setFile('/etc/bind/named.conf.options',
                       DomainNameCachingServiceFileTemplates['named_options'])
         node.setFile('/etc/bind/named.conf.local', '')
-        if len(self.__root_servers) > 0:
-            hint = '\n'.join(self.__root_servers)
+        if len(self.getRootServers()) > 0:
+            hint = '\n'.join(self.getRootServers())
             node.setFile('/usr/share/dns/root.hints', hint)
             node.setFile('/etc/bind/db.root', hint)
         node.appendStartCommand('service named start')
@@ -186,16 +195,18 @@ class DomainNameCachingService(Service):
 
     __auto_root: bool
 
-    def __init__(self, autoRoot: bool = True):
+    def __init__(self, autoRoot: bool = True, do_enc: bool = False):
         """!
         @brief DomainNameCachingService constructor.
 
         @param autoRoot (optional) find root zone name servers automatically.
         True by default, if true, DomainNameCachingService will find root NS in
         DomainNameService and use them as root.
+        @param do_enc  support encrypted DNS (DNS privacy)
         """
         super().__init__()
         self.__auto_root = autoRoot
+        self.__do_enc = do_enc
         self.addDependency('Base', False, False)
         if autoRoot:
             self.addDependency('DomainNameService', False, False)

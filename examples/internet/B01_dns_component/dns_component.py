@@ -2,7 +2,7 @@
 # encoding: utf-8
 
 from seedemu.core import Emulator
-from seedemu.services import DomainNameService, DomainNameCachingService
+from seedemu.services import DomainNameService
 from seedemu.services.dns.DNSCommon import A_RR
 
 

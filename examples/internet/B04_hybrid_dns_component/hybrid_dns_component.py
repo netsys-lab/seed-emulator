@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # encoding: utf-8
+
+from seedemu.services import dns as Dns
 from seedemu import *
-from seedemu.services.dns import *
 
 def run(dumpfile = None):
     emu = Emulator()
@@ -9,7 +10,7 @@ def run(dumpfile = None):
     # DNS
     ###########################################################
     # Create a DNS layer
-    dns = dns.DomainNameService()
+    dns = Dns.DomainNameService()
 
     # Create a nameserver for the root zone.
     # Make it shadow the real root zone.
