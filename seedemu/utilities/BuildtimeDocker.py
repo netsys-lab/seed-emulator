@@ -24,6 +24,7 @@ def sh(command, input=None):
             command,
             shell=True,
             input=input,
+            capture_output=True
         )
         return p.returncode
     except subprocess.CalledProcessError as e:
@@ -112,4 +113,4 @@ class BuildtimeDockerContainer:
             raise Exception("Failed to run docker container:\n" + run_command)
 
         for source, _ in self.__volumes:
-            sh(f"docker run --rm {source}:/tmp alpine:latest chown -R {os.getuid()}:{os.getgid()} /tmp")
+            sh(f"docker run --rm --volume {source}:/tmp alpine:latest chown -R {os.getuid()}:{os.getgid()} /tmp")

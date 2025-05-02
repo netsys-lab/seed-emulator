@@ -138,7 +138,7 @@ def run(dumpfile = None):
     brs = defaultdict()
     cses = defaultdict()
 
-    dns_svc = DomainNameService()
+    dns_svc = DomainNameService(dns_setup=OptionRegistry().dns_setup(DNSStack.SCION))
     minica = MiniCAService()
 
     sdns = DomainNameCachingService(do_enc=True)
@@ -374,11 +374,12 @@ def run(dumpfile = None):
     # HTTP FWD proxy and sdns rec. resolver
     # 'entrypoint' into the simulation for browser-extension
     host_a = base.getAutonomousSystem(102).getHost('host_0')
-    host_a.addPortForwarding(8888,8888, 'tcp')
+    host_a.addPortForwarding(8888, 8888, 'tcp')
 
     sdns_server = sdns.install('sdns-vnode')
     sdns_server.setCAServer(caServer)
-    # TODO add binding to host_a
+    # add binding to host_a
+    emu.addBinding(Binding('sdns-vnode', filter=Filter(asn=102, nodeName='host_0', allowBound=True)))
 
     # HTTP web server and HTTP reverse proxy ...........................
 
@@ -400,7 +401,7 @@ def run(dumpfile = None):
     root_a = dns_svc.install('root-a')
     root_a.setCAServer(caServer)
     root_a.addZone('.', createNsAndSoa=True).setMaster()
-    emu.addBinding(Binding('root-a', filter=Filter(asn=235, nodeName='host_0')))
+    emu.addBinding(Binding('root-a', filter=Filter(asn=235, nodeName='host_0', allowBound=True)))
 
     #dns_svc.hostZoneOn()
 

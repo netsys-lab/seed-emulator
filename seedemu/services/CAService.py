@@ -73,7 +73,8 @@ class RootMiniCAStore(RootCAStoreBase):
         """
         generates a key pair and certificate for the given domain
         """
-        self.__container.run(f'minica --domains { ' '.join(server_names)}') # cert & key is output to ./{domain.name}/
+        dnames = ','.join( s for s in server_names if s!=None and s!='')
+        self.__container.run(f'minica --domains "{ dnames}"') # cert & key is output to ./{domain.name}/
 
 
     def getStorePath(self) -> str:

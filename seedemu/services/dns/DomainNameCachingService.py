@@ -39,6 +39,7 @@ class DomainNameCachingServer(Server, Configurable):
         super().__init__()
         self.__do_enc = do_enc
         self.__root_servers = []
+        self.__enable_https_func = None
         self.__configure_resolvconf = False
         self.__pending_forward_zones = {}
         self.__asn_range = []
@@ -50,7 +51,8 @@ class DomainNameCachingServer(Server, Configurable):
         what shall be used as the resolvers 'server name' for its TLS cert
         sth. like '{scope}-{node.getName()}' ?!
         """
-        pass
+        self.__enable_https_func = server.enableHTTPSFunc
+
 
     def setConfigureResolvconf(self, configure: bool) -> DomainNameCachingServer:
         """!
@@ -123,6 +125,7 @@ class DomainNameCachingServer(Server, Configurable):
             if net.getType() == NetworkType.Local:
                 address = iface.getAddress()
                 break
+        # TODO add SCION address logic
 
         assert address != "", 'address is not configured.'
 
