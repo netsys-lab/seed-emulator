@@ -1,6 +1,6 @@
 from __future__ import annotations
 from seedemu.core import Configurable, Service, Server
-from seedemu.core import Node, ScopedRegistry, Emulator
+from seedemu.core import Node, ScopedRegistry, Emulator, CAServerBase
 from .DomainNameService import DomainNameService
 from .DNSCommon import *
 from typing import List, Dict
@@ -43,6 +43,14 @@ class DomainNameCachingServer(Server, Configurable):
         self.__pending_forward_zones = {}
         self.__asn_range = []
         self.__is_range_all = False
+
+    def setCAServer(self, server: CAServerBase):
+        assert self.__do_enc, 'logic error'
+        """
+        what shall be used as the resolvers 'server name' for its TLS cert
+        sth. like '{scope}-{node.getName()}' ?!
+        """
+        pass
 
     def setConfigureResolvconf(self, configure: bool) -> DomainNameCachingServer:
         """!
@@ -212,7 +220,7 @@ class DomainNameCachingService(Service):
             self.addDependency('DomainNameService', False, False)
 
     def _createServer(self) -> DomainNameCachingServer:
-        return DomainNameCachingServer()
+        return DomainNameCachingServer(self.__do_enc)
 
     def getName(self) -> str:
         return 'DomainNameCachingService'

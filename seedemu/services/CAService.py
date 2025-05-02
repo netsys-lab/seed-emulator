@@ -55,6 +55,8 @@ class RootMiniCAStore(RootCAStoreBase):
           All certs are generated and installed at build time.
 
     """
+     # TODO maybe add 'debug' option here which makes generateCert() always issue '*' wildcard certificates
+     #      then SNI errors shouldn't be a problem in the emulator anymore...
     def __init__(self, caDomain: str):
         super().__init__(caDomain)
 
