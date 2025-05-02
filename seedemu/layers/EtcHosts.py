@@ -80,7 +80,7 @@ class EtcHosts(Layer):
 
         for node in nodes:
             node.setFile("/tmp/etc-hosts", '\n'.join(sorted_hosts_file_content))
-            node.insertStartCommand(0, "cat /tmp/etc-hosts >> /etc/hosts")
+            node.insertStartCommand(4, "cat /tmp/etc-hosts >> /etc/hosts")
 
         for node in scion_nodes:
             node.setFile("/tmp/etc-scion-hosts", '\n'.join(sorted_scion_hosts_file_content))
@@ -89,6 +89,6 @@ class EtcHosts(Layer):
                                            key=lambda x: tuple(map(int, x.split()[0].split('.'))))
             node.setFile("/tmp/etc-hosts", '\n'.join(sorted_intra_as_nodes))
 
-            node.insertStartCommand(0, "cat /tmp/etc-hosts >> /etc/hosts")
+            node.insertStartCommand(4, "cat /tmp/etc-hosts >> /etc/hosts")
 
-            node.insertStartCommand(0, "cat /tmp/etc-scion-hosts >> /etc/scion/hosts")
+            node.insertStartCommand(4, "cat /tmp/etc-scion-hosts >> /etc/scion/hosts")
