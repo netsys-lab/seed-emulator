@@ -5,7 +5,7 @@ from typing import List, Dict, Tuple, Set
 from re import sub
 import inspect
 import requests
-#from seedemu.services import CAService, StepCAServer # circular import
+from seedemu.core import CAServerBase
 from .DNSCommon import  ResourceRecord, _getRRforNode, _getNsAddrRecord, _getSoaRR , NS_RR, DNSStack, A_RR, TXT_RR, rrname2Type
 
 
@@ -23,6 +23,22 @@ options {
 };
 '''
 
+
+DomainNameServiceFileTemplates['bind9_tls_block'] = '''\
+tls local-tls-{zone} {
+ 	key-file "{key_path}";
+ 	cert-file "{cert_path}";
+};
+'''
+
+# DoH endpoint description
+DomainNameServiceFileTemplates['bind9_http'] = '''\
+http local-http-server {
+ 	# multiple paths can be specified
+ 	endpoints { "/dns-query";  };
+};
+'''
+
 # CoreDNS 'server-block'
 DomainNameServiceFileTemplates['coredns_config'] = '''\
 {schema}://{zone}:{port} {
@@ -34,7 +50,7 @@ log
 errors
 }
 '''
-# for root-ns
+# for root-ns:
 # schema: squic
 # file zones/db. .
 # tls_cert ca/scion-root-servers-net-cert.pem
@@ -294,7 +310,7 @@ class DomainNameServer(Server):
 
     __zones: Set[Tuple[str, bool]]
     __node: Node # only known after configure()
-    __ns_server_name: str # only known after configure()
+    __ns_server_name: Dict[str,str] # only known after configure()
     __is_master: bool
     __is_real_root: bool
 
@@ -307,21 +323,34 @@ class DomainNameServer(Server):
         self.__zones = set()
         self.__is_master = False
         self.__is_real_root = False
+        self.__ns_server_name = {}
         self.__enable_https_func = None
         self.__do_enc = do_enc
 
-    '''
-    def setCAServer(self, ca: StepCAServer):
+    def _getCryptoPathsForZone(self, zone: str, ns_name: str = None) ->Tuple[str,str]:
+        """
+        returns (cert_path, key_path) tuple for the given zone
+        @param zone zonename of the zone, for which the certificate is issued
+        @param ns_name  domain name of the nameserver holding the certificate (usually sth. like 'ns1.zonename.' )
+                        #FIXME Actually unnecessary because all nameservers of the same zone have the same certificate right ?!
+        """
+        crypto_path = '/etc/coredns/ca'
+        cert_path = f'{crypto_path}/{zone}-cert.pem'
+        key_path = f'{crypto_path}/{zone}-key.pem'
+        return (cert_path, key_path)
+
+
+    def setCAServer(self, ca: CAServerBase):
         """
         DNS over Encrypted Transport requires the nameservers to have TLS certs
         just like webservers
         """
         # once we are configure()'d  and know our 'node' and server-name
         # we can invoke this callback and pass our node and svc-name as arguments
-        self.__enable_https_func = ca.enableHTTPsBuildTimeFunc
+        self.__enable_https_func = ca.enableHTTPsFunc
 
         return self
-    '''
+
 
     def addZone(self, zonename: str, createNsAndSoa: bool = True) -> DomainNameServer:
         """!
@@ -417,6 +446,11 @@ class DomainNameServer(Server):
         addr = ifaces[0].getAddress()
         return addr
 
+    def getServerName(self, zone: str) -> str:
+        """
+        returns the domain name of this nameserver in the given zone
+        """
+        return self.__ns_server_name[zone]
 
     def configure(self, node: Node, dns: DomainNameService):
         """!
@@ -456,10 +490,17 @@ class DomainNameServer(Server):
                         break
 
                 ns_name=f'ns{str(ns_number)}.{zonename}'
-                self.__ns_server_name = ns_name
+                self.__ns_server_name[zonename] = ns_name
+                if self.__do_enc:
+                    cert_path, key_path = self._getCryptoPathsForZone(zonename, ns_name)
+                    # request a certificate for '$server_name' from the CA
+                    self.__enable_https_func(node=node,
+                                            context='dns',
+                                            server_names=[self.getServerName(zonename), zonename],
+                                            dst_cert_path=cert_path,
+                                            dst_key_path=key_path)
                 zone.addGuleRecord(ns_name, str(addr), node)
                 zone.addRecord(_getNsAddrRecord(node, ns_number, zonename, str(addr) ))
-                #zone.addRecord('@ NS ns{}.{}'.format(str(ns_number), zonename))
                 zone.addRecord( NS_RR(zonename='@', nsname=ns_name) )
 
             if zone.getName() == "." and self.__is_real_root:
@@ -479,6 +520,10 @@ class DomainNameServer(Server):
             for o in dns.getAvailableOptions():
                 node.setOption(o)
         if (val:=node.getOption('dns_setup').value) == DNSStack.DEFAULT:
+            if self.__do_enc:
+                #'bind9 is only capable of DNS-over-HTTPS (DoH) and DNS-over-TLS (DoT) not DNS-over-QUIC (DoQ) yet'
+                raise NotImplementedError
+
             self._do_install_bind9(node, dns)
         elif val == DNSStack.SCION:
             assert self.__do_enc, 'No support for unencrypted DNS in the Future Next Generation Internet anymore !'
@@ -502,8 +547,6 @@ class DomainNameServer(Server):
         """ add a server-block to Corefile for each zone
         """
 
-        crypto_path = '/etc/coredns/ca'
-
         node.setFile(corefile_path, '')
         for (_zonename, auto_ns_soa) in self.__zones:
             zone = dns.getZone(_zonename)
@@ -512,9 +555,8 @@ class DomainNameServer(Server):
                 filename = 'root'
                 zonename = '.'
 
-            # TODO generate TLS certificate and private key for zone
-            cert_path = f'{crypto_path}/{zonename}-cert.pem'
-            key_path = f'{crypto_path}/{zonename}-key.pem'
+            #  TLS certificate and private key for zone are generated by _enableHttpsFunc
+            cert_path, key_path = self._getCryptoPathsForZone(zonename, self.getServerName() )
 
             zonefile_path = f'{zones_path}/{filename}'
             server_block = DomainNameServiceFileTemplates['coredns_config'].format(
@@ -531,9 +573,13 @@ class DomainNameServer(Server):
         """!@ installs and configures coredns server on the given node
         @note see https://coredns.io/manual/configuration/
         """
+
+        #TODO install coredns binaries onto node
+
         corefile_path = f'/etc/coredns/Corefile'
         zones_path = '/etc/coredns/zones'
         self._do_generate_zonefiles(node, dns, zones_path)
+        # TODO move corefile generation to after-configure() when server-name is known
         self._do_generate_corefile(node, dns, corefile_path, zones_path)
 
 
@@ -555,7 +601,25 @@ class DomainNameServer(Server):
 
             node.addSoftware('bind9')
             node.appendStartCommand('echo "include \\"/etc/bind/named.conf.zones\\";" >> /etc/bind/named.conf.local')
-            node.setFile('/etc/bind/named.conf.options', DomainNameServiceFileTemplates['named_options'])
+            node.setFile('/etc/bind/named.conf.options',
+                          DomainNameServiceFileTemplates['named_options'])
+
+            '''
+            #TODO implement encrypted DNS for bind9
+            Add the following to options{} block:
+
+                'https-port 443;'
+
+                'listen-on port 443 tls local-tls http local-http-server {any;};'
+            And:
+
+                DomainNameServiceFiletemplates['bind9_http']
+
+                outside the options{} block in the .conf.options file
+
+            ...to enable DoH with bind
+            '''
+
             node.setFile('/etc/bind/named.conf.zones', '')
 
             for (_zonename, auto_ns_soa) in self.__zones:

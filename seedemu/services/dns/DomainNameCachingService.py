@@ -63,7 +63,7 @@ class DomainNameCachingServer(Server, Configurable):
         set to true in DomainNameCachingService, manual changes will be
         overridden.
 
-        @param servers list of IP addresses of the root servers.
+        @param servers list of IP or SCION addresses of the root servers.
 
         @returns self, for chaining API calls.
         """
@@ -163,7 +163,9 @@ class DomainNameCachingServer(Server, Configurable):
         sr = ScopedRegistry(scope, reg)
         ifaces = node.getInterfaces()
         assert len(ifaces) > 0, 'Node {} has no IP address.'.format(node.getName())
+        assert len(ifaces) == 1, f'Node {node.getName()} is not a host'
         addr = ifaces[0].getAddress()
+        # TODO add SCION address logic here
 
         for rnode in sr.getByType('rnode'):
             rnode.appendFile('/etc/resolv.conf.new', 'nameserver {}\n'.format(addr))

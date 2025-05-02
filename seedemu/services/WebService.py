@@ -1,9 +1,7 @@
 from __future__ import annotations
-from seedemu.core import Node, Service, Server
+from seedemu.core import Node, Service, Server, CAServerBase
 from typing import Dict, List
 from enum import Enum
-
-from .CAService import CAServerBase
 
 WebServerFileTemplates: Dict[str, str] = {}
 
