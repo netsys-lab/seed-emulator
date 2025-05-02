@@ -138,8 +138,9 @@ class DomainNameCachingServer(Server, Configurable):
 
     def _do_install_bind9(self, node: Node):
         node.addSoftware('bind9')
-        node.setFile('/etc/bind/named.conf.options', DomainNameCachingServiceFileTemplates['named_options'])
-        node.setFile('/etc/bind/named.conf.local','')
+        node.setFile('/etc/bind/named.conf.options',
+                      DomainNameCachingServiceFileTemplates['named_options'])
+        node.setFile('/etc/bind/named.conf.local', '')
         if len(self.__root_servers) > 0:
             hint = '\n'.join(self.__root_servers)
             node.setFile('/usr/share/dns/root.hints', hint)
@@ -239,6 +240,9 @@ class DomainNameCachingService(Service):
                 server.setRootServers(root_servers)
 
     def _init_etc_resolv_conf(self, ipaddrs: List[str], emulator: Emulator):
+        """
+        @param ipaddrs IP addresses of nameservers
+        """
 
         # For the nodes that are not covered, all the local DNS servers will be added to them (the default behavior).
         reg = emulator.getRegistry()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from seedemu.core import Node, Service, Server
 from typing import Dict, List
+from enum import Enum
 
 from .CAService import CAServerBase
 
@@ -8,7 +9,11 @@ WebServerFileTemplates: Dict[str, str] = {}
 
 WebServerFileTemplates['nginx_site'] = '''\
 server {{
+    {listen_http}
     listen {port};
+    {ssl_cert}
+    {ssl_proto}
+    {ssl_key}
     root /var/www/html;
     index index.html;
     server_name {serverName};
@@ -17,6 +22,22 @@ server {{
     }}
 }}
 '''
+
+class CAServerKind(Enum):
+    NONE = 0
+    MINICA = 1
+    SMALLSTEP = 2
+
+
+    @staticmethod
+    def fromCAServer(server: CAServerBase):
+        if 'MinicaCertificateAuthority' in server.getClassNames():
+            return CAServerKind.MINICA
+        elif 'SmallstepCertificateAuthority' in server.getClassNames():
+            return CAServerKind.SMALLSTEP
+        else:
+            raise Exception('unsupported CA service ')
+
 
 class WebServer(Server):
     """!
@@ -36,6 +57,7 @@ class WebServer(Server):
         self.__index = '<h1>{nodeName} at {asn}</h1>'
         self.__enable_https = False
         self.__enable_https_func = None
+        self.__ca_server_kind = CAServerKind.NONE
 
 
     def setPort(self, port: int) -> WebServer:
@@ -84,6 +106,8 @@ class WebServer(Server):
         @returns self, for chaining API calls.
         """
         self.__enable_https_func = ca.enableHTTPSFunc
+
+        self.__ca_server_kind = CAServerKind.fromCAServer(ca)
         return self
 
     def enableHTTPS(self) -> WebServer:
@@ -99,16 +123,41 @@ class WebServer(Server):
         """!
         @brief Install the service.
         """
+        nginx_conf = '/etc/nginx/sites-available/default'
+        key_path = '/etc/ssl/private/nginx.key'
+        cert_path = '/etc/ssl/certs/nginx.crt'
         node.addSoftware('nginx-light')
         node.setFile('/var/www/html/index.html', self.__index.format(asn = node.getAsn(), nodeName = node.getName()))
-        node.setFile('/etc/nginx/sites-available/default',
-                     WebServerFileTemplates['nginx_site'].format(port = self.__port, serverName = ' '.join(self._server_name)))
         node.appendStartCommand('service nginx start')
         node.appendClassName("WebService")
         if self.__enable_https:
-            self.__enable_https_func(node=node, server_names=self._server_name,
-                                     dst_cert_path='/etc/ssl/certs/nginx.crt',
-                                     dst_key_path='/etc/ssl/private/nginx.key')
+            assert (self.__ca_server_kind != CAServerKind.NONE
+                    and self.__enable_https_func != None), 'set a CAServer in order to use HTTPS'
+            self.__enable_https_func(node=node,
+                                     context='nginx',
+                                     server_names=self._server_name,
+                                     dst_cert_path=cert_path,
+                                     dst_key_path=key_path)
+            match self.__ca_server_kind:
+                case CAServerKind.MINICA:
+                    # change nginx config file to use the cert
+                    node.setFile(nginx_conf,
+                     WebServerFileTemplates['nginx_site'].format(port = f'{self.__port if self.__port != 80 else 443} ssl',
+                                                                 listen_http = f'listen {self.__port};',
+                                                                 ssl_cert = f'ssl_certificate {cert_path};',
+                                                                 ssl_key = f'ssl_certificate_key {key_path};',
+                                                                 ssl_proto = 'ssl_protocols TLSv1.2 TLSv1.3;',
+                                                                 serverName = ' '.join(self._server_name)
+                                                                 ))
+                case CAServerKind.SMALLSTEP:
+                # 'ssl_*' fields are set by certbot with --nginx flag
+                    node.setFile(nginx_conf,
+                     WebServerFileTemplates['nginx_site'].format(port = self.__port,
+                                                                 ssl_cert = '',
+                                                                 listen_http = '',
+                                                                 ssl_proto = '',
+                                                                 ssl_key = '',
+                                                                 serverName = ' '.join(self._server_name)))
 
     def print(self, indent: int) -> str:
         out = ' ' * indent

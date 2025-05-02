@@ -161,7 +161,7 @@ class CAServerBase(Server):
         return self
 
 
-    def enableHTTPSFunc(self, node: Node, server_names: List[str], dst_cert_path: str = None, dst_key_path: str = None):
+    def enableHTTPSFunc(self, context: str, node: Node, server_names: List[str], dst_cert_path: str = None, dst_key_path: str = None):
         """
         a callback that web servers can invoke to equip themselves with a TLS certificate
         issued by this CAServer
@@ -311,17 +311,21 @@ class RootCAStoreBase:
 
 class RootMiniCAStore(RootCAStoreBase):
 
+    """
+    @note uses https://github.com/jsha/minica MiniCA to generate keypairs and certificates.
+          This CA does not incur any additional cost at emulation runtime.
+          All certs are generated and installed at build time.
+
+    """
     def __init__(self, caDomain: str):
         super().__init__(caDomain)
 
         self._dockerfile_contents = CaFileTemplates['minica_docker']
-
-        #self._minica_image = BuildtimeDockerFile("minica") #.build(self.dockerfile_contents).container()
         self.__caDir = tempfile.mkdtemp(prefix="seedemu-minica-")
 
         with cd(self.__caDir):
             self.__container = BuildtimeDockerImage("minica").build(BuildtimeDockerFile(self._dockerfile_contents)).container()
-            self.__container.user(f"{os.getuid()}:{os.getuid()}").mountVolume( self.__caDir, "/certs" )#.entrypoint("step")
+            self.__container.user(f"{os.getuid()}:{os.getuid()}").mountVolume( self.__caDir, "/certs" )
             # .user(f"{os.getuid()}:{os.getuid()}")
 
 
@@ -343,15 +347,7 @@ class RootMiniCAStore(RootCAStoreBase):
         @brief Initialize the CA store.
         User can either call it manually or let the CA server to call it.
         """
-        '''
-        if self.__initialized:
-            return
-        with cd(self.__caDir):
-            initialize_command = "minica --domains '*'"
-            self.__container.run(initialize_command)
-
-        self.__initialized = True
-        '''
+        pass
 
 
 
@@ -361,9 +357,6 @@ class MiniCAServer(CAServerBase):
 
     def __init__(self):
         super().__init__()
-
-    def getName(self):
-        return "MinicaCertificateAuthority"
 
     def install(self, node: Node):
         """!
@@ -386,7 +379,7 @@ class MiniCAServer(CAServerBase):
             os.path.join(
                 self.getCAStore().getStorePath(), "minica.pem"
             ),
-            f"/usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA.pem",
+            f"/usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA.crt",
         )
 
         node.appendStartCommand("update-ca-certificates")
@@ -395,7 +388,7 @@ class MiniCAServer(CAServerBase):
 
 
 
-    def enableHTTPSFunc(self, node: Node, server_names: List[str], dst_cert_path: str, dst_key_path: str):
+    def enableHTTPSFunc(self, context: str, node: Node, server_names: List[str], dst_cert_path: str, dst_key_path: str):
         """
         unlike StepCA requires no ACME at runtime,
         because it copies all required stuff into containers at build time
@@ -408,23 +401,20 @@ class MiniCAServer(CAServerBase):
         assert isinstance(store, RootMiniCAStore), 'logic error'
         store.generateCert(server_names)
 
-        # TODO copy generated certs from caDir to node
-
+        # copy generated certs from caDir to node
         cert_dir = os.path.join(store.getStorePath(), server_names[0])
         for root, _, files in os.walk(cert_dir):
             for file in files:
-                node.importFile(
-                    os.path.join(root, file),
-                    dst_cert_path)
-                '''
-                os.path.join(
-                    "/root",
-                    os.path.relpath(os.path.join(root, file), store.getStorePath()),
-                ),
-                '''
-
-
-
+                if file == 'cert.pem':
+                    node.importFile(
+                        os.path.join(root, file),
+                        dst_cert_path)
+                elif file == 'key.pem':
+                    node.importFile(
+                        os.path.join(root, file),
+                        dst_key_path)
+                else:
+                    raise Exception('implementation error')
 
         node.addSoftware("ca-certificates")
         node.appendStartCommand("update-ca-certificates")
@@ -433,10 +423,12 @@ class MiniCAService(CAServiceBase):
 
     def _createServer(self) -> Server:
         server = MiniCAServer()
+        server.appendClassName(self.getName())
         self.addCAServer(server)
         return server
 
-
+    def getName(self):
+        return "MinicaCertificateAuthority"
 
 
 
@@ -462,13 +454,13 @@ class StepCAServer(CAServerBase):
         node.appendStartCommand("update-ca-certificates")
 
 
-    def enableHTTPSFunc(self, node: Node, server_names: List[str], dst_cert_path: str = None, dst_key_path:str = None):
+    def enableHTTPSFunc(self, context: str, node: Node, server_names: List[str], dst_cert_path: str = None, dst_key_path:str = None):
         """!
         @brief Enable HTTPS for the web server.
         This is not supposed to be called directly. The WebService will call this function.
 
         @param node The node to enable HTTPS.
-
+        @pram context a hint from the caller, what the certificate is needed for i.e. 'nginx'
         @param web The web server to enable HTTPS.
         """
         node.addSoftware("certbot").addSoftware("python3-certbot-nginx").addSoftware(
@@ -481,13 +473,15 @@ class StepCAServer(CAServerBase):
                 self.getCADomain()
             )
         )
-        node.appendStartCommand(
-            'REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
-certbot --server https://{ca_domain}/acme/acme/directory --non-interactive --nginx --no-redirect --agree-tos --email example@example.com \
+        certbot_command =  'REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
+certbot {server} --non-interactive {flags} --no-redirect --agree-tos {main} \
 -d {server_name} > /dev/null && echo "ACME: cert issued"'.format(
-                server_name=" -d ".join(server_names), ca_domain=self.getCADomain()
+                server=f'--server https://{self.getCADomain()}/acme/acme/directory',
+                server_name=" -d ".join(server_names),
+                mail='--email example@example.com',
+                flags='--nginx' if context=='nginx' else ''
             )
-        )
+        node.appendStartCommand(certbot_command)
         node.appendStartCommand(
             "sed 's/^#\? \?renew_before_expiry = .*$/renew_before_expiry = 8hours/' -i /etc/letsencrypt/renewal/*.conf"
         )
@@ -574,6 +568,7 @@ fi"
 
     def _createServer(self) -> Server:
         server = StepCAServer(self._step_version)
+        server.appendClassName(self.getName())
         self.addCAServer(server)
         return server
 

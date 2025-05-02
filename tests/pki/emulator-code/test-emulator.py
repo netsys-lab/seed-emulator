@@ -39,11 +39,11 @@ caStore2 = RootMiniCAStore(caDomain='ca2.internal')
 
 caServer1: StepCAServer = ca1.install('ca1-vnode')
 caServer1.setCAStore(caStore1)
-caServer1.installCACert(Filter(asn=150))
+caServer1.installCACert(Filter())
 
 caServer2: MiniCAServer = ca2.install('ca2-vnode')
 caServer2.setCAStore(caStore2)
-caServer2.installCACert(Filter(asn=151))
+caServer2.installCACert(Filter())
 
 as150 = base.createAutonomousSystem(150)
 as150.createNetwork('net0')
