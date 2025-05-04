@@ -52,14 +52,6 @@ def run(dumpfile = None):
 
     devsvc = GolangDevService( 'amdfxlucas', 'saculolissat@gmx.de' )
 
-    ''' # seems to be private repo
-    GitRepo( repo_url = 'https://github.com/netsys-lab/ngi-search',
-           repo_branch = 'main',
-           repo_path = '/repos/ngi-search',
-           notes='actually only a README and git-submodule pointers' \
-                   'to scion-apps(containing skip), pan-lua and scion-browser-extensions'),
-    '''
-
     repos = [
             GitRepo( repo_url = 'https://github.com/netsys-lab/pan-lua',
                     repo_branch = 'main',
@@ -83,28 +75,20 @@ def run(dumpfile = None):
             GitRepo( repo_url = 'https://github.com/netsys-lab/scion-coredns-doq',
                     repo_branch = 'main',
                     repo_path = '/repos/scion-coredns-doq',
-                    notes='SCION DoQ capable coredns nameserver fork based on caddy'
-                    # or:  https://github.com/amdfxlucas/scion-coredns branch: impl_doq
+                    notes = 'SCION DoQ capable coredns nameserver fork based on caddy  \
+                            Also includes RHINE through a modified file plugin \
+                        '
 
                     # upstream coredns: https://github.com/coredns/coredns
                     #       depends on github.com/miekg/dns v1.1.65 (latest version as of 03.05.2025)
                     #               	github.com/quic-go/quic-go v0.50.1
                       ),
 
-            GitRepo( repo_url = 'https://github.com/netsys-lab/scion-apps',
-                    repo_branch = 'master',
-                    repo_path = '/repos/netsys-scion-apps',
-                    notes =' branch: attempt-master-rebase is based of the latest upstream scion-apps \
-                         it contains a single commit for which a mini PR can be opened upstream. \
-                        It introduces ListenQUIC2() overload which is used for CoreDNS SQUIC impl'
-                        # NOTE this commit is not strictly necessary and so is keeping a custom fork around !
-                        #       it is just for convenience
-                        ),
-
-            # NOTE identical to netsys-lab/scion-apps
+            # DEPRECATED: obsolete ! our miekg/dns fork uses the latest upstream scion-apps
             #GitRepo( repo_url = 'https://github.com/netsys-lab/scion-apps',
             #        repo_branch = 'master',
-            #        repo_path = '/repos/luki-scion-apps' ),
+            #        repo_path = '/repos/netsys-scion-apps',
+            #        notes =' ' ),
 
             GitRepo( repo_url = 'https://github.com/netsys-lab/exdns',
                     notes='dig like CLI program for issuing test request to the resolver or NS',
@@ -112,32 +96,24 @@ def run(dumpfile = None):
                     repo_path = '/repos/exdns',
                     notes = 'forked from https://github.com/miekg/exdns \
                             only dependency is miekg/dns 1.56 \
-                            This is our favorite because it has the least dependencies'
+                            This is our favorite because it has the least dependencies \
+                            Our fork is capable of SCION DoQ AND RHINE verification '
                               ),
 
 
             GitRepo( repo_url = 'https://github.com/netsys-lab/dns',
                     repo_branch = 'master',
                     repo_path = '/repos/dns',
-                    notes='fork of amdfxlucas/dns without any additional work\
-                           we will use netsys-lab/* in general instead of any amdfxlucas/*'
+                    notes='fork of miekg/dns with SCION support'
                     ),
 
-            GitRepo(repo_url = 'https://github.com/netsys-lab/scion-rdig',
-                    repo_branch = 'main',
-                    repo_path = '/repos/scion-rdig',
-                    notes = 'dig like CLI tool for dns queries that supports RHINE verification \
-                            Note: also just a copy of miekg/exdns q programm exdns '
-                      ),
-
-            GitRepo( repo_url = 'https://github.com/amdfxlucas/dnslookup',
-                    repo_branch = 'master',
-                    repo_path = '/repos/dnslookup',
-                    notes='also CLI dns query tool forked from https://github.com/ameshkov/dnslookup \
-                           usage: dnslookup example.org quic://dns.adguard.com  \
-                        '                    ),
-                        # depends on miekg/dns 1.59 and AdguardTeam/dnsproxy 0.71.1
-                        # DEPRECATED: it would require to maintain a SCION capable fork of dnsproxy as well
+            # DEPRECATED: obsolete! just an old outdated version of exdns. use it instead
+            #GitRepo(repo_url = 'https://github.com/netsys-lab/scion-rdig',
+            #        repo_branch = 'main',
+            #        repo_path = '/repos/scion-rdig',
+            #        notes = 'dig like CLI tool for dns queries that supports RHINE verification \
+            #                Note: also just a copy of miekg/exdns q programm exdns '
+            #          ),
 
             GitRepo(repo_url = 'https://github.com/scionproto-contrib/http-proxy.git',
                     repo_branch = 'main',
@@ -153,25 +129,6 @@ def run(dumpfile = None):
             ]
 
     '''
-    https://github.com/amdfxlucas/dns    a fork of  https://github.com/loujie1/dns
-        that adds 10x commits
-
-    https://github.com/loujie1/dns  a  fork of  https://github.com/miekg/dns
-        that adds a single commit 'add RRSIG verification with public key' to dnssec.go
-        and is otherwise 128 commits behind miekg/dns
-
-        This is implemented in upstream miekg/dns by now:
-            miekg: '(rr *RRSIG) Verify(k *DNSKEY, rrset []RR) error '
-
-            loujie1: 'func (rr *RRSIG) VerifyWithPublicKey(pubkey ed25519.PublicKey, rrset []RR) error {'
-
-        So loujie1 dependency is obsolete and we need to consider only the 10x remaining commits
-
-        TODO: probably its good to create a fresh fork of miekg/dns and rebase the 10x commits onto it
-            to see what has changed and might not be needed anymore
-            Update: This branch is 'master-rebased'
-
-            miekg/dns is used by upstream coredns
 
         Is there any reason for 'resolveapi' package being a part of miekg/dns fork ?
         Can't we make it a module on its own (not i.e. part of scion-apps pan!!) and get
@@ -180,11 +137,11 @@ def run(dumpfile = None):
 
 
         the miekg/dns fork imports scion-apps to implement SCION DoQ support for the dns-client/server
-        it also imports our custom fork because it needs the ListenQUIC2 overload
+
     '''
 
 
-    '''
+    '''NOTES:
     scion-coredns-doq imports miekg/dns fork resolveapi package for secondary file plugin
     to resolve the SNI name of the master DNS server from which to transfer a zone from
     '''
