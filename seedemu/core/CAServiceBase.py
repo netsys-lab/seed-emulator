@@ -47,6 +47,12 @@ def ipsInNetwork(ips: Iterable, network: str) -> bool:
 
 
 class RootCAStoreBase:
+    """
+    common base interface for any means that can be used
+    to generate and issue cryptografic certificates
+
+    @details can be implemented i.e. with SmallstepCA, OpenSSL or MiniCA
+    """
 
     def __init__(self, caDomain: str = "ca.internal"):
         """!
@@ -71,13 +77,24 @@ class RootCAStoreBase:
     def initialize(self):
         pass
 
+    def generateCert(self, server_names: List[str]):
+        """
+        generates a key pair and certificate for the given domain/s
+        @details called by CAServers to implement their client's CertRequests
+        """
+        pass
+
     def save(self, path: str):
         pass
     def restore(self, path: str):
         pass
 
 class CAServerBase(Server):
-
+    """
+    a CA Server is a means for other (i.e. Web-) Servers
+    to obtain a certificate for their domain-name.
+    This is required to serve clients over HTTPS.
+    """
     def __init__(self):
         super().__init__()
         self.__filters: List[Filter | None] = []
@@ -93,9 +110,19 @@ class CAServerBase(Server):
         return self.__id
 
     def getCADomain(self) -> str:
+        """
+        returns the domain name of the certificate authority
+        whoose root certificate is required to verify certificates
+        issued by this CAServer.
+        @note depends on the RootCAStore used by this Server
+        """
         return self.__ca_domain
 
     def certDuration(self) -> str:
+        """
+        returns how long certificates issued by this server
+        will be valid
+        """
         return self.__duration
 
     def _appendFilter(self, filter: Filter):
@@ -158,6 +185,8 @@ class CAServerBase(Server):
         raise NotImplemented
 
     def setCAStore(self, caStore: RootCAStoreBase) -> 'CAServerBase':
+        """
+        """
         self.__ca_store = caStore
         self.__ca_store.initialize()
         self.__ca_domain = self.__ca_store._caDomain

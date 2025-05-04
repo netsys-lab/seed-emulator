@@ -42,8 +42,7 @@ http local-http-server {
 # CoreDNS 'server-block'
 DomainNameServiceFileTemplates['coredns_config'] = '''\
 {schema}://{zone}:{port} {{
-tls {tls_cert}
-    {tls_key}
+tls {tls_cert} {tls_key}
 file {zonefile} {zone}
 debug
 log
@@ -334,6 +333,7 @@ class DomainNameServer(Server):
         @param ns_name  domain name of the nameserver holding the certificate (usually sth. like 'ns1.zonename.' )
                         #FIXME Actually unnecessary because all nameservers of the same zone have the same certificate right ?!
         """
+        assert zone != '', 'invalid input'
         crypto_path = '/etc/coredns/ca'
         cert_path = f'{crypto_path}/{zone}-cert.pem'
         key_path = f'{crypto_path}/{zone}-key.pem'
@@ -495,7 +495,7 @@ class DomainNameServer(Server):
                 if self.__do_enc:
                     cert_names = [self.getServerName(_zone), _zone] # the SNI's for which the certificate is needed
 
-                    cert_path, key_path = self._getCryptoPathsForZone(zonename, ns_name)
+                    cert_path, key_path = self._getCryptoPathsForZone(_zone, ns_name)
                     # request a certificate for '$server_name' from the CA
                     self.__enable_https_func(node=node,
                                             context='dns',

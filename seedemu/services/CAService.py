@@ -66,15 +66,14 @@ class RootMiniCAStore(RootCAStoreBase):
         with cd(self.__caDir):
             self.__container = BuildtimeDockerImage("minica").build(BuildtimeDockerFile(self._dockerfile_contents)).container()
             self.__container.user(f"{os.getuid()}:{os.getuid()}").mountVolume( self.__caDir, "/certs" )
-            # .user(f"{os.getuid()}:{os.getuid()}")
-
 
     def generateCert(self, server_names: List[str]):
         """
         generates a key pair and certificate for the given domain
         """
-        dnames = ','.join( s for s in server_names if s!=None and s!='')
-        self.__container.run(f'minica --domains "{ dnames}"') # cert & key is output to ./{domain.name}/
+        assert not any([' ' in ns for ns in server_names]), 'invalid input: server_names must be valid fully qualified domain names.'
+        dnames = ','.join( s for s in server_names if s != None and s != '')
+        self.__container.run(f'minica --domains "{dnames}"') # cert & key is output to ./{domain.name}/
 
 
     def getStorePath(self) -> str:
@@ -134,7 +133,8 @@ class MiniCAServer(CAServerBase):
         unlike StepCA requires no ACME at runtime,
         because it copies all required stuff into containers at build time
         @param node  the Node onto which the (Web/Dns whatever)Server which requires TLS is installed
-        @param server_name domain-name of the Server for which it needs a certificate
+        @param context minica server is context agnostic. This argument is ignored.
+        @param server_name domain-name/s of the Server for which it needs a certificate
         @param dst_cert_path destination path on 'node' where to place the generated cert and key
         """
 
