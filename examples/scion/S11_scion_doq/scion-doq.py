@@ -73,7 +73,7 @@ def run(dumpfile = None):
 
 
             GitRepo( repo_url = 'https://github.com/netsys-lab/scion-coredns-doq',
-                    repo_branch = 'main',
+                    repo_branch = 'main', # attempt-rebase
                     repo_path = '/repos/scion-coredns-doq',
                     notes = 'SCION DoQ capable coredns nameserver fork based on caddy  \
                             Also includes RHINE through a modified file plugin \
@@ -91,10 +91,10 @@ def run(dumpfile = None):
             #        notes =' ' ),
 
             GitRepo( repo_url = 'https://github.com/netsys-lab/exdns',
-                    notes='dig like CLI program for issuing test request to the resolver or NS',
-                    repo_branch = 'master',
-                    repo_path = '/repos/exdns',
-                    notes = 'forked from https://github.com/miekg/exdns \
+                     repo_branch = 'master', # master-rebased
+                     repo_path = '/repos/exdns',
+                     notes='dig like CLI program for issuing test DNS requests to the resolver or NS \
+                          forked from https://github.com/miekg/exdns \
                             only dependency is miekg/dns 1.56 \
                             This is our favorite because it has the least dependencies \
                             Our fork is capable of SCION DoQ AND RHINE verification '
@@ -102,18 +102,11 @@ def run(dumpfile = None):
 
 
             GitRepo( repo_url = 'https://github.com/netsys-lab/dns',
-                    repo_branch = 'master',
+                    repo_branch = 'master', # master-rebase
                     repo_path = '/repos/dns',
                     notes='fork of miekg/dns with SCION support'
                     ),
 
-            # DEPRECATED: obsolete! just an old outdated version of exdns. use it instead
-            #GitRepo(repo_url = 'https://github.com/netsys-lab/scion-rdig',
-            #        repo_branch = 'main',
-            #        repo_path = '/repos/scion-rdig',
-            #        notes = 'dig like CLI tool for dns queries that supports RHINE verification \
-            #                Note: also just a copy of miekg/exdns q programm exdns '
-            #          ),
 
             GitRepo(repo_url = 'https://github.com/scionproto-contrib/http-proxy.git',
                     repo_branch = 'main',
@@ -520,6 +513,7 @@ def run(dumpfile = None):
     emu.addLayer(scion)
     emu.addLayer(etc_hosts)
     emu.addLayer(dns_svc)
+    emu.addLayer(sdns)
     emu.addLayer(minica)
     emu.addLayer(devsvc)
 
