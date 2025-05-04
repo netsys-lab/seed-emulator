@@ -3,10 +3,241 @@ from seedemu.core import Configurable, Service, Server
 from seedemu.core import Node, ScopedRegistry, Emulator, CAServerBase
 from .DomainNameService import DomainNameService
 from .DNSCommon import *
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from seedemu.core.enums import NetworkType
 
 DomainNameCachingServiceFileTemplates: Dict[str, str] = {}
+
+# configuration for sdns recursive resolver
+# to function as a drop-in SCION replacement for the system resolver on every host
+DomainNameCachingServiceFileTemplates['sdns_conf'] = '''\
+bind = "127.0.0.1:53"
+
+# Enable SCION
+scion = true
+
+# RHINE certificate to validate RRs with
+cacertificatefile = "{rhine_cert}"
+
+# Root zone SCION servers
+rootscionservers = [
+{scion_root_hints}
+#"17-ffaa:1:1008,127.0.0.1:53",
+]
+
+loglevel = "debug"
+
+# Which clients allowed to make queries
+accesslist = [
+"0.0.0.0/0",
+"::0/0"
+]
+# TLS certificate file
+tlscertificate = "{cert_path}"
+
+# TLS private key file
+tlsprivatekey = "{key_path}"
+'''
+
+DomainNameCachingServiceFileTemplates['sdns_conf_full'] = '''\
+# Address to bind to for the DNS server
+#bind = "0.0.0.0:5553"
+bind = "127.0.0.1:5553"
+#bind = "10.0.2.15:5553"
+
+# Enable SCION
+scion = true
+
+# RHINE certificate to validate RRs with
+cacertificatefile = "../netsys-lab_scion-rains/testdata/scionlab/CACert.pem"
+
+# Root zone SCION servers
+rootscionservers = [
+"17-ffaa:1:1008,127.0.0.1:53",
+"19-ffaa:1:fe4,127.0.0.1:53" # rhine.ovgu.scionlab.
+]
+
+# What kind of information should be logged, Log verbosity level [crit,error,warn,info,debug]
+loglevel = "debug"
+
+# List of locations to recursively read blocklists from (warning, every file found is assumed to be a hosts-file or domain list)
+blocklistdir = "bl"
+
+# Which clients allowed to make queries
+accesslist = [
+"0.0.0.0/0",
+"::0/0"
+]
+
+#--------------------------------------------------------------------------------
+# Config version, config and build versions can be different.
+version = "1.2.0"
+
+
+
+# Address to bind to for the DNS-over-TLS server
+#bindtls = ":8853"
+
+# Address to bind to for the DNS-over-HTTPS server
+# binddoh = ":8053"
+
+# TLS certificate file
+tlscertificate = "ca/localhost/localhost-cert.pem"
+
+# TLS private key file
+tlsprivatekey = "ca/localhost/localhost-key.pem"
+
+# Outbound ipv4 addresses, if you set multiple, sdns can use random outbound ipv4 address by request based
+#outboundips = [
+#    "10.0.2.15:3333"
+#  "127.0.0.1"
+#]
+
+# Outbound ipv6 addresses, if you set multiple, sdns can use random outbound ipv6 address by request based
+outboundip6s = [
+]
+
+# Root zone ipv4 servers
+rootservers = [
+"192.5.5.241:53",
+"198.41.0.4:53",
+"192.228.79.201:53",
+"192.33.4.12:53",
+"199.7.91.13:53",
+"192.203.230.10:53",
+"192.112.36.4:53",
+"128.63.2.53:53",
+"192.36.148.17:53",
+"192.58.128.30:53",
+"193.0.14.129:53",
+"199.7.83.42:53",
+"202.12.27.33:53"
+]
+
+# Root zone ipv6 servers
+root6servers = [
+#"[2001:500:2f::f]:53",
+#"[2001:503:ba3e::2:30]:53",
+#"[2001:500:200::b]:53",
+#"[2001:500:2::c]:53",
+#"[2001:500:2d::d]:53",
+#"[2001:500:a8::e]:53",
+#"[2001:500:12::d0d]:53",
+#"[2001:500:1::53]:53",
+#"[2001:7fe::53]:53",
+#"[2001:503:c27::2:30]:53",
+#"[2001:7fd::1]:53",
+#"[2001:500:9f::42]:53",
+#"[2001:dc3::35]:53"
+]
+
+# Trusted anchors for dnssec
+rootkeys = [
+".			172800	IN	DNSKEY	257 3 8 AwEAAaz/tAm8yTn4Mfeh5eyI96WSVexTBAvkMgJzkKTOiW1vkIbzxeF3+/4RgWOq7HrxRixHlFlExOLAJr5emLvN7SWXgnLh4+B5xQlNVz8Og8kvArMtNROxVQuCaSnIDdD5LKyWbRd2n9WGe2R8PzgCmr3EgVLrjyBxWezF0jLHwVN8efS3rCj/EWgvIWgb9tarpVUDK/b58Da+sqqls3eNbuv7pr+eoZG+SrDK6nWeL3c6H5Apxz7LjVc1uTIdsIXxuOLYA4/ilBmSVIzuDWfdRUfhHdY6+cn8HFRm+2hM8AnXGXws9555KrUB5qihylGa8subX2Nn6UwNR1AkUTV74bU="
+]
+
+# Failover resolver ipv4 or ipv6 addresses with port, left blank for disabled"
+# fallbackservers = [
+#	"8.8.8.8:53",
+#	"8.8.4.4:53"
+# ]
+fallbackservers = [
+]
+
+# Forwarder resolver ipv4 or ipv6 addresses with port, left blank for disabled"
+# forwarderservers = [
+#	"8.8.8.8:53",
+#	"8.8.4.4:53"
+# ]
+forwarderservers = [
+]
+
+# Address to bind to for the http API server, left blank for disabled
+api = "127.0.0.1:8081"
+
+# What kind of information should be logged, Log verbosity level [crit,error,warn,info,debug]
+#loglevel = "debug"
+
+# The location of access log file, left blank for disabled. SDNS uses Common Log Format by default.
+# accesslog = ""
+
+# List of remote blocklists address list. All lists will be download to blocklist folder.
+# blocklists = [
+# "http://mirror1.malwaredomains.com/files/justdomains",
+# "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+# "http://sysctl.org/cameleon/hosts",
+# "https://zeustracker.abuse.ch/blocklist.php?download=domainblocklist",
+# "https://s3.amazonaws.com/lists.disconnect.me/simple_tracking.txt",
+# "https://s3.amazonaws.com/lists.disconnect.me/simple_ad.txt",
+# "https://raw.githubusercontent.com/quidsup/notrack/master/trackers.txt"
+# ]
+#blocklists = [
+#]
+
+# List of locations to recursively read blocklists from (warning, every file found is assumed to be a hosts-file or domain list)
+#blocklistdir = "bl"
+
+# IPv4 address to forward blocked queries to
+nullroute = "0.0.0.0"
+
+# IPv6 address to forward blocked queries to
+nullroutev6 = "::0"
+
+# Enables serving zone data from a hosts file, left blank for disabled
+# the form of the entries in the /etc/hosts file are based on IETF RFC 952 which was updated by IETF RFC 1123.
+hostsfile = ""
+
+# Network timeout for each dns lookups in duration
+timeout = "3s"
+
+# Default error cache TTL in seconds
+expire = 600
+
+# Cache size (total records in cache)
+cachesize = 256000
+
+# Maximum iteration depth for a query
+maxdepth = 30
+
+# Query based ratelimit per second, 0 for disabled
+ratelimit = 0
+
+# Client ip address based ratelimit per minute, 0 for disabled
+clientratelimit = 0
+
+# Manual blocklist entries
+blocklist = []
+
+# Manual whitelist entries
+whitelist = []
+
+# DNS server identifier (RFC 5001), it's useful while operating multiple sdns. left blank for disabled
+nsid = ""
+
+# Enable to answer version.server, version.bind, hostname.bind, id.server chaos queries.
+chaos = true
+
+# Qname minimization level. If higher, it can be more complex and impact the response performance.
+# If set 0, qname minimization will be disable
+qname_min_level = 5
+
+# Empty zones return answer for RFC 1918 zones. Please see http://as112.net/
+# for details of the problems you are causing and the counter measures that have had to be deployed.
+# If the list empty, SDNS will be use default zones described at RFC.
+# emptyzones [
+#	"10.in-addr.arpa."
+# ]
+emptyzones = []
+
+# You can add your own plugins to sdns. The plugin order is very important.
+# Plugins can be load before cache middleware.
+# Config keys should be string and values can be anything.
+# There is an example plugin at https://github.com/semihalev/sdnsexampleplugin
+# [plugins]
+#     [plugins.example]
+#     path = "exampleplugin.so"
+#     config = {key_1 = "value_1", key_2 = 2, key_3 = true}
+'''
 
 DomainNameCachingServiceFileTemplates['named_options'] = '''\
 options {
@@ -18,12 +249,36 @@ options {
 };
 '''
 
+def getNodeAddr(node: Node) -> str:
+    address = getIpAddr(node)
+    if 'scion_address' in node.getLabel():
+        scion_addr = node.getLabel()['scion_address']
+        ia_str = scion_addr.split(',')[0]
+        ip_str = scion_addr.split(',')[1]
+        assert ip_str==str(address), 'implementation error'
+        return scion_addr
+    else:
+        return str(address)
+
+def getIpAddr(node: Node) -> str:
+    ifaces = node.getInterfaces()
+    assert len(ifaces) > 0, 'Node {} has no IP address.'.format(node.getName())
+    assert len(ifaces) == 1, f'Node {node.getName()} is not and end-host'
+    for iface in ifaces:
+        net = iface.getNet()
+        if net.getType() == NetworkType.Local:
+            address = iface.getAddress()
+            return address
+    return ""
+
 class DomainNameCachingServer(Server, Configurable):
     """!
     @brief Caching DNS server (i.e., Local DNS server)
 
     @todo DNSSEC
     """
+    __node: Node
+    __server_name: str
     __do_enc: bool
     __root_servers: List[str]
     __configure_resolvconf: bool
@@ -32,11 +287,14 @@ class DomainNameCachingServer(Server, Configurable):
     __asn_range: List[int]
     __is_range_all: bool
 
-    def __init__(self, do_enc: bool):
+    def __init__(self, do_enc: bool, server_name: str = None):
         """!
         @brief DomainNameCachingServer constructor.
+        @param do_enc enable DNS over encrypted transport
         """
         super().__init__()
+        self.__node = None
+        self.__server_name = server_name
         self.__do_enc = do_enc
         self.__root_servers = []
         self.__enable_https_func = None
@@ -48,8 +306,6 @@ class DomainNameCachingServer(Server, Configurable):
     def setCAServer(self, server: CAServerBase):
         assert self.__do_enc, 'logic error'
         """
-        what shall be used as the resolvers 'server name' for its TLS cert
-        sth. like '{scope}-{node.getName()}' ?!
         """
         self.__enable_https_func = server.enableHTTPSFunc
 
@@ -108,33 +364,77 @@ class DomainNameCachingServer(Server, Configurable):
         return self
 
     def setNameServerOnNodesByAsns(self, asns: List[int]):
+        """
+        adds the hosts in the given ASes to this servers catchment
+        """
         self.__asn_range.extend(asns)
 
     def setNameServerOnAllNodes(self):
         self.__is_range_all = True
 
+    def getServerName(self) -> str:
+        regInfo = self.__node.getRegistryInfo()
+        host_id = regInfo[2].replace('_', '') # or use custom host name if present
+        return self.__server_name if self.__server_name != None else f'sdns.{host_id}.{regInfo[0]}.'
+
+    def _getCryptoPaths(self) -> Tuple[str, str]:
+        """ return where to find the certificate and private key
+        """
+        if self.__node.getOption('dns_setup').value == DNSStack.SCION:
+            cert_path = f'/etc/sdns/ca/{self.getServerName()}-cert.pem'
+            key_path = f'/etc/sdns/ca/{self.getServerName()}-key.pem'
+        else:
+            cert_path = f'/etc/bind9/ca/{self.getServerName()}-cert.pem'
+            key_path = f'/etc/bind9/ca/{self.getServerName()}-key.pem'
+
+        return (cert_path, key_path)
+
     def configure(self, emulator: Emulator, node:Node):
         self.__emulator = emulator
+        self.__node = node
 
-        reg = emulator.getRegistry()
-        address: str = None
-        ifaces = node.getInterfaces()
-        assert len(ifaces) > 0, 'Node {} has no IP address.'.format(node.getName())
-        for iface in ifaces:
-            net = iface.getNet()
-            if net.getType() == NetworkType.Local:
-                address = iface.getAddress()
-                break
-        # TODO add SCION address logic
+        address = getNodeAddr(node)
 
         assert address != "", 'address is not configured.'
 
+        if node.getOption('dns_setup').value == DNSStack.SCION:
+            cert_path, key_path = self._getCryptoPaths()
+            # request a certificate for the resolvers server-name from the CA
+            self.__enable_https_func(node=node,
+                                context='sdns',
+                                server_names=[self.getServerName()],
+                                dst_cert_path=cert_path,
+                                dst_key_path=key_path)
+
+        if not self.__is_range_all and len(self.__asn_range) == 0:
+            #quic out in case of empty catchment
+            return
+
+        self._configureResolverCatchment(address, node)
+
+    def _configureResolverCatchment(self, address: str):
+        """
+        configures all nodes which fall within this resolver's asn_range
+        to use this resolver, by adding it to their /etc/resolv.conf files
+
+        @param address  the IP or SCION address under which it listens for client requests
+        @note by default a resolvers catchment is empty (zero ASN_range)
+        """
+        reg = self.__emulator.getRegistry()
         for ((scope, type, name), node) in reg.getAll().items():
             if type in ['hnode', 'rnode']:
-                if self.__is_range_all or node.getAsn() in self.__asn_range:
+                if self.getIsNodeWithinCatchment(node):
                     if not any(command[0] == ': > /etc/resolv.conf' for command in node.getStartCommands()):
                         node.insertStartCommand(0,': > /etc/resolv.conf')
                     node.insertStartCommand(1, 'echo "nameserver {}" >> /etc/resolv.conf'.format(address))
+
+
+    def getIsNodeWithinCatchment(self, node: Node) -> bool:
+        """
+        return whether the given node shall be configured to use this resolver
+        """
+        return self.__is_range_all or node.getAsn() in self.__asn_range
+
 
     def install(self, node: Node):
 
@@ -154,6 +454,18 @@ class DomainNameCachingServer(Server, Configurable):
         """
         install the sdns recursive resolver on the node
         """
+        cert_path, key_path = self._getCryptoPaths()
+
+        sc_root_hints = ',\n'.join( map( lambda x: f'"{x}"', self.getRootServers()))
+        # use MiniCA root certificate which is installed in every host's trust store
+        # as rhine certificate to verify RHINE records
+        rcert='/usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA.crt'
+        sdns_conf = DomainNameCachingServiceFileTemplates['sdns_conf'].format(rhine_cert=rcert,
+                                                                              cert_path=cert_path,
+                                                                              key_path=key_path,
+                                                                              scion_root_hints=sc_root_hints)
+
+        node.setFile('/etc/sdns/sdns.conf', sdns_conf)
         pass
 
     def _do_install_bind9(self, node: Node):
@@ -172,20 +484,23 @@ class DomainNameCachingServer(Server, Configurable):
 
             ifaces = pnode.getInterfaces()
             assert len(ifaces) > 0, 'resolvePendingRecords(): node as{}/{} has no interfaces'.format(pnode.getAsn(), pnode.getName())
+            assert len(ifaces) == 1, f'Node {pnode.getName()} is not a host'
             vnode_addr = ifaces[0].getAddress()
             node.appendFile('/etc/bind/named.conf.local',
                         'zone "{}" {{ type forward; forwarders {{ {}; }}; }};\n'.format(zone_name, vnode_addr))
 
         if not self.__configure_resolvconf: return
+        self._configure_resolvconf_impl(node)
+
+
+    def _configure_resolvconf_impl(self, node: Node):
+        """ resolv.conf of all other nodes in the node's AS will be set to this server/node.
+        """
 
         reg = self.__emulator.getRegistry()
         (scope, _, _) = node.getRegistryInfo()
         sr = ScopedRegistry(scope, reg)
-        ifaces = node.getInterfaces()
-        assert len(ifaces) > 0, 'Node {} has no IP address.'.format(node.getName())
-        assert len(ifaces) == 1, f'Node {node.getName()} is not a host'
-        addr = ifaces[0].getAddress()
-        # TODO add SCION address logic here
+        addr = getNodeAddr(node)
 
         for rnode in sr.getByType('rnode'):
             rnode.appendFile('/etc/resolv.conf.new', 'nameserver {}\n'.format(addr))
@@ -206,6 +521,28 @@ class DomainNameCachingService(Service):
 
     __auto_root: bool
 
+    @classmethod
+    def getAvailableOptions(cls):
+        # avoid code duplication and have DNS options only in one place
+        return DomainNameService.getAvailableOptions()
+
+    def _doInstall(self, node: Node, server: DomainNameCachingServer):
+        opt = node.getOption('dns_setup')
+        if opt == None:
+            for o in self.getAvailableOptions():
+                node.setOption(o)
+        server.install(node, self)
+
+    def setConfigureFallbackResolvconf(self, configure: bool):
+        """
+        shall the /etc/resolve.conf files of all hosts that don't fall
+        into the catchment of any CachingResolver be configured to use
+        all resolvers or not.
+        The default is false, and these 'leftover' nodes
+        just have any resolvers configured.
+        """
+        self.__configure_fallback_resolveconf = configure
+
     def __init__(self, autoRoot: bool = True, do_enc: bool = False):
         """!
         @brief DomainNameCachingService constructor.
@@ -216,11 +553,13 @@ class DomainNameCachingService(Service):
         @param do_enc  support encrypted DNS (DNS privacy)
         """
         super().__init__()
+        self.__configure_fallback_resolveconf = False
         self.__auto_root = autoRoot
         self.__do_enc = do_enc
         self.addDependency('Base', False, False)
         if autoRoot:
             self.addDependency('DomainNameService', False, False)
+
 
     def _createServer(self) -> DomainNameCachingServer:
         return DomainNameCachingServer(self.__do_enc)
@@ -231,31 +570,9 @@ class DomainNameCachingService(Service):
     def getConflicts(self) -> List[str]:
         return ['DomainNameService']
 
-    def __getIpAddr(self, node:Node) -> str:
-        ifaces = node.getInterfaces()
-        assert len(ifaces) > 0, 'Node {} has no IP address.'.format(node.getName())
-        for iface in ifaces:
-            net = iface.getNet()
-            if net.getType() == NetworkType.Local:
-                address = iface.getAddress()
-                return address
-
-        return ""
-
     def configure(self, emulator: Emulator):
         super().configure(emulator)
-
         targets = self.getTargets()
-        ipaddrs = []
-        for (server, node) in targets:
-            server.configure(emulator, node)
-
-            address = self.__getIpAddr(node)
-            assert address != "", 'address is not configured.'
-            ipaddrs.append(address)
-
-        self._init_etc_resolv_conf(ipaddrs, emulator)
-
         if self.__auto_root:
             dns_layer: DomainNameService = emulator.getRegistry().get('seedemu', 'layer', 'DomainNameService')
             root_zone = dns_layer.getRootZone()
@@ -263,10 +580,27 @@ class DomainNameCachingService(Service):
             for (server, node) in targets:
                 server.setRootServers(root_servers)
 
-    def _init_etc_resolv_conf(self, ipaddrs: List[str], emulator: Emulator):
+        addrs = []
+        for (server, node) in targets:
+            server.configure(emulator, node)
+
+            address = getNodeAddr(node)
+            assert address != "", 'address is not configured.'
+            addrs.append((address, server))
+
+        # NOTE this is no duplication with CachingServer::_configure_resolvconf_impl !
+        if self.__configure_fallback_resolveconf:
+            self._init_etc_resolv_conf(addrs, emulator)
+
+
+    def _init_etc_resolv_conf(self, addrs: List[Tuple[str,Server]], emulator: Emulator):
         """
-        @param ipaddrs IP addresses of nameservers
+        @param addrs IP/SCION addresses of nameservers.
+                    They will be added as nameserver in /etc/resolv.conf
+        @note call only after CachingServers have been configured
         """
+        #The implementation in CachingServer adds resolvers to only hosts which are inside of their catchment
+        # this method is a fallback for all nodes which aren't in any catchment (of at least one resolver)
 
         # For the nodes that are not covered, all the local DNS servers will be added to them (the default behavior).
         reg = emulator.getRegistry()
@@ -274,8 +608,9 @@ class DomainNameCachingService(Service):
             if type in ['hnode', 'rnode']:
                 if not any(command[0] == ': > /etc/resolv.conf' for command in node.getStartCommands()):
                     node.insertStartCommand(0,': > /etc/resolv.conf')
-                    for s in (ipaddrs):
-                        node.insertStartCommand(1, 'echo "nameserver {}" >> /etc/resolv.conf'.format(s))
+                    for a, s in (addrs):
+                        #if s.getIsNodeWithinCatchment(node):
+                            node.insertStartCommand(1, 'echo "nameserver {}" >> /etc/resolv.conf'.format(a))
 
     def print(self, indent: int) -> str:
         out = ' ' * indent

@@ -195,6 +195,7 @@ class Service(Layer):#TODO: add availableOptions()
         return self._pending_targets[vnode]
 
     def configure(self, emulator: Emulator):
+        super().configure(emulator)
         for (vnode, server) in self._pending_targets.items():
             pnode = emulator.getBindingFor(vnode)
             self._log('looking for binding for {}...'.format(vnode))
