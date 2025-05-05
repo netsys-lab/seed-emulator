@@ -11,7 +11,7 @@ DomainNameCachingServiceFileTemplates: Dict[str, str] = {}
 # configuration for sdns recursive resolver
 # to function as a drop-in SCION replacement for the system resolver on every host
 DomainNameCachingServiceFileTemplates['sdns_conf'] = '''\
-bind = "127.0.0.1:53"
+bind = "{bind_addr_port}"
 
 # Enable SCION
 scion = true
@@ -22,7 +22,6 @@ cacertificatefile = "{rhine_cert}"
 # Root zone SCION servers
 rootscionservers = [
 {scion_root_hints}
-#"17-ffaa:1:1008,127.0.0.1:53",
 ]
 
 loglevel = "debug"
@@ -281,19 +280,24 @@ class DomainNameCachingServer(Server, Configurable):
     __server_name: str
     __do_enc: bool
     __root_servers: List[str]
+    __wipe_docker_resolv_conf: bool
     __configure_resolvconf: bool
     __emulator: Emulator
     __pending_forward_zones: Dict[str, str]
     __asn_range: List[int]
     __is_range_all: bool
 
-    def __init__(self, do_enc: bool, server_name: str = None):
+    def __init__(self, do_enc: bool, server_name: str = None, wipe_docker_resolv_conf: bool = False):
         """!
         @brief DomainNameCachingServer constructor.
         @param do_enc enable DNS over encrypted transport
+        @param wipe_docker_resolv_conf  whether to wipe out the default docker container configuration
+                'nameserver 127.0.0.11' (system resolver)
         """
+        self.__configured = False
         super().__init__()
         self.__node = None
+        self.__wipe_docker_resolv_conf = wipe_docker_resolv_conf
         self.__server_name = server_name
         self.__do_enc = do_enc
         self.__root_servers = []
@@ -373,6 +377,10 @@ class DomainNameCachingServer(Server, Configurable):
         self.__is_range_all = True
 
     def getServerName(self) -> str:
+        """
+        the server name of the TLS certificate that this CachingServer
+        presents to its clients for DoE
+        """
         regInfo = self.__node.getRegistryInfo()
         host_id = regInfo[2].replace('_', '') # or use custom host name if present
         return self.__server_name if self.__server_name != None else f'sdns.{host_id}.{regInfo[0]}.'
@@ -390,6 +398,8 @@ class DomainNameCachingServer(Server, Configurable):
         return (cert_path, key_path)
 
     def configure(self, emulator: Emulator, node:Node):
+        assert not self.__configured, 'implementation error'
+        self.__configured = True
         self.__emulator = emulator
         self.__node = node
 
@@ -398,6 +408,27 @@ class DomainNameCachingServer(Server, Configurable):
         assert address != "", 'address is not configured.'
 
         if node.getOption('dns_setup').value == DNSStack.SCION:
+
+            # will wipe the existing default docker /etc/resolv.conf  'nameserver 127.0.0.11'
+            # this has no effect here, because Node is already configured by Base Layer
+            #node.setNameServers(['127.0.0.1'])
+
+            # instead: hook = emulator.getHook('ResolvConfByNode')
+            #           hook.addNameservers(node, ['127.0.0.1'] )
+            # also bad idea because Hook had to be added manually by user along with DomainNameCachingService
+
+
+            if not self.getIsPublicResolver():
+                error_msg =  'logic error: this node already had nameservers configured with setNameServers()'
+                assert not any(command[0] == ': > /etc/resolv.conf' for command in node.getStartCommands()), error_msg
+                assert len(node.getNameServers())==0, error_msg
+                s = '127.0.0.1'
+                node.setNameServers([s])
+
+                node.insertStartCommand(0,': > /etc/resolv.conf')
+                node.insertStartCommand(1, 'echo "nameserver {}" >> /etc/resolv.conf'.format(s))
+
+
             cert_path, key_path = self._getCryptoPaths()
             # request a certificate for the resolvers server-name from the CA
             self.__enable_https_func(node=node,
@@ -424,8 +455,11 @@ class DomainNameCachingServer(Server, Configurable):
         for ((scope, type, name), node) in reg.getAll().items():
             if type in ['hnode', 'rnode']:
                 if self.getIsNodeWithinCatchment(node):
+                    # ': > /etc/resolv.conf' wipes the contents of the file
                     if not any(command[0] == ': > /etc/resolv.conf' for command in node.getStartCommands()):
                         node.insertStartCommand(0,': > /etc/resolv.conf')
+                        # TODO branch on self.__wipe_docker_resolv_conf and discard
+                        # the existing contents only if desired, rather than >> appending to them
                     node.insertStartCommand(1, 'echo "nameserver {}" >> /etc/resolv.conf'.format(address))
 
 
@@ -435,9 +469,26 @@ class DomainNameCachingServer(Server, Configurable):
         """
         return self.__is_range_all or node.getAsn() in self.__asn_range
 
+    def getIsPublicResolver(self) -> bool:
+        """ a public resolver listens on at least one non-loopback address
+            that is reachable for other client hosts in its catchment.
+            @note only callable after node is configured
+        """
+        if not self.__is_range_all and len(self.__asn_range) == 0:
+            # quick out or empty-catchment
+            return False
+
+        # it migh still be possible that the resolvers catchmet AS contains no hosts ...
+        reg = self.__emulator.getRegistry()
+        for ((scope, type, name), node) in reg.getAll().items():
+            if type in ['hnode', 'rnode']:
+                if self.getIsNodeWithinCatchment(node):
+                    return True
+        return False
 
     def install(self, node: Node):
-
+        """ only called when the server is already configured
+        """
         opt = node.getOption('dns_setup')
         if opt == None:
             for o in DomainNameService.getAvailableOptions():
@@ -456,16 +507,25 @@ class DomainNameCachingServer(Server, Configurable):
         """
         cert_path, key_path = self._getCryptoPaths()
 
-        sc_root_hints = ',\n'.join( map( lambda x: f'"{x}"', self.getRootServers()))
+        root_ns = [ r.split('=')[1].strip('"') for r in self.getRootServers() if 'TXT' in r]
+        port = 853 # DoQ standart port
+        sc_root_hints = ',\n'.join( map( lambda x: f'"{x}:{port}"', root_ns))
         # use MiniCA root certificate which is installed in every host's trust store
         # as rhine certificate to verify RHINE records
-        rcert='/usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA.crt'
+        rcert = '/usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA.crt'
+
+        # on which address the resolver listens for requests
+        bind_addrport = '127.0.0.1:53' if not self.getIsPublicResolver() else f'{getNodeAddr(node)}:{port}'
         sdns_conf = DomainNameCachingServiceFileTemplates['sdns_conf'].format(rhine_cert=rcert,
+                                                                              bind_addr_port=bind_addrport,
                                                                               cert_path=cert_path,
                                                                               key_path=key_path,
                                                                               scion_root_hints=sc_root_hints)
 
         node.setFile('/etc/sdns/sdns.conf', sdns_conf)
+
+        #TODO start sdns process and disable system resolver
+        node.appendStartCommand('sdns --config /etc/sdsns/sdns.conf')
         pass
 
     def _do_install_bind9(self, node: Node):
@@ -516,10 +576,14 @@ class DomainNameCachingService(Service):
     """!
     @brief Caching DNS (i.e., Local DNS)
 
-    @todo DNSSEC
+    @todo DNSSEC, DoE
     """
 
     __auto_root: bool
+    __do_enc: bool
+    __wipe_docker_resolv_conf: bool
+    # TODO: maybe we should distinguish whether to wipe the client-host's /etc/resolv.conf
+    #       or the node's which have a CachingServer installed or both ..
 
     @classmethod
     def getAvailableOptions(cls):
@@ -531,11 +595,11 @@ class DomainNameCachingService(Service):
         if opt == None:
             for o in self.getAvailableOptions():
                 node.setOption(o)
-        server.install(node, self)
+        server.install(node)# pass self like with DomainNameServers ?!
 
     def setConfigureFallbackResolvconf(self, configure: bool):
         """
-        shall the /etc/resolve.conf files of all hosts that don't fall
+        shall the /etc/resolv.conf files of all hosts that don't fall
         into the catchment of any CachingResolver be configured to use
         all resolvers or not.
         The default is false, and these 'leftover' nodes
@@ -543,7 +607,9 @@ class DomainNameCachingService(Service):
         """
         self.__configure_fallback_resolveconf = configure
 
-    def __init__(self, autoRoot: bool = True, do_enc: bool = False):
+    def __init__(self, autoRoot: bool = True,
+                 do_enc: bool = False,
+                 wipe_docker_resolv_conf: bool = False):
         """!
         @brief DomainNameCachingService constructor.
 
@@ -551,10 +617,13 @@ class DomainNameCachingService(Service):
         True by default, if true, DomainNameCachingService will find root NS in
         DomainNameService and use them as root.
         @param do_enc  support encrypted DNS (DNS privacy)
+        @param wipe_docker_resolve_conf whether the default docker /etc/resolv.conf config
+                    shall be kept or overridden
         """
         super().__init__()
         self.__configure_fallback_resolveconf = False
         self.__auto_root = autoRoot
+        self.__wipe_docker_resolv_conf = wipe_docker_resolv_conf
         self.__do_enc = do_enc
         self.addDependency('Base', False, False)
         if autoRoot:
@@ -562,7 +631,8 @@ class DomainNameCachingService(Service):
 
 
     def _createServer(self) -> DomainNameCachingServer:
-        return DomainNameCachingServer(self.__do_enc)
+        return DomainNameCachingServer(self.__do_enc,
+                                       wipe_docker_resolv_conf=self.__wipe_docker_resolv_conf)
 
     def getName(self) -> str:
         return 'DomainNameCachingService'

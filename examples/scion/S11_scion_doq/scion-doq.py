@@ -62,7 +62,7 @@ def run(dumpfile = None):
                     repo_path = '/repos/panapi' ),
 
              GitRepo( repo_url = 'https://github.com/netsys-lab/scion-sdns',
-                    repo_branch = 'scion',
+                    repo_branch = 'main',
                     repo_path = '/repos/scion-sdns',
                     notes= 'the recursive resolver that must run on the host \
                             instead of the default systemd-resolved.service \

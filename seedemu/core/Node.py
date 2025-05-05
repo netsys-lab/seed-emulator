@@ -361,11 +361,11 @@ class Node(Printable, Registrable, Configurable, Vertex, Customizable):
             if issubclass(self.__class__, Router):
                     self.setBorderRouter(True)
 
-        if len(self.__name_servers) == 0:
+        if len(self.getNameServers()) == 0:
             return
 
         self.insertStartCommand(0,': > /etc/resolv.conf')
-        for idx, s in enumerate(self.__name_servers, start=1):
+        for idx, s in enumerate(self.getNameServers(), start=1):
             self.insertStartCommand(idx, 'echo "nameserver {}" >> /etc/resolv.conf'.format(s))
 
     def setNameServers(self, servers: List[str]) -> Node:

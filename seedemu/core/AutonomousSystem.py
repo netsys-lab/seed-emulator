@@ -148,13 +148,13 @@ class AutonomousSystem(Printable, Graphable, Configurable, Customizable):
         """
         for host in self.__hosts.values():
             if len(host.getNameServers()) == 0:
-                host.setNameServers(self.__name_servers)
+                host.setNameServers(self.getNameServers())
 
             host.configure(emulator)
 
         for name, router in self.__routers.items():
             if len(router.getNameServers()) == 0:
-                router.setNameServers(self.__name_servers)
+                router.setNameServers(self.getNameServers())
 
             router.configure(emulator)
             if router.isBorderRouter():

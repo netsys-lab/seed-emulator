@@ -13,7 +13,7 @@ class ResolvConfHook(Hook):
         """!
         @brief ResolvConfHook constructor.
 
-        
+
         """
         self.__servers = nameservers
 
@@ -29,6 +29,7 @@ class ResolvConfHook(Hook):
             if type != 'hnode': continue
             self._log('setting resolv.conf for as{}/{}'.format(scope, name))
             host: Node = object
+            # NOTE this discards all nameservers that were set via setNameservers() on the node directly
             host.appendStartCommand(': > /etc/resolv.conf')
             for s in self.__servers:
                 host.appendStartCommand('echo "nameserver {}" >> /etc/resolv.conf'.format(s))
