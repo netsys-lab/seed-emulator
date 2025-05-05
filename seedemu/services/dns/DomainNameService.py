@@ -584,9 +584,8 @@ class DomainNameServer(Server):
         self._do_generate_zonefiles(node, dns, zones_path)
         # TODO move corefile generation to after-configure() when server-name is known
         self._do_generate_corefile(node, dns, corefile_path, zones_path)
-
-
-        node.appendStartCommand(f'coredns -conf {corefile_path}', fork=True)
+        node.addSoftware('apache2-utils') # for rotatelogs
+        node.appendStartCommand(f'coredns -conf {corefile_path} 2>&1 | rotatelogs -n 2 /var/log/coredns.log 1M', fork=True)
 
     def _do_install_bind9(self, node: Node, dns: DomainNameService):
             """!@brief installs the default bind9 DNS stack onto the given node

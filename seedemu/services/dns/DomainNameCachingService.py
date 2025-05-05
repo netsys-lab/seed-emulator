@@ -566,7 +566,9 @@ class DomainNameCachingServer(Server, Configurable):
         node.setFile('/etc/sdns/sdns.conf', sdns_conf)
 
         # start sdns process
-        node.appendStartCommand('sdns --config /etc/sdsns/sdns.conf', fork=True)
+        node.addSoftware('apache2-utils') # for rotatelogs
+        # sdns needs scion paths for root server update on startup
+        node.appendStartCommand('sleep 20; sdns --config /etc/sdns/sdns.conf 2>&1 | rotatelogs -n 2 /var/log/sdns.log 1M', fork=True)
 
 
     def _do_install_bind9(self, node: Node):
