@@ -8,10 +8,46 @@ from seedemu.core.enums import NetworkType
 
 DomainNameCachingServiceFileTemplates: Dict[str, str] = {}
 
+
+DomainNameCachingServiceFileTemplates['sdns_conf_new'] = '''\
+bind = "{bind_addr_port}"
+{bindsdoq}
+
+# Enable SCION
+scion = true
+lookupscionaddresseager = true
+donottalktootherthanscion = true
+
+# RHINE certificate to validate RRs with
+cacertificatefile = "{rhine_cert}"
+
+# Root zone SCION servers
+namedRootSCIONServers = [
+{scion_root_hints}
+]
+
+loglevel = "debug"
+
+# Which clients allowed to make queries
+accesslist = [
+"0.0.0.0/0",
+"::0/0"
+]
+# TLS certificate file
+tlscertificate = "{cert_path}"
+
+# TLS private key file
+tlsprivatekey = "{key_path}"
+'''
+
+
+
 # configuration for sdns recursive resolver
 # to function as a drop-in SCION replacement for the system resolver on every host
+# and optionally as a public resolver
 DomainNameCachingServiceFileTemplates['sdns_conf'] = '''\
 bind = "{bind_addr_port}"
+{bindsdoq}
 
 # Enable SCION
 scion = true
@@ -409,22 +445,13 @@ class DomainNameCachingServer(Server, Configurable):
 
         if node.getOption('dns_setup').value == DNSStack.SCION:
 
-            # will wipe the existing default docker /etc/resolv.conf  'nameserver 127.0.0.11'
-            # this has no effect here, because Node is already configured by Base Layer
-            #node.setNameServers(['127.0.0.1'])
-
-            # instead: hook = emulator.getHook('ResolvConfByNode')
-            #           hook.addNameservers(node, ['127.0.0.1'] )
-            # also bad idea because Hook had to be added manually by user along with DomainNameCachingService
-
-
             if not self.getIsPublicResolver():
                 error_msg =  'logic error: this node already had nameservers configured with setNameServers()'
                 assert not any(command[0] == ': > /etc/resolv.conf' for command in node.getStartCommands()), error_msg
                 assert len(node.getNameServers())==0, error_msg
-                s = '127.0.0.1'
+                s = '127.0.0.127' # FIXME this ought to be a property of 'self'
                 node.setNameServers([s])
-
+                # wipe default docker generated contents of resolv.conf
                 node.insertStartCommand(0,': > /etc/resolv.conf')
                 node.insertStartCommand(1, 'echo "nameserver {}" >> /etc/resolv.conf'.format(s))
 
@@ -506,27 +533,41 @@ class DomainNameCachingServer(Server, Configurable):
         install the sdns recursive resolver on the node
         """
         cert_path, key_path = self._getCryptoPaths()
-
-        root_ns = [ r.split('=')[1].strip('"') for r in self.getRootServers() if 'TXT' in r]
         port = 853 # DoQ standart port
-        sc_root_hints = ',\n'.join( map( lambda x: f'"{x}:{port}"', root_ns))
+
         # use MiniCA root certificate which is installed in every host's trust store
         # as rhine certificate to verify RHINE records
         rcert = '/usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA.crt'
 
         # on which address the resolver listens for requests
-        bind_addrport = '127.0.0.1:53' if not self.getIsPublicResolver() else f'{getNodeAddr(node)}:{port}'
+        bind_addrport = '127.0.0.127:53' # from local-host
+        bind_scion_doq = '' if not self.getIsPublicResolver() else f'bindsdoq="{getNodeAddr(node)}:{port}"' # from clients
+
+        '''
+        root_ns = [ r.split('=')[1].strip('"') for r in self.getRootServers() if 'TXT' in r]
+        sc_root_hints = ',\n'.join( map( lambda x: f'"{x}:{port}"', root_ns))
         sdns_conf = DomainNameCachingServiceFileTemplates['sdns_conf'].format(rhine_cert=rcert,
+                                                                              bindsdoq=bind_scion_doq,
                                                                               bind_addr_port=bind_addrport,
                                                                               cert_path=cert_path,
                                                                               key_path=key_path,
                                                                               scion_root_hints=sc_root_hints)
+        '''
+        root_ns = [ (r.split('TXT')[0].strip() ,r.split('=')[1].strip('"')) for r in self.getRootServers() if 'TXT' in r]
+        named_sc_root_hints = ',\n'.join( map( lambda x: f'["{x[1]}:{port}", "{x[0]}"]', root_ns))
+        sdns_conf = DomainNameCachingServiceFileTemplates['sdns_conf_new'].format(rhine_cert=rcert,
+                                                                              bindsdoq=bind_scion_doq,
+                                                                              bind_addr_port=bind_addrport,
+                                                                              cert_path=cert_path,
+                                                                              key_path=key_path,
+                                                                              scion_root_hints=named_sc_root_hints)
+
 
         node.setFile('/etc/sdns/sdns.conf', sdns_conf)
 
-        #TODO start sdns process and disable system resolver
-        node.appendStartCommand('sdns --config /etc/sdsns/sdns.conf')
-        pass
+        # start sdns process
+        node.appendStartCommand('sdns --config /etc/sdsns/sdns.conf', fork=True)
+
 
     def _do_install_bind9(self, node: Node):
         node.addSoftware('bind9')

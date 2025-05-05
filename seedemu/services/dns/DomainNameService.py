@@ -586,7 +586,7 @@ class DomainNameServer(Server):
         self._do_generate_corefile(node, dns, corefile_path, zones_path)
 
 
-        node.appendStartCommand(f'coredns -conf {corefile_path}')
+        node.appendStartCommand(f'coredns -conf {corefile_path}', fork=True)
 
     def _do_install_bind9(self, node: Node, dns: DomainNameService):
             """!@brief installs the default bind9 DNS stack onto the given node
