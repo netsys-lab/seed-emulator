@@ -354,6 +354,17 @@ class GolangDevService(ContainerDevelopmentService):
         super()._teardown()
         subprocess.run('docker volume rm usrlocalgo protobuf gopath goenv gocache')
 
+    def _setNodeENV(self, node: Node):
+        """
+        configures golang installation related environment variables on the host
+        """
+        # add $GOPATH/bin  to PATH  in order for 'go install' to work
+        node.addDockerCommand('ENV PATH=$PATH:/usr/local/go/bin:/go/bin:/root/.local/protoc-29.3-linux-x86_64/bin')
+
+        node.addDockerCommand('ENV GOPATH=/go')
+        node.addDockerCommand('ENV GOROOT=/usr/local/go')
+        node.addDockerCommand('ENV GOENV=/root/.config/go/env')
+
     def configure(self, emulator: Emulator):
         super().configure(emulator)
         targets = list(self.getPendingTargets().keys())
@@ -380,9 +391,7 @@ class GolangDevService(ContainerDevelopmentService):
         pnode.addDockerCommand('RUN mkdir /root/.local && wget https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-linux-x86_64.zip && unzip protoc-29.3-linux-x86_64.zip -d /root/.local ')
 
         pnode.addDockerCommand(f'RUN wget -O- "{go_url}" --connect-timeout 1.5 | tar  -xz -C /usr/local ')
-        pnode.addDockerCommand('ENV PATH=$PATH:/usr/local/go/bin:/go/bin:/root/.local/protoc-29.3-linux-x86_64/bin')
-
-        pnode.addDockerCommand('RUN go env -w GOPATH=/go')
+        self._setNodeENV(pnode)
         # language server for IDE
         pnode.addDockerCommand('RUN go install golang.org/x/tools/gopls@latest' )
         # protobuf compiler
@@ -398,7 +407,7 @@ class GolangDevService(ContainerDevelopmentService):
             # required for 'go install' to verify TLS certs
             node.addSoftware("ca-certificates ") #protobuf-compiler
 
-            node.addDockerCommand('ENV PATH=$PATH:/usr/local/go/bin:/go/bin:/root/.local/protoc-29.3-linux-x86_64/bin')
+            self._setNodeENV(node)
             # contains the protobuf installation
             node.addPersistentStorage('/root/.local', 'protobuf', volume={'nocopy':True})
             # contains GOROOT (actual installation)
