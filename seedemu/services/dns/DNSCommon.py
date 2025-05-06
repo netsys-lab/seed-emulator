@@ -2,6 +2,9 @@ from seedemu.core import Node, Option
 from enum import Enum
 from dataclasses import dataclass
 from random import randint
+import os
+from typing import List
+from seedemu.utilities.BuildtimeDocker import BuildtimeDockerFile, BuildtimeDockerImage
 
 _default_name = '@'
 
@@ -88,6 +91,86 @@ class TXT_RR(ResourceRecord):
 #ORIGIN
 
 
+class DNSStackHelperBase:
+    """"""
+    def install(self, node: Node, context: str):
+        pass
+
+class DNSStackHelper(DNSStackHelperBase):
+    """installs CoreDNS nameserver and sdns resolver onto nodes.
+        As well as the exdns 'dig' like CLI query tool.
+    """
+
+    __seen_nodes: List[Node] = []
+    # target-name, url, branch, checkout-dir, do-build
+    __dns_urls = [('dns', 'https://github.com/netsys-lab/dns', 'master-rebase', '/repos/dns', False),
+                  ('coredns', 'https://github.com/netsys-lab/scion-coredns-doq', 'attempt-rebase', '/repos/coredns', True),
+                  ('sdns', 'https://github.com/netsys-lab/scion-sdns', 'new-main', '/repos/sdns', True),
+                  ('exdns', 'https://github.com/netsys-lab/exdns', 'master-rebased', '/repos/exdns', True)
+                ]
+
+    def getGoBuildImage(self):
+        return 'golang:1.24-alpine'
+
+    def __init__(self):
+        # create buildtime docker container
+
+        #out = 'coredns' # one of 'dns' 'coredns' 'sdns' 'exdns'
+        #build_path = f".dns_build_output/{out}"
+        DNSStackHelper.build_path = ".dns_build_output"
+
+        if not os.path.isdir(DNSStackHelper.build_path):
+
+            DNS_BUILD_TEMPLATE = f"""FROM {self.getGoBuildImage()}
+            RUN apk add --no-cache git
+            """
+
+            for target in DNSStackHelper.__dns_urls:
+                DNS_BUILD_TEMPLATE += f'RUN git clone --branch {target[2]} {target[1]} {target[3]}\n'
+                if target[4]:
+                    if target[0] == 'exdns':
+                        DNS_BUILD_TEMPLATE += f'RUN cd {target[3]}/q && go mod tidy && go build -o ../bin/{target[0]} .\n'
+                    else:
+                        DNS_BUILD_TEMPLATE += f'RUN cd {target[3]} && go mod tidy && go build -o bin/{target[0]} .\n'
+
+
+            DNSStackHelper.dockerfile = BuildtimeDockerFile(DNS_BUILD_TEMPLATE)
+            DNSStackHelper.container = BuildtimeDockerImage(f"dns-build-container").build(DNSStackHelper.dockerfile).container()
+
+
+        #else:
+        #    output_dir = os.path.join(os.getcwd(), build_path)
+        #    return output_dir
+
+            # TODO: copy binaries from BuildtimeDockerContainer mount to node's container image
+            current_dir = os.getcwd()
+            output_dir = os.path.join(current_dir, DNSStackHelper.build_path)
+            # copy from build container to docker host
+            copy_command = []
+            for target in DNSStackHelper.__dns_urls:
+                if target[4]:
+                    copy_command.append(f"cp -r {target[3]}/bin/* /build")
+
+            full_cp_cmd = f"-c \"{' && '.join(copy_command)}\""
+            DNSStackHelper.container.entrypoint("sh").mountVolume(output_dir, "/build").run(
+               full_cp_cmd
+            )
+            #return output_dir
+
+            DNSStackHelper.out_dir = output_dir
+
+    def install(self, node: Node, context: str):
+        """
+        @param context what should be installed on 'node'
+                i.e. 'coredns' (nameserver) or 'sdns' (resolver)
+        """
+        if node not in DNSStackHelper.__seen_nodes:
+            DNSStackHelper.__seen_nodes.append(node)
+            path_to_binaries = "/bin/dns"
+            node.addSharedFolder(path_to_binaries, DNSStackHelper.out_dir)
+            node.addDockerCommand(f'ENV PATH={path_to_binaries}:$PATH ')
+
+
 class DNSStack(Enum):
     """
     user choice whether the naming system in the emulation
@@ -96,7 +179,17 @@ class DNSStack(Enum):
     # legacy IP only
     DEFAULT = 0 # implemented with bind9
     # Next-Generation Internet
-    SCION = 1 # experimental implementation with custom coredns fork
+    SCION = 1 # CoreDNS nameserver + sdns resolver installation
+    # only configuration is generated,
+    #  and user must provide binaries via DevService herself
+    SCION_DEV = 2
+
+    def getHelper(self) -> DNSStackHelperBase:
+
+        if self == DNSStack.SCION:
+            return DNSStackHelper()
+        else:
+            return DNSStackHelperBase()
 
 class DNS_Setup(Option):
     """

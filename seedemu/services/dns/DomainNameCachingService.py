@@ -370,7 +370,7 @@ class DomainNameCachingServer(Server, Configurable):
     def _getCryptoPaths(self) -> Tuple[str, str]:
         """ return where to find the certificate and private key
         """
-        if self.__node.getOption('dns_setup').value == DNSStack.SCION:
+        if self.__node.getOption('dns_setup').value in [ DNSStack.SCION, DNSStack.SCION_DEV]:
             cert_path = f'/etc/sdns/ca/{self.getServerName()}-cert.pem'
             key_path = f'/etc/sdns/ca/{self.getServerName()}-key.pem'
         else:
@@ -389,7 +389,7 @@ class DomainNameCachingServer(Server, Configurable):
 
         assert address != "", 'address is not configured.'
 
-        if node.getOption('dns_setup').value == DNSStack.SCION:
+        if node.getOption('dns_setup').value in [DNSStack.SCION, DNSStack.SCION_DEV]:
 
             if not self.getIsPublicResolver():
                 error_msg =  'logic error: this node already had nameservers configured with setNameServers()'
@@ -470,9 +470,9 @@ class DomainNameCachingServer(Server, Configurable):
             if self.__do_enc:
                 raise NotImplementedError
             self._do_install_bind9(node)
-        elif val == DNSStack.SCION:
+        elif val in [DNSStack.SCION, DNSStack.SCION_DEV]:
             assert self.__do_enc, 'No support for unencrypted DNS (Do53) in the Future Next Generation Internet anymore !'
-            self._do_install_sdns(node)
+            self._do_install_sdns(node, val.getHelper())
 
     def bindDo53AddrPort(self) -> str:
         """where to listen on localhost
@@ -483,10 +483,13 @@ class DomainNameCachingServer(Server, Configurable):
         """where to listen for public resolver"""
         return f'{self.getNodeAddr(node)}:{self.__doq_port}'
 
-    def _do_install_sdns(self, node: Node):
+    def _do_install_sdns(self, node: Node, helper: DNSStackHelperBase):
         """
         install the sdns recursive resolver on the node
         """
+
+        helper.install(node, 'sdns')
+
         cert_path, key_path = self._getCryptoPaths()
 
 

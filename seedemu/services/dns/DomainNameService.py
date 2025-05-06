@@ -6,7 +6,7 @@ from re import sub
 import inspect
 import requests
 from seedemu.core import CAServerBase
-from .DNSCommon import  ResourceRecord, _getRRforNode, _getNsAddrRecord, _getSoaRR , NS_RR, DNSStack, A_RR, TXT_RR, rrname2Type
+from .DNSCommon import  ResourceRecord, _getRRforNode, _getNsAddrRecord, _getSoaRR , NS_RR, DNSStack, A_RR, TXT_RR, rrname2Type, DNSStackHelperBase
 
 
 DomainNameServiceFileTemplates: Dict[str, str] = {}
@@ -49,11 +49,6 @@ log
 errors
 }}
 '''
-# for root-ns:
-# schema: squic
-# file zones/db. .
-# tls_cert ca/scion-root-servers-net-cert.pem
-# tls_key ca/scion-root-servers-net-key.pem
 
 
 class Zone(Printable):
@@ -528,9 +523,9 @@ class DomainNameServer(Server):
                 raise NotImplementedError
 
             self._do_install_bind9(node, dns)
-        elif val == DNSStack.SCION:
+        elif val in [DNSStack.SCION, DNSStack.SCION_DEV]:
             assert self.__do_enc, 'No support for unencrypted DNS in the Future Next Generation Internet anymore !'
-            self._do_install_coredns(node,dns)
+            self._do_install_coredns(node, dns, val.getHelper())
 
     def _do_generate_zonefiles(self, node: Node, dns: DomainNameService, zones_path: str):
         """ generate a zonefile for each of the zones under /etc/coredns/zones
@@ -572,12 +567,13 @@ class DomainNameServer(Server):
             )
             node.appendFile(corefile_path, server_block)
 
-    def _do_install_coredns(self, node: Node, dns: DomainNameService):
+    def _do_install_coredns(self, node: Node, dns: DomainNameService, helper: DNSStackHelperBase):
         """!@ installs and configures coredns server on the given node
         @note see https://coredns.io/manual/configuration/
         """
 
-        #TODO install coredns binaries onto node
+        # install coredns binaries onto node
+        helper.install(node, 'coredns')
 
         corefile_path = f'/etc/coredns/Corefile'
         zones_path = '/etc/coredns/zones'

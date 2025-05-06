@@ -61,6 +61,52 @@ def run(dumpfile = None):
                     repo_branch = 'main',
                     repo_path = '/repos/panapi' ),
 
+             GitRepo( repo_url = 'https://github.com/netsys-lab/scion-sdns',
+                    repo_branch = 'main', # new-main
+                    repo_path = '/repos/scion-sdns',
+                    notes= 'the recursive resolver that must run on the host \
+                            instead of the default systemd-resolved.service \
+                            it is forked from: https://github.com/semihalev/sdns \
+                            note: it depends on github.com/miekg/dns v1.1.63  \
+                               github.com/quic-go/quic-go v0.49.0  \
+                            ' ),
+
+
+            GitRepo( repo_url = 'https://github.com/netsys-lab/scion-coredns-doq',
+                    repo_branch = 'main', # attempt-rebase
+                    repo_path = '/repos/scion-coredns-doq',
+                    notes = 'SCION DoQ capable coredns nameserver fork based on caddy  \
+                            Also includes RHINE through a modified file plugin \
+                        '
+
+                    # upstream coredns: https://github.com/coredns/coredns
+                    #       depends on github.com/miekg/dns v1.1.65 (latest version as of 03.05.2025)
+                    #               	github.com/quic-go/quic-go v0.50.1
+                      ),
+
+            # DEPRECATED: obsolete ! our miekg/dns fork uses the latest upstream scion-apps
+            #GitRepo( repo_url = 'https://github.com/netsys-lab/scion-apps',
+            #        repo_branch = 'master',
+            #        repo_path = '/repos/netsys-scion-apps',
+            #        notes =' ' ),
+
+            GitRepo( repo_url = 'https://github.com/netsys-lab/exdns',
+                     repo_branch = 'master', # master-rebased
+                     repo_path = '/repos/exdns',
+                     notes='dig like CLI program for issuing test DNS requests to the resolver or NS \
+                          forked from https://github.com/miekg/exdns \
+                            only dependency is miekg/dns 1.56 \
+                            This is our favorite because it has the least dependencies \
+                            Our fork is capable of SCION DoQ AND RHINE verification '
+                              ),
+
+
+            GitRepo( repo_url = 'https://github.com/netsys-lab/dns',
+                    repo_branch = 'master', # master-rebase
+                    repo_path = '/repos/dns',
+                    notes='fork of miekg/dns with SCION support'
+                    ),
+
 
             GitRepo(repo_url = 'https://github.com/scionproto-contrib/http-proxy.git',
                     repo_branch = 'main',
@@ -74,6 +120,24 @@ def run(dumpfile = None):
                     notes='caddy server plugins' )
 
             ]
+
+    '''
+
+        Is there any reason for 'resolveapi' package being a part of miekg/dns fork ?
+        Can't we make it a module on its own (not i.e. part of scion-apps pan!!) and get
+        one step close to not-needing a separate miekg/dns fork anymore ... !?
+        - the dns module already contains 'clientconfig.go' to parse the contents of /etc/resolv.conf
+
+
+        the miekg/dns fork imports scion-apps to implement SCION DoQ support for the dns-client/server
+
+    '''
+
+
+    '''NOTES:
+    scion-coredns-doq imports miekg/dns fork resolveapi package for secondary file plugin
+    to resolve the SNI name of the master DNS server from which to transfer a zone from
+    '''
 
     def install_dev_svc(emu: Emulator, node: Node, devsvc, repos: List[GitRepo] ):
 
@@ -91,11 +155,14 @@ def run(dumpfile = None):
     brs = defaultdict()
     cses = defaultdict()
 
-    dns_svc = DomainNameService(dns_setup=OptionRegistry().dns_setup(DNSStack.SCION))
+    # do not install CoreDNS, sdns etc. binaries since we provide them via the DevService
+    # The DNS layers will only generate the config files and set up the certificates
+    dns_svc = DomainNameService(dns_setup=OptionRegistry().dns_setup(DNSStack.SCION_DEV))
     minica = MiniCAService()
 
     sdns = DomainNameCachingService(do_enc=True)
 
+    # TODO code duplication - reuse code from 'scion-doq.py'
     def create_as(isd, asn, is_core=False, issuer=None):
         as_ = base.createAutonomousSystem(asn)
         scion_isd.addIsdAs(isd, asn, is_core)
@@ -154,6 +221,29 @@ def run(dumpfile = None):
     emu = Emulator()
     base = ScionBase()
 
+    '''
+    scionproto      1.22.7 latest 1.24.2
+    scion-apps      1.22.7 - 10
+    coredns         1.23.0 - 1.24.1
+    sdns            1.22  -  1.22.5
+
+    scion-coredns   1.20
+    scion-sdns      1.20
+
+    caddy-scion     1.22.7 - 1.22.10
+    '''
+
+
+    '''
+    for multiple go versions:
+            go install golang.org/dl/go1.18@latest
+            $ go1.18 download
+
+            optional:
+                export GOROOT=$(go1.18 env GOROOT)
+                $ export PATH=${GOROOT}/bin;${PATH}
+    '''
+
     spec = SetupSpecification.LOCAL_BUILD(
             CheckoutSpecification(
                 mode = "build",
@@ -166,6 +256,7 @@ def run(dumpfile = None):
     scion = Scion()
     etc_hosts = EtcHosts()
 
+    # TODO code duplication - reuse code from 'scion-doq.py'
     def create_topo():
             # SCION ISDs
         base.createIsolationDomain(1)
