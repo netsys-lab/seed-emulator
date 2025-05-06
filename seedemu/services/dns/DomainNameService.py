@@ -726,9 +726,6 @@ class DomainNameService(Service):
         server.configure(node, self)
 
     def configure(self, emulator: Emulator):
-        # TODO: install the TLS root certificates on all hosts
-        #       in order for them to verify the certs of the DNS nameservers
-        #  see CAService for this, the WebService also uses it for HTTPS
 
         self.__resolvePendingRecords(emulator, self.__rootZone)
         return super().configure(emulator)

@@ -80,11 +80,6 @@ DomainNameCachingServiceFileTemplates['sdns_conf_full'] = '''\
 bind = "127.0.0.1:5553"
 #bind = "10.0.2.15:5553"
 
-# Enable SCION
-scion = true
-
-# RHINE certificate to validate RRs with
-cacertificatefile = "../netsys-lab_scion-rains/testdata/scionlab/CACert.pem"
 
 # Root zone SCION servers
 rootscionservers = [
@@ -108,19 +103,11 @@ accesslist = [
 # Config version, config and build versions can be different.
 version = "1.2.0"
 
-
-
 # Address to bind to for the DNS-over-TLS server
 #bindtls = ":8853"
 
 # Address to bind to for the DNS-over-HTTPS server
 # binddoh = ":8053"
-
-# TLS certificate file
-tlscertificate = "ca/localhost/localhost-cert.pem"
-
-# TLS private key file
-tlsprivatekey = "ca/localhost/localhost-key.pem"
 
 # Outbound ipv4 addresses, if you set multiple, sdns can use random outbound ipv4 address by request based
 #outboundips = [
@@ -196,27 +183,9 @@ api = "127.0.0.1:8081"
 # The location of access log file, left blank for disabled. SDNS uses Common Log Format by default.
 # accesslog = ""
 
-# List of remote blocklists address list. All lists will be download to blocklist folder.
-# blocklists = [
-# "http://mirror1.malwaredomains.com/files/justdomains",
-# "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
-# "http://sysctl.org/cameleon/hosts",
-# "https://zeustracker.abuse.ch/blocklist.php?download=domainblocklist",
-# "https://s3.amazonaws.com/lists.disconnect.me/simple_tracking.txt",
-# "https://s3.amazonaws.com/lists.disconnect.me/simple_ad.txt",
-# "https://raw.githubusercontent.com/quidsup/notrack/master/trackers.txt"
-# ]
-#blocklists = [
-#]
-
 # List of locations to recursively read blocklists from (warning, every file found is assumed to be a hosts-file or domain list)
 #blocklistdir = "bl"
 
-# IPv4 address to forward blocked queries to
-nullroute = "0.0.0.0"
-
-# IPv6 address to forward blocked queries to
-nullroutev6 = "::0"
 
 # Enables serving zone data from a hosts file, left blank for disabled
 # the form of the entries in the /etc/hosts file are based on IETF RFC 952 which was updated by IETF RFC 1123.
@@ -240,39 +209,15 @@ ratelimit = 0
 # Client ip address based ratelimit per minute, 0 for disabled
 clientratelimit = 0
 
-# Manual blocklist entries
-blocklist = []
-
-# Manual whitelist entries
-whitelist = []
-
 # DNS server identifier (RFC 5001), it's useful while operating multiple sdns. left blank for disabled
 nsid = ""
 
-# Enable to answer version.server, version.bind, hostname.bind, id.server chaos queries.
-chaos = true
 
 # Qname minimization level. If higher, it can be more complex and impact the response performance.
 # If set 0, qname minimization will be disable
 qname_min_level = 5
-
-# Empty zones return answer for RFC 1918 zones. Please see http://as112.net/
-# for details of the problems you are causing and the counter measures that have had to be deployed.
-# If the list empty, SDNS will be use default zones described at RFC.
-# emptyzones [
-#	"10.in-addr.arpa."
-# ]
-emptyzones = []
-
-# You can add your own plugins to sdns. The plugin order is very important.
-# Plugins can be load before cache middleware.
-# Config keys should be string and values can be anything.
-# There is an example plugin at https://github.com/semihalev/sdnsexampleplugin
-# [plugins]
-#     [plugins.example]
-#     path = "exampleplugin.so"
-#     config = {key_1 = "value_1", key_2 = 2, key_3 = true}
 '''
+
 
 DomainNameCachingServiceFileTemplates['named_options'] = '''\
 options {
@@ -342,6 +287,7 @@ class DomainNameCachingServer(Server, Configurable):
         self.__pending_forward_zones = {}
         self.__asn_range = []
         self.__is_range_all = False
+        self.__doq_port = 853 # DoQ standart port
 
     def setCAServer(self, server: CAServerBase):
         assert self.__do_enc, 'logic error'
@@ -528,20 +474,29 @@ class DomainNameCachingServer(Server, Configurable):
             assert self.__do_enc, 'No support for unencrypted DNS (Do53) in the Future Next Generation Internet anymore !'
             self._do_install_sdns(node)
 
+    def bindDo53AddrPort(self) -> str:
+        """where to listen on localhost
+        """
+        return '127.0.0.127:53'
+
+    def bindDoQAddrPort(self, node: Node) -> str:
+        """where to listen for public resolver"""
+        return f'{self.getNodeAddr(node)}:{self.__doq_port}'
+
     def _do_install_sdns(self, node: Node):
         """
         install the sdns recursive resolver on the node
         """
         cert_path, key_path = self._getCryptoPaths()
-        port = 853 # DoQ standart port
+
 
         # use MiniCA root certificate which is installed in every host's trust store
         # as rhine certificate to verify RHINE records
         rcert = '/usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA.crt'
 
         # on which address the resolver listens for requests
-        bind_addrport = '127.0.0.127:53' # from local-host
-        bind_scion_doq = '' if not self.getIsPublicResolver() else f'bindsdoq="{getNodeAddr(node)}:{port}"' # from clients
+        bind_addrport = self.bindDo53AddrPort() # from local-host
+        bind_scion_doq = '' if not self.getIsPublicResolver() else f'bindsdoq="{self.bindDoQAddrPort(node)}"' # from clients
 
         '''
         root_ns = [ r.split('=')[1].strip('"') for r in self.getRootServers() if 'TXT' in r]
@@ -554,7 +509,7 @@ class DomainNameCachingServer(Server, Configurable):
                                                                               scion_root_hints=sc_root_hints)
         '''
         root_ns = [ (r.split('TXT')[0].strip() ,r.split('=')[1].strip('"')) for r in self.getRootServers() if 'TXT' in r]
-        named_sc_root_hints = ',\n'.join( map( lambda x: f'["{x[1]}:{port}", "{x[0]}"]', root_ns))
+        named_sc_root_hints = ',\n'.join( map( lambda x: f'["{x[1]}:{self.__doq_port}", "{x[0]}"]', root_ns))
         sdns_conf = DomainNameCachingServiceFileTemplates['sdns_conf_new'].format(rhine_cert=rcert,
                                                                               bindsdoq=bind_scion_doq,
                                                                               bind_addr_port=bind_addrport,
