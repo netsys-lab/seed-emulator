@@ -205,7 +205,7 @@ def _getRRforNode(domain_name: str, addr: str, node: Node=None) -> ResourceRecor
     """
     if node != None:
         if 'scion_address' in  node.getLabel():
-            return TXT_RR(name=domain_name, text=f'scion={node.getLabel()['scion_address']}')
+            return TXT_RR(name=domain_name, text=f"scion={node.getLabel()['scion_address']}")
         else:
             return A_RR(name=domain_name, address=addr)
     else:
