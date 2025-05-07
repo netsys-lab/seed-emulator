@@ -479,13 +479,20 @@ class ScionRouting(Routing):
                 as_: ScionAutonomousSystem = base_layer.getAutonomousSystem(asn)
                 isds = isd_layer.getAsIsds(asn)
                 assert len(isds) == 1, f"AS {hex(asn)} must be a member of exactly one ISD"
-
+                isd = isds[0][0]
                 # Install AS topology file
-                as_topology = as_.getTopology(isds[0][0])
+                as_topology = as_.getTopology(isd)
                 topo = json.dumps(as_topology, indent=2)
 
                 handleScionConfFile(node, 'topology.json', topo)
                 self._provision_base_config(node)
+
+                # generate /etc/scion/environment.json
+                # FIXME: use IA __repr__ for the dict keys here
+                env_json = {'ases': {
+                    f'{isd}-{asn}': {'daemon_address': '127.0.0.1:30255'}
+                }}
+                handleScionConfFile(node, 'environment.json', json.dumps(env_json, indent=2))
 
             if type == "brdnode":
                 self._provision_router_config(obj)
