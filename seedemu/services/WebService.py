@@ -1,7 +1,9 @@
 from __future__ import annotations
 from seedemu.core import Node, Service, Server, CAServerBase
 from typing import Dict, List
+import os
 from enum import Enum
+from seedemu.utilities.BuildtimeDocker import BuildtimeDockerFile, BuildtimeDockerImage
 
 WebServerFileTemplates: Dict[str, str] = {}
 
@@ -21,223 +23,365 @@ server {{
 }}
 '''
 
+WebServerFileTemplates['caddyfile_server_block'] = {
+    'listen': [] , # list of ports
+    'routes': [] # list of route-objects
+    # 'tls_connection_policies'
+}
+
+# a route block for 'caddyfile_server_block'
+WebServerFileTemplates['caddy_route'] = {
+    'match': [],
+    'handle': []
+}
+
+WebServerFileTemplates['caddyfile_template'] = {'apps': {
+    'http':{
+        'servers': {
+            # list of 'server' objects -> keys are arbitrary i.e. 'www_example_com'
+        }
+    }
+}
+}
+
+# 'tls' app block that can be added to 'caddyfile_template'
+# when using minica
+WebServerFileTemplates['caddy_tls'] = {
+    'certificates': {
+        'load_files': {
+            'certificate': '/path/to/certificates/certs',
+            'key': '/path/to/certificates/keys'
+        }
+    }
+}
+
+# 'tls' app block that can be added to 'caddyfile_template'
+# when using smallstep ca for automatic cert renewal
+WebServerFileTemplates['caddy_tls_automation'] = {
+ "automation": {
+                "policies": [
+                    {
+                        "subjects": ["www.example.com"],
+                        "issuers": [
+                            {
+                                "module": "acme",
+                                "email": "your-email@example.com"
+                            }
+                        ],
+                        "key_type": "rsa2048",
+                        "storage": {
+                            "module": "file_system",
+                            "keys": "/path/to/certificates/keys",
+                            "certificates": "/path/to/certificates/certs"
+                        }
+                    }
+                ]
+            }
+}
+
+# FIXME: for all this we could just use a dict and them json.dump it ..
+WebServerFileTemplates['caddy_file_server'] = '''\
+{{
+    "apps": {{
+        "scion": {{}},
+        "http": {{
+            "servers": {{
+                "{server_block_name}": {{
+                    "listen": [{ports}],
+                    "routes": [
+                        {{
+                            "match": [
+                                {{
+                                    "host": [{domain_names}]
+                                }}
+                            ],
+                            "handle": [
+                                {{
+                                    "handler": "file_server",
+                                    "root": "{path_to_index}",
+                                    "index_names": ["index.html"]
+                                }}
+                            ]
+                        }}
+                    ]
+                }}
+            }}
+        }}
+    }}
+}}
+'''
+
+
+
+# FIXME: for all this we could just use a dict and them json.dump it ..
+WebServerFileTemplates['caddy_file_server_https'] = '''\
+{{
+    "apps": {{
+        "scion": {{}},
+        "http": {{
+            "servers": {{
+                "{server_block_name}": {{
+                    "listen": [{ports}],
+                    "routes": [
+                        {{
+                            "match": [
+                                {{
+                                    "host": [{domain_names}]
+                                }}
+                            ],
+                            "handle": [
+                                {{
+                                    "handler": "file_server",
+                                    "root": "{path_to_index}",
+                                    "index_names": ["index.html"]
+                                }}
+                            ]
+                        }}
+                    ],
+                    "tls_connection_policies": [
+                        {{
+                            "certificate_selection": {{
+                                "any_tag": ["cert0"]
+                            }}
+                        }}
+                    ]
+                }}
+            }}
+        }},
+        "tls": {{
+            "certificates": {{
+                "load_files": [
+                    {{
+                        "certificate": "{cert_path}",
+                        "key": "{key_path}",
+                         "tags": [
+                            "cert0"
+                        ]
+                    }}
+                ]
+            }}
+        }}
+    }}
+}}
+'''
+
 WebServerFileTemplates['caddy_reverse'] = '''\
-{
-    "admin": {
+{{
+    "admin": {{
         "disabled": false,
         "listen": "localhost:2020",
-        "config": {
+        "config": {{
             "persist": false
-        }
-    },
-    "apps": {
-        "scion": {},
-        "http": {
+        }}
+    }},
+    "apps": {{
+        "scion": {{}},
+        "http": {{
             "http_port": 7080,
             "https_port": 7443,
-            "servers": {
-                "proxy": {
-                    "logs": {},
-                    "metrics": {},
+            "servers": {{
+                "proxy": {{
+                    "logs": {{}},
+                    "metrics": {{}},
                     "listen": [
-                        "scion+single-stream/[1-ff00:0:112,127.0.0.1]:7080",
-                        "scion+single-stream/[1-ff00:0:112,127.0.0.1]:7443",
-                        "scion/[1-ff00:0:112,127.0.0.1]:8443"
+                        "scion+single-stream/[{scion_listen_addr}]:7080",
+                        "scion+single-stream/[{scion_listen_addr}]:7443",
+                        "scion/[{scion_listen_addr}]:8443"
                     ],
-                    "automatic_https": {
+                    "automatic_https": {{
                         "disable_redirects": true
-                    },
+                    }},
                     "routes": [
-                        {
+                        {{
                             "match": [
-                                {
+                                {{
                                     "host": [
                                         "localhost",
                                         "whoami.local",
                                         "scion.local",
                                         "ip.local"
                                     ]
-                                }
+                                }}
                             ],
                             "handle": [
-                                {
+                                {{
                                     "handler": "detect_scion"
-                                },
-                                {
+                                }},
+                                {{
                                     "handler": "reverse_proxy",
                                     "upstreams": [
-                                        {
+                                        {{
                                             "dial": "localhost:8081"
-                                        }
+                                        }}
                                     ],
                                     "handle_response": [
-                                        {
+                                        {{
                                             "routes": [
-                                                {
+                                                {{
                                                     "handle": [
-                                                        {
+                                                        {{
                                                             "handler": "copy_response_headers"
-                                                        },
-                                                        {
+                                                        }},
+                                                        {{
                                                             "handler": "advertise_scion",
                                                             "Strict-SCION": "17-ffaa:1:1103,192.168.56.1:7443"
-                                                        },
-                                                        {
+                                                        }},
+                                                        {{
                                                             "handler": "copy_response"
-                                                        }
+                                                        }}
                                                     ]
-                                                }
+                                                }}
                                             ]
-                                        }
+                                        }}
                                     ]
-                                }
+                                }}
                             ]
-                        }
+                        }}
                     ],
                     "listen_protocols": [
                         ["h1", "h2"],
                         ["h1", "h2"],
                         ["h3"]
                     ]
-                }
-            }
-        },
-        "pki": {
-            "certificate_authorities": {
-                "local": {
+                }}
+            }}
+        }},
+        "pki": {{
+            "certificate_authorities": {{
+                "local": {{
                     "install_trust": false
-                }
-            }
-        }
-    },
-    "logging": {
-        "logs": {
-            "default": {
+                }}
+            }}
+        }}
+    }},
+    "logging": {{
+        "logs": {{
+            "default": {{
                 "level": "DEBUG"
-            }
-        }
-    }
-}
+            }}
+        }}
+    }}
+}}
 '''
 
 WebServerFileTemplates['caddy_reverse_native'] = '''\
-{
-    "admin": {
+{{
+    "admin": {{
         "disabled": false,
         "listen": "localhost:2020",
-        "config": {
+        "config": {{
             "persist": false
-        }
-    },
-    "apps": {
-        "scion": {},
-        "http": {
+        }}
+    }},
+    "apps": {{
+        "scion": {{}},
+        "http": {{
             "http_port": 8080,
             "https_port": 8443,
-            "servers": {
-                "proxy": {
-                    "logs": {},
-                    "metrics": {},
+            "servers": {{
+                "proxy": {{
+                    "logs": {{}},
+                    "metrics": {{}},
                     "listen": [
-                        "scion/[1-ff00:0:112,127.0.0.1]:8443"
+                        "scion/[{scion_listen_addr}]:8443"
                     ],
-                    "automatic_https": {
+                    "automatic_https": {{
                         "disable_redirects": true
-                    },
+                    }},
                     "routes": [
-                        {
+                        {{
                             "match": [
-                                {
+                                {{
                                     "host": [
                                         "localhost",
                                         "whoami.local",
                                         "scion.local",
                                         "ip.local"
                                     ]
-                                }
+                                }}
                             ],
                             "handle": [
-                                {
+                                {{
                                     "handler": "detect_scion"
-                                },
-                                {
+                                }},
+                                {{
                                     "handler": "reverse_proxy",
                                     "upstreams": [
-                                        {
+                                        {{
                                             "dial": "localhost:8081"
-                                        }
+                                        }}
                                     ],
                                     "handle_response": [
-                                        {
+                                        {{
                                             "routes": [
-                                                {
+                                                {{
                                                     "handle": [
-                                                        {
+                                                        {{
                                                             "handler": "copy_response_headers"
-                                                        },
-                                                        {
+                                                        }},
+                                                        {{
                                                             "handler": "advertise_scion",
                                                             "Strict-SCION": "17-ffaa:1:1103,192.168.56.1:7443"
-                                                        },
-                                                        {
+                                                        }},
+                                                        {{
                                                             "handler": "copy_response"
-                                                        }
+                                                        }}
                                                     ]
-                                                }
+                                                }}
                                             ]
-                                        }
+                                        }}
                                     ]
-                                }
+                                }}
                             ]
-                        }
+                        }}
                     ],
                     "Protocols": ["h3"]
-                }
-            }
-        },
-        "pki": {
-            "certificate_authorities": {
-                "local": {
+                }}
+            }}
+        }},
+        "pki": {{
+            "certificate_authorities": {{
+                "local": {{
                     "install_trust": false
-                }
-            }
-        }
-    },
-    "logging": {
-        "logs": {
-            "default": {
+                }}
+            }}
+        }}
+    }},
+    "logging": {{
+        "logs": {{
+            "default": {{
                 "level": "DEBUG"
-            }
-        }
-    }
-}
+            }}
+        }}
+    }}
+}}
 '''
 
 WebServerFileTemplates['caddy_forward'] = '''\
-{
-    "admin": {
+{{
+    "admin": {{
         "disabled": true,
-        "config": {
+        "config": {{
             "persist": false
-        }
-    },
-    "apps": {
-        "http": {
+        }}
+    }},
+    "apps": {{
+        "http": {{
             "http_port": 9080,
             "https_port": 9443,
-            "servers": {
-                "forward": {
-                    "logs": {},
-                    "metrics": {},
+            "servers": {{
+                "forward": {{
+                    "logs": {{}},
+                    "metrics": {{}},
                     "listen": [
                         ":9080",
                         ":9443"
                     ],
-                    "automatic_https": {
+                    "automatic_https": {{
                         "disable_redirects": true
-                    },
+                    }},
                     "routes": [
-                        {
+                        {{
                             "handle": [
                                 {
                                     "handler": "forward_proxy",
@@ -247,57 +391,57 @@ WebServerFileTemplates['caddy_forward'] = '''\
                                     ]
                                 }
                             ]
-                        }
+                        }}
                     ],
                     "tls_connection_policies": [
-                        {}
+                        {{}}
                     ]
-                }
-            }
-        },
-        "pki": {
-            "certificate_authorities": {
-                "local": {
+                }}
+            }}
+        }},
+        "pki": {{
+            "certificate_authorities": {{
+                "local": {{
                     "install_trust": false,
-                    "storage": {
+                    "storage": {{
                         "module": "file_system",
                         "root": "/usr/share/scion/caddy-scion"
-                    }
-                }
-            }
-        },
-        "tls": {
-            "certificates": {
+                    }}
+                }}
+            }}
+        }},
+        "tls": {{
+            "certificates": {{
                 "automate": [
                     "localhost",
                     "forward-proxy.scion"
                 ]
-            },
-            "automation": {
+            }},
+            "automation": {{
                 "policies": [
-                    {
+                    {{
                         "issuers": [
-                            {
+                            {{
                                 "module": "internal"
-                            }
+                            }}
                         ],
-                        "storage": {
+                        "storage": {{
                             "module": "file_system",
                             "root": "/usr/share/scion/caddy-scion"
-                        }
-                    }
+                        }}
+                    }}
                 ]
-            }
-        }
-    },
-    "logging": {
-        "logs": {
-            "default": {
+            }}
+        }}
+    }},
+    "logging": {{
+        "logs": {{
+            "default": {{
                 "level": "DEBUG"
-            }
-        }
-    }
-}
+            }}
+        }}
+    }}
+}}
 '''
 
 
@@ -418,7 +562,7 @@ class WebServerBase(Server):
     def _getHTTPSFunc(self):
         return self.__enable_https_func
 
-    def install(self, node: Node):
+    def install(self, node: Node, web: WebService):
         """!
         @brief Install the service.
         """
@@ -435,14 +579,21 @@ class WebService(Service):
     @brief The WebService class.
     """
 
+    _helper: InstallHelperBase = None
+
     def __init__(self, kind: WebServerKind = WebServerKind.NGINX):
         """!
         @brief WebService constructor.
         """
         self._kind = kind
+        if kind == WebServerKind.CADDY:
+            WebService._helper = CaddyHelper()
         super().__init__()
         self.addDependency('Base', False, False)
         self.addDependency('Routing', False, False)
+
+    def getHelper(self) -> InstallHelperBase:
+        return self._helper
 
     def _createServer(self) -> WebServerBase:
         match self._kind:
@@ -454,18 +605,91 @@ class WebService(Service):
     def getName(self) -> str:
         return 'WebService'
 
+    def _doInstall(self, node: Node, server: WebServerBase):
+        server.install(node, self)
+
     def print(self, indent: int) -> str:
         out = ' ' * indent
         out += 'WebServiceLayer\n'
 
         return out
 
+class InstallHelperBase:
+    def install(self, node: Node, context: str):
+        pass
+
+class CaddyHelper(InstallHelperBase):
+
+    dockerfile: BuildtimeDockerFile
+    # container: Container
+    out_dir: str = None
+    build_path: str
+    __seen_nodes: List[Node] = []
+    # target-name, url, branch, checkout-dir, do-build
+    __dns_urls = [('scion-caddy', 'https://github.com/scionproto-contrib/caddy-scion.git', 'main', '/repos/scion-caddy', True),
+
+                ]
+
+    def getGoBuildImage(self):
+        return 'golang:1.24-alpine'
+
+    def __init__(self):
+        # create buildtime docker container
+
+        CaddyHelper.build_path = ".caddy_build_output"
+        current_dir = os.getcwd()
+        output_dir = os.path.join(current_dir, CaddyHelper.build_path)
+        CaddyHelper.out_dir = output_dir
+
+        if not os.path.isdir(CaddyHelper.build_path):
+
+            _BUILD_TEMPLATE = f"""FROM {self.getGoBuildImage()}
+            RUN apk add --no-cache git
+            """
+
+            for target in CaddyHelper.__dns_urls:
+                _BUILD_TEMPLATE += f'RUN git clone --branch {target[2]} {target[1]} {target[3]}\n'
+                if target[4]:
+                    _BUILD_TEMPLATE += f'RUN cd {target[3]} && go mod tidy && CGO_ENABLED=0 go build -a -o bin/ ./cmd/scion-caddy ./cmd/scion-caddy-native ./cmd/scion-caddy-forward ./cmd/scion-caddy-reverse\n'
+
+
+            CaddyHelper.dockerfile = BuildtimeDockerFile(_BUILD_TEMPLATE)
+            CaddyHelper.container = BuildtimeDockerImage(f"caddy-build-container").build(CaddyHelper.dockerfile).container()
+
+            # copy from build container to docker host
+            copy_command = []
+            for target in CaddyHelper.__dns_urls:
+                if target[4]:
+                    copy_command.append(f"cp -r {target[3]}/bin/* /build")
+
+            full_cp_cmd = f"-c \"{' && '.join(copy_command)}\""
+            CaddyHelper.container.entrypoint("sh").mountVolume(output_dir, "/build").run(
+               full_cp_cmd
+            )
+
+    def install(self, node: Node, context: str):
+        """
+        @param context what should be installed on 'node' e.g. 'caddy'
+
+        """
+        # mount shared folder with  binaries from docker host to node's container
+
+        if node not in CaddyHelper.__seen_nodes:
+            CaddyHelper.__seen_nodes.append(node)
+            path_to_binaries = "/bin/caddy"
+            node.addSharedFolder(path_to_binaries, CaddyHelper.out_dir)
+            node.addDockerCommand(f'ENV PATH={path_to_binaries}:$PATH ')
+
 class CaddyWebServer(WebServerBase):
 
-    def install(self, node: Node):
-
-        node.addBuildCommand('curl -o scion-caddy -output-dir /usr/local/bin https://github.com/scionproto-contrib/caddy-scion/releases/download/v0.2.0-beta/scion-caddy-native_linux_x86_64')
-        node.addBuildCommand('setcap cap_net_bind_service=+ep /usr/local/bin/scion-caddy')
+    def install(self, node: Node, web: WebService):
+        wh = web.getHelper()
+        wh.install(node, 'scion-caddy')
+        # apparently the release binaries are not statically linked
+        # scion-caddy: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.32' not found (required by scion-caddy)
+        # scion-caddy: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.34' not found (required by scion-caddy)
+        #node.addBuildCommand('apt install wget -y && wget -O /usr/local/bin/scion-caddy https://github.com/scionproto-contrib/caddy-scion/releases/download/v0.2.0-beta/scion-caddy-native_linux_x86_64 && chmod a+x /usr/local/bin/scion-caddy')
+        #node.addBuildCommand('setcap cap_net_bind_service=+ep /usr/local/bin/scion-caddy')
 
         '''INSTALLATION
         scioncaddy can be downloaded as releases:
@@ -520,6 +744,47 @@ class CaddyWebServer(WebServerBase):
 
         # https://caddyserver.com/docs/json/apps/tls/
 
+
+        path_to_content = '/var/www/html/'
+        config_path = '/etc/caddy/config.json'
+        node.setFile( f'{path_to_content}index.html', self.getIndexContent().format(asn = node.getAsn(), nodeName = node.getName()))
+
+        shortname = self.getServerNames()[0].replace('.','_') # www.example.com -> www_example_com
+        dname = ', '.join( [ f'"{s}"' for s in self.getServerNames()] )
+
+
+        if self.getHTTPSEnabled():
+            key_path = '/etc/ssl/private/caddy.key'
+            cert_path = '/etc/ssl/certs/caddy.crt'
+            assert (self._getCAServerKind() != CAServerKind.NONE
+                    and self._getHTTPSFunc() != None), 'set a CAServer in order to use HTTPS'
+            self._getHTTPSFunc()(node = node,
+                                 context = 'caddy',
+                                 server_names = self.getServerNames(),
+                                 dst_cert_path = cert_path,
+                                 dst_key_path = key_path)
+
+            match self._getCAServerKind():
+                case CAServerKind.MINICA:
+                    # ports = f"scion/[{scion_listen_addr}]:8443"
+                    node.setFile(config_path, WebServerFileTemplates['caddy_file_server_https'].format(ports=f'":{self.getPort()}", ":443"',
+                                                                                     path_to_index=path_to_content,
+                                                                                     server_block_name=shortname,
+                                                                                     domain_names=dname,
+                                                                                     key_path=key_path,
+                                                                                     cert_path=cert_path) )
+                case CAServerKind.SMALLSTEP:
+                    #TODO use caddy tls automation ACME
+                    raise NotImplementedError
+        else:
+            node.setFile(config_path, WebServerFileTemplates['caddy_file_server'].format(ports=f":{self.getPort()}",
+                                                                                     path_to_index=path_to_content,
+                                                                                     server_block_name=shortname,
+                                                                                     domain_names=dname) )
+
+        node.addSoftware('apache2-utils')
+        node.appendStartCommand(f'scion-caddy run --config {config_path} 2>&1 | rotatelogs -n 2 /var/log/caddy.log 1M', fork=True)
+        node.appendClassName("WebService")
         pass
 
 class NginxWebServer(WebServerBase):
@@ -530,7 +795,7 @@ class NginxWebServer(WebServerBase):
 
         return out
 
-    def install(self, node: Node):
+    def install(self, node: Node, web: WebService):
         """!
         @brief Install the service.
         """
@@ -543,7 +808,7 @@ class NginxWebServer(WebServerBase):
         node.appendClassName("WebService")
         if self.getHTTPSEnabled():
             assert (self._getCAServerKind() != CAServerKind.NONE
-                    and self.__enable_https_func != None), 'set a CAServer in order to use HTTPS'
+                    and self._getHTTPSFunc() != None), 'set a CAServer in order to use HTTPS'
             self._getHTTPSFunc()(node = node,
                                  context = 'nginx',
                                  server_names = self.getServerNames(),
