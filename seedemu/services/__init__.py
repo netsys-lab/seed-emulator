@@ -1,4 +1,4 @@
-from .WebService import WebService, WebServer
+from .WebService import WebService, WebServerBase, WebServerKind
 from .BotnetService import BotnetClientService, BotnetClientServer, BotnetService, BotnetServer
 from .dns import *
 from .TorService import TorService, TorServer, TorNodeType
