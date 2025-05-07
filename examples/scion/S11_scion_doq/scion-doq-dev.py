@@ -433,6 +433,8 @@ def run(dumpfile = None):
     host_web_1 = base.getAutonomousSystem(172).getHost('host_0')
 
     w1 = web.install('web1')
+    w1.enableHTTPS()
+    w1.setServerNames(['www.example.com'])
     w1.setCAServer(caServer)
     emu.addBinding(Binding('web1', filter=Filter(asn=172, nodeName='host_0')))
 
@@ -440,6 +442,8 @@ def run(dumpfile = None):
     host_web_2 = base.getAutonomousSystem(173).getHost('host_0')
 
     w2 = web.install('web2')
+    w2.enableHTTPS()
+    w2.setServerNames(['www.example.net'])
     w2.setCAServer(caServer)
     emu.addBinding(Binding('web2', filter=Filter(asn=173, nodeName='host_0')))
 
@@ -447,6 +451,8 @@ def run(dumpfile = None):
     host_web_3 = base.getAutonomousSystem(241).getHost('host_0')
 
     w3 = web.install('web3')
+    w3.enableHTTPS()
+    w3.setServerNames(['www.example.edu'])
     w3.setCAServer(caServer)
     emu.addBinding(Binding('web3', filter=Filter(asn=241, nodeName='host_0')))
 
@@ -532,6 +538,7 @@ def run(dumpfile = None):
     emu.addLayer(etc_hosts)
     emu.addLayer(dns_svc)
     emu.addLayer(sdns)
+    emu.addLayer(web)
     emu.addLayer(minica)
     emu.addLayer(devsvc)
 
