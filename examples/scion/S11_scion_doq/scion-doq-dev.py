@@ -3,7 +3,7 @@
 
 
 from seedemu.services import (GolangDevService, AccessMode,
-                              DomainNameService, DomainNameServer,
+                              DomainNameService, DomainNameServer, WebService, WebServerKind,
                               MiniCAService, RootMiniCAStore, MiniCAServer,
                               DomainNameCachingService, DomainNameCachingServer)
 from seedemu.services.dns.DNSCommon import *
@@ -159,6 +159,8 @@ def run(dumpfile = None):
     # The DNS layers will only generate the config files and set up the certificates
     dns_svc = DomainNameService(dns_setup=OptionRegistry().dns_setup(DNSStack.SCION_DEV))
     minica = MiniCAService()
+
+    web = WebService(kind = WebServerKind.CADDY)
 
     sdns = DomainNameCachingService(do_enc=True)
 
@@ -430,11 +432,23 @@ def run(dumpfile = None):
     # 'www.example.com'
     host_web_1 = base.getAutonomousSystem(172).getHost('host_0')
 
+    w1 = web.install('web1')
+    w1.setCAServer(caServer)
+    emu.addBinding(Binding('web1', filter=Filter(asn=172, nodeName='host_0')))
+
     # 'www.example.net'
     host_web_2 = base.getAutonomousSystem(173).getHost('host_0')
 
+    w2 = web.install('web2')
+    w2.setCAServer(caServer)
+    emu.addBinding(Binding('web2', filter=Filter(asn=173, nodeName='host_0')))
+
     # 'www.example.edu'
     host_web_3 = base.getAutonomousSystem(241).getHost('host_0')
+
+    w3 = web.install('web3')
+    w3.setCAServer(caServer)
+    emu.addBinding(Binding('web3', filter=Filter(asn=241, nodeName='host_0')))
 
 
     # coredns DoQ nameservers ..........................................
