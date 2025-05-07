@@ -513,6 +513,8 @@ class DomainNameServer(Server):
         """
         assert node == self.__node, 'configured node differs from install node.\
                                      Please check if there are conflict bindings'
+
+        node.appendClassName(dns.getName())
         opt = node.getOption('dns_setup')
         if opt == None:
             for o in dns.getAvailableOptions():

@@ -100,7 +100,10 @@ class DNSStackHelper(DNSStackHelperBase):
     """installs CoreDNS nameserver and sdns resolver onto nodes.
         As well as the exdns 'dig' like CLI query tool.
     """
-
+    dockerfile: BuildtimeDockerFile
+    # container: Container
+    out_dir: str = None
+    build_path: str
     __seen_nodes: List[Node] = []
     # target-name, url, branch, checkout-dir, do-build
     __dns_urls = [('dns', 'https://github.com/netsys-lab/dns', 'master-rebase', '/repos/dns', False),
@@ -115,9 +118,10 @@ class DNSStackHelper(DNSStackHelperBase):
     def __init__(self):
         # create buildtime docker container
 
-        #out = 'coredns' # one of 'dns' 'coredns' 'sdns' 'exdns'
-        #build_path = f".dns_build_output/{out}"
         DNSStackHelper.build_path = ".dns_build_output"
+        current_dir = os.getcwd()
+        output_dir = os.path.join(current_dir, DNSStackHelper.build_path)
+        DNSStackHelper.out_dir = output_dir
 
         if not os.path.isdir(DNSStackHelper.build_path):
 
@@ -137,14 +141,6 @@ class DNSStackHelper(DNSStackHelperBase):
             DNSStackHelper.dockerfile = BuildtimeDockerFile(DNS_BUILD_TEMPLATE)
             DNSStackHelper.container = BuildtimeDockerImage(f"dns-build-container").build(DNSStackHelper.dockerfile).container()
 
-
-        #else:
-        #    output_dir = os.path.join(os.getcwd(), build_path)
-        #    return output_dir
-
-            # TODO: copy binaries from BuildtimeDockerContainer mount to node's container image
-            current_dir = os.getcwd()
-            output_dir = os.path.join(current_dir, DNSStackHelper.build_path)
             # copy from build container to docker host
             copy_command = []
             for target in DNSStackHelper.__dns_urls:
@@ -155,15 +151,16 @@ class DNSStackHelper(DNSStackHelperBase):
             DNSStackHelper.container.entrypoint("sh").mountVolume(output_dir, "/build").run(
                full_cp_cmd
             )
-            #return output_dir
 
-            DNSStackHelper.out_dir = output_dir
+
 
     def install(self, node: Node, context: str):
         """
         @param context what should be installed on 'node'
                 i.e. 'coredns' (nameserver) or 'sdns' (resolver)
         """
+        # mount shared folder with  binaries from docker host to node's container
+
         if node not in DNSStackHelper.__seen_nodes:
             DNSStackHelper.__seen_nodes.append(node)
             path_to_binaries = "/bin/dns"

@@ -462,6 +462,7 @@ class DomainNameCachingServer(Server, Configurable):
     def install(self, node: Node):
         """ only called when the server is already configured
         """
+        node.appendClassName('DomainNameCachingService')
         opt = node.getOption('dns_setup')
         if opt == None:
             for o in DomainNameService.getAvailableOptions():
@@ -511,6 +512,9 @@ class DomainNameCachingServer(Server, Configurable):
                                                                               key_path=key_path,
                                                                               scion_root_hints=sc_root_hints)
         '''
+
+        # TODO if want to still be able to resolve the real-world's domain-names
+        # i.e. for the DevService we'd need to either configure sdns to forward to '8.8.8.8' or keep at least one 'real world' entry in /etc/resolv.conf
         root_ns = [ (r.split('TXT')[0].strip() ,r.split('=')[1].strip('"')) for r in self.getRootServers() if 'TXT' in r]
         named_sc_root_hints = ',\n'.join( map( lambda x: f'["{x[1]}:{self.__doq_port}", "{x[0]}"]', root_ns))
         sdns_conf = DomainNameCachingServiceFileTemplates['sdns_conf_new'].format(rhine_cert=rcert,
@@ -525,8 +529,8 @@ class DomainNameCachingServer(Server, Configurable):
 
         # start sdns process
         node.addSoftware('apache2-utils') # for rotatelogs
-        # sdns needs scion paths for root server update on startup
-        node.appendStartCommand('sleep 20; sdns --config /etc/sdns/sdns.conf 2>&1 | rotatelogs -n 2 /var/log/sdns.log 1M', fork=True)
+        # sdns needs scion paths for root server update on startup # maybe SDNS_DEBUG=true
+        node.appendStartCommand('sleep 60; echo "resolver started"; SDNS_DEBUG=true SDNS_PPROF=true sdns --config /etc/sdns/sdns.conf 2>&1 | rotatelogs -n 2 /var/log/sdns.log 1M', fork=True)
 
 
     def _do_install_bind9(self, node: Node):
