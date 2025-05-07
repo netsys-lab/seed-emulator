@@ -72,7 +72,7 @@ def run(dumpfile = None):
 
     ###########################################################
     # Create a DNS layer
-    dns = DomainNameService()
+    dns = DomainNameService(do_enc=False)
 
     # Create two nameservers for the root zone
     dns.install('a-root-server').addZone('.').setMaster()   # Master server
@@ -124,6 +124,6 @@ def run(dumpfile = None):
     else:
         emu.render()
         emu.compile(Docker(platform=platform), './output', override=True)
-        
+
 if __name__ == "__main__":
     run()

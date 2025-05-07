@@ -488,15 +488,16 @@ class DomainNameServer(Server):
                 ns_name=f'ns{str(ns_number)}.{zonename}'
                 self.__ns_server_name[_zone] = ns_name
                 if self.__do_enc:
+                    assert self.__enable_https_func, 'CAServer required for DoE'
                     cert_names = [self.getServerName(_zone), _zone] # the SNI's for which the certificate is needed
 
                     cert_path, key_path = self._getCryptoPathsForZone(_zone, ns_name)
                     # request a certificate for '$server_name' from the CA
-                    self.__enable_https_func(node=node,
-                                            context='dns',
-                                            server_names=cert_names,
-                                            dst_cert_path=cert_path,
-                                            dst_key_path=key_path)
+                    self.__enable_https_func(node = node,
+                                             context = 'dns',
+                                             server_names = cert_names,
+                                             dst_cert_path = cert_path,
+                                             dst_key_path = key_path)
                 zone.addGuleRecord(ns_name, str(addr), node)
                 zone.addRecord(_getNsAddrRecord(node, ns_number, zonename, str(addr) ))
                 zone.addRecord( NS_RR(zonename='@', nsname=ns_name) )

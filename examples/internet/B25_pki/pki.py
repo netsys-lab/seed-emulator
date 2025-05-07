@@ -4,7 +4,7 @@
 from seedemu.compiler import Docker, Platform
 from seedemu.core import Binding, Emulator, Filter, Action
 from seedemu.layers import Base
-from seedemu.services import CAService, StepCAServer, WebService, WebServer, RootStepCAStore
+from seedemu.services import StepCAService, StepCAServer, WebService, WebServer, RootStepCAStore
 import base_internet
 import os, sys
 
@@ -48,7 +48,7 @@ as151.createHost('web2').joinNetwork('net0', address='10.151.0.8') \
 # Create and configure CA server vnodes
 caStore1 = RootStepCAStore(caDomain='seedCA.net')
 caStore2 = RootStepCAStore(caDomain='seedCA.com')
-ca  = CAService()
+ca  = StepCAService()
 caServer1: StepCAServer = ca.install('ca1-vnode')
 caServer1.setCAStore(caStore1)
 caServer1.setCertDuration("2160h")
