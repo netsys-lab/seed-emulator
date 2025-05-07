@@ -10,7 +10,7 @@ def run(dumpfile = None):
     # DNS
     ###########################################################
     # Create a DNS layer
-    dns = Dns.DomainNameService()
+    dns = Dns.DomainNameService(do_enc=False)
 
     # Create a nameserver for the root zone.
     # Make it shadow the real root zone.
@@ -21,8 +21,8 @@ def run(dumpfile = None):
     dns.install('ns-google-com').addZone('google.com.')
 
     # Add records to zones
-    dns.getZone('twitter.com.').addRecord(A_RR(address='1.1.1.1'))
-    dns.getZone('google.com.').addRecord(A_RR(address='2.2.2.2'))
+    dns.getZone('twitter.com.').addRecord(Dns.A_RR(address='1.1.1.1'))
+    dns.getZone('google.com.').addRecord(Dns.A_RR(address='2.2.2.2'))
 
     # Customize the display names (for visualization purpose)
     emu.getVirtualNode('a-root-server').setDisplayName('Root-A')

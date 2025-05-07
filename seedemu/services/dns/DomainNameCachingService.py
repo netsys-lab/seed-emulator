@@ -414,7 +414,7 @@ class DomainNameCachingServer(Server, Configurable):
             #quic out in case of empty catchment
             return
 
-        self._configureResolverCatchment(address, node)
+        self._configureResolverCatchment(address)
 
     def _configureResolverCatchment(self, address: str):
         """

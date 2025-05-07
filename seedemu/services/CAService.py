@@ -215,7 +215,7 @@ class StepCAServer(CAServerBase):
             )
         )
         certbot_command =  'REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
-certbot {server} --non-interactive {flags} --no-redirect --agree-tos {main} \
+certbot {server} --non-interactive {flags} --no-redirect --agree-tos {mail} \
 -d {server_name} > /dev/null && echo "ACME: cert issued"'.format(
                 server=f'--server https://{self.getCADomain()}/acme/acme/directory',
                 server_name=" -d ".join(server_names),

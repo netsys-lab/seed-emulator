@@ -11,7 +11,7 @@ def run(dumpfile = None):
 
     ###########################################################
     # Create a DNS layer
-    dns = DomainNameService()
+    dns = DomainNameService(do_enc=False)
 
     # Create two nameservers for the root zone
     dns.install('a-root-server').addZone('.').setMaster()   # Master server
