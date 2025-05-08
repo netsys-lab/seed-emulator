@@ -224,29 +224,6 @@ def run(dumpfile = None):
     emu = Emulator()
     base = ScionBase()
 
-    '''
-    scionproto      1.22.7 latest 1.24.2
-    scion-apps      1.22.7 - 10
-    coredns         1.23.0 - 1.24.1
-    sdns            1.22  -  1.22.5
-
-    scion-coredns   1.20
-    scion-sdns      1.20
-
-    caddy-scion     1.22.7 - 1.22.10
-    '''
-
-
-    '''
-    for multiple go versions:
-            go install golang.org/dl/go1.18@latest
-            $ go1.18 download
-
-            optional:
-                export GOROOT=$(go1.18 env GOROOT)
-                $ export PATH=${GOROOT}/bin;${PATH}
-    '''
-
     spec = SetupSpecification.LOCAL_BUILD(
             CheckoutSpecification(
                 mode = "build",
@@ -418,15 +395,20 @@ def run(dumpfile = None):
     caServer.setCAStore(caStore)
     caServer.installCACert(Filter())
 
-    # HTTP FWD proxy and sdns rec. resolver
     # 'entrypoint' into the simulation for browser-extension
     host_a = base.getAutonomousSystem(102).getHost('host_0')
     host_a.addPortForwarding(8888, 8888, 'tcp')
 
     sdns_server = sdns.install('sdns-vnode')
     sdns_server.setCAServer(caServer)
-    # add binding to host_a
     emu.addBinding(Binding('sdns-vnode', filter=Filter(asn=102, nodeName='host_0', allowBound=True)))
+
+    fwdpxy = web.install('fwd_pxy')
+    fwdpxy.enableHTTPS()
+    fwdpxy.makeForwardProxy()
+    fwdpxy.setServerNames(['localhost'])
+    fwdpxy.setCAServer(caServer)
+    emu.addBinding(Binding('fwd_pxy', filter=Filter(asn=102, nodeName='host_0', allowBound=True)))
 
     # HTTP web server and HTTP reverse proxy ...........................
 
