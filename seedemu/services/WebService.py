@@ -779,6 +779,11 @@ class CaddyWebServer(WebServerBase):
         shortname = self.getServerNames()[0].replace('.','_') # www.example.com -> www_example_com
         dname = ', '.join( [ f'"{s}"' for s in self.getServerNames()] )
 
+        listen = f'":{self.getPort()}", ":443"'
+        if 'scion_address' in node.getLabel():
+            assert self.getHTTPSEnabled(), 'configuration error: No unencrypted HTTP supported with SCION'
+            scion_addr = node.getLabel()['scion_address']
+            listen += f', "scion/[{scion_addr}]:8443"'
 
         if self.getHTTPSEnabled():
             key_path = '/etc/ssl/private/caddy.key'
@@ -793,8 +798,7 @@ class CaddyWebServer(WebServerBase):
 
             match self._getCAServerKind():
                 case CAServerKind.MINICA:
-                    # ports = f"scion/[{scion_listen_addr}]:8443"
-                    node.setFile(config_path, WebServerFileTemplates['caddy_file_server_https'].format(ports=f'":{self.getPort()}", ":443"',
+                    node.setFile(config_path, WebServerFileTemplates['caddy_file_server_https'].format(ports=listen,
                                                                                      path_to_index=path_to_content,
                                                                                      server_block_name=shortname,
                                                                                      domain_names=dname,
