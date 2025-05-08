@@ -125,9 +125,6 @@ WebServerFileTemplates['caddy_file_server_https'] = '''\
                     "routes": [
                         {{
                             "match": [
-                                {{
-                                    "host": [{domain_names}]
-                                }}
                             ],
                             "handle": [
                                 {{
@@ -159,6 +156,13 @@ WebServerFileTemplates['caddy_file_server_https'] = '''\
                         ]
                     }}
                 ]
+            }}
+        }}
+    }},
+    "logging": {{
+        "logs": {{
+            "default": {{
+                "level": "{loglevel}"
             }}
         }}
     }}
@@ -519,6 +523,16 @@ class WebServerBase(Server):
 
         return self
 
+    def _getRoot(self) -> str:
+        """!@brief get path to web root (containing index.html)
+        """
+        return '/var/www/html/'
+
+    def _installContents(self, node: Node):
+        """! installs the static web page contents/files onto the given node
+        """
+        node.setFile( f'{self._getRoot()}index.html', self.getIndexContent().format(asn = node.getAsn(), nodeName = node.getName()))
+
     def getServerNames(self) -> List[str]:
         return self._server_name
 
@@ -619,16 +633,17 @@ class InstallHelperBase:
         pass
 
 class CaddyHelper(InstallHelperBase):
-
+    """!@brief installs caddy web server with SCION plugin
+        @note if you don't want to listen on SCION addresses,
+            just don't load the '"scion": {}' app in your caddy config.
+    """
     dockerfile: BuildtimeDockerFile
     # container: Container
     out_dir: str = None
     build_path: str
     __seen_nodes: List[Node] = []
     # target-name, url, branch, checkout-dir, do-build
-    __dns_urls = [('scion-caddy', 'https://github.com/scionproto-contrib/caddy-scion.git', 'main', '/repos/scion-caddy', True),
-
-                ]
+    __dns_urls = [('scion-caddy', 'https://github.com/scionproto-contrib/caddy-scion.git', 'main', '/repos/scion-caddy', True)]
 
     def getGoBuildImage(self):
         return 'golang:1.24-alpine'
@@ -683,23 +698,13 @@ class CaddyHelper(InstallHelperBase):
 class CaddyWebServer(WebServerBase):
 
     def install(self, node: Node, web: WebService):
+        """!@brief install and configure caddy web server on the given node
+            @details if node is found to be a SCION Node
+                    the server will also listen on its SCION address (HTTP/3:8443)
+        """
         wh = web.getHelper()
         wh.install(node, 'scion-caddy')
-        # apparently the release binaries are not statically linked
-        # scion-caddy: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.32' not found (required by scion-caddy)
-        # scion-caddy: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.34' not found (required by scion-caddy)
-        #node.addBuildCommand('apt install wget -y && wget -O /usr/local/bin/scion-caddy https://github.com/scionproto-contrib/caddy-scion/releases/download/v0.2.0-beta/scion-caddy-native_linux_x86_64 && chmod a+x /usr/local/bin/scion-caddy')
-        #node.addBuildCommand('setcap cap_net_bind_service=+ep /usr/local/bin/scion-caddy')
 
-        '''INSTALLATION
-        scioncaddy can be downloaded as releases:
-        https://github.com/scionproto-contrib/caddy-scion/releases/download/v0.2.0-beta/scion-caddy-forward_linux_x86_64
-        https://github.com/scionproto-contrib/caddy-scion/releases/download/v0.2.0-beta/scion-caddy-native_linux_x86_64
-        https://github.com/scionproto-contrib/caddy-scion/releases/download/v0.2.0-beta/scion-caddy-reverse_linux_x86_64
-
-        otherwise the source code is available here:
-        https://github.com/scionproto-contrib/caddy-scion.git branch: main
-        '''
 
         '''
         CONFIGURATION
@@ -745,9 +750,10 @@ class CaddyWebServer(WebServerBase):
         # https://caddyserver.com/docs/json/apps/tls/
 
 
-        path_to_content = '/var/www/html/'
+        path_to_content = self._getRoot()
         config_path = '/etc/caddy/config.json'
-        node.setFile( f'{path_to_content}index.html', self.getIndexContent().format(asn = node.getAsn(), nodeName = node.getName()))
+
+        super()._installContents(node)
 
         shortname = self.getServerNames()[0].replace('.','_') # www.example.com -> www_example_com
         dname = ', '.join( [ f'"{s}"' for s in self.getServerNames()] )
@@ -771,6 +777,7 @@ class CaddyWebServer(WebServerBase):
                                                                                      path_to_index=path_to_content,
                                                                                      server_block_name=shortname,
                                                                                      domain_names=dname,
+                                                                                     loglevel='DEBUG',
                                                                                      key_path=key_path,
                                                                                      cert_path=cert_path) )
                 case CAServerKind.SMALLSTEP:
@@ -787,7 +794,46 @@ class CaddyWebServer(WebServerBase):
         node.appendClassName("WebService")
         pass
 
+'''
+./bat 1-172,10.172.0.71:8443 -v -i
+2025/05/07 18:31:30.344317 bat.go:238: Error Get "http://[1-172,10.172.0.71]:8443": CRYPTO_ERROR 0x178 (remote): tls: no application protocol
+
+
+"args": [ "-servername",  "www.example.com",  "https://1-172,10.172.0.71:8443"]
+5/05/07 19:23:50.456308 bat.go:249: Error Get "https://[1-172,10.172.0.71]:8443":
+ CRYPTO_ERROR 0x12a (local): tls: failed to verify certificate: x509: certificate is valid for www.example.com, not 1-172,10.172.0.71
+
+
+/repos/caddy-scion/build/scion-caddy run --config /etc/caddy/config.json
+2025/05/07 18:53:47.536 INFO    using config from file  {"file": "/etc/caddy/config.json"}
+2025/05/07 18:53:47.540 INFO    admin   admin endpoint started  {"address": "localhost:2019", "enforce_origin": false, "origins": ["//localhost:2019", "//[::1]:2019", "//127.0.0.1:2019"]}
+2025/05/07 18:53:47.542 INFO    tls.cache.maintenance   started background certificate maintenance      {"cache": "0xc000399400"}
+2025/05/07 18:53:47.544 WARN    tls     stapling OCSP   {"error": "no OCSP stapling for [www.example.com]: no OCSP server specified in certificate"}
+2025/05/07 18:53:47.544 INFO    http.auto_https enabling automatic HTTP->HTTPS redirects        {"server_name": "www_example_com"}
+2025/05/07 18:53:47.545 WARN    http    HTTP/3 skipped because it requires TLS  {"network": "tcp", "addr": ":80"}
+2025/05/07 18:53:47.546 WARN    http    HTTP/2 skipped because it requires TLS  {"network": "tcp", "addr": ":80"}
+2025/05/07 18:53:47.546 INFO    http    enabling HTTP/3 listener        {"addr": ":443"}
+2025/05/07 18:53:47.549 INFO    tls     storage cleaning happened too recently; skipping for now        {"storage": "FileStorage:/root/.local/share/caddy", "instance": "9527a235-2843-434f-a0ec-e20de0117a23", "try_again": "2025/05/08 18:53:47.549", "try_again_in": 86399.999998114}
+2025/05/07 18:53:47.549 INFO    tls     finished cleaning storage units
+2025/05/07 18:53:47.549 INFO    http    enabling HTTP/3 listener        {"addr": "1-172,10.172.0.71:8443"}
+2025/05/07 18:53:47.554 INFO    connection doesn't allow setting of receive buffer size. Not a *net.UDPConn?. See https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes for details.
+2025/05/07 18:53:47.554 INFO    http.log        server running  {"name": "www_example_com", "protocols": ["h1", "h2", "h3"]}
+2025/05/07 18:53:47.554 WARN    http    HTTP/3 skipped because it requires TLS  {"network": "scion", "addr": "1-172,10.172.0.71:80"}
+2025/05/07 18:53:47.554 WARN    http    HTTP/2 skipped because it requires TLS  {"network": "scion", "addr": "1-172,10.172.0.71:80"}
+2025/05/07 18:53:47.554 INFO    http.log        server running  {"name": "remaining_auto_https_redirects", "protocols": ["h1", "h2", "h3"]}
+2025/05/07 18:53:47.554 INFO    autosaved config (load with --resume flag)      {"file": "/root/.config/caddy/autosave.json"}
+2025/05/07 18:53:47.554 INFO    serving initial configuration
+
+'''
+
 class NginxWebServer(WebServerBase):
+    """
+    an instance of a nginx web server
+    hosting a static web page
+    @note currently it is not SCION capable.
+        For NextGen Future SCION Internet
+        use the Caddy web server instead.
+    """
 
     def print(self, indent: int) -> str:
         out = ' ' * indent
@@ -803,7 +849,7 @@ class NginxWebServer(WebServerBase):
         key_path = '/etc/ssl/private/nginx.key'
         cert_path = '/etc/ssl/certs/nginx.crt'
         node.addSoftware('nginx-light')
-        node.setFile('/var/www/html/index.html', self.getIndexContent().format(asn = node.getAsn(), nodeName = node.getName()))
+        self._installContents(node)
         node.appendStartCommand('service nginx start')
         node.appendClassName("WebService")
         if self.getHTTPSEnabled():
