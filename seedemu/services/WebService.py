@@ -1,6 +1,6 @@
 from __future__ import annotations
 from seedemu.core import Node, Service, Server, CAServerBase
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import os
 from enum import Enum
 from seedemu.utilities.BuildtimeDocker import BuildtimeDockerFile, BuildtimeDockerImage
@@ -397,8 +397,7 @@ WebServerFileTemplates['caddy_forward'] = '''\
                     "logs": {{}},
                     "metrics": {{}},
                     "listen": [
-                        ":9080",
-                        ":9443"
+                        {ports}
                     ],
                     "automatic_https": {{
                         "disable_redirects": true
@@ -406,52 +405,35 @@ WebServerFileTemplates['caddy_forward'] = '''\
                     "routes": [
                         {{
                             "handle": [
-                                {
+                                {{
                                     "handler": "forward_proxy",
                                     "hosts": [
-                                        "localhost",
-                                        "forward-proxy.scion"
+                                            {hosts_list}
                                     ]
-                                }
+                                }}
                             ]
                         }}
                     ],
                     "tls_connection_policies": [
-                        {{}}
+                        {{
+                            "certificate_selection": {{
+                                "any_tag": ["cert0"]
+                            }}
+                        }}
                     ]
                 }}
             }}
         }},
-        "pki": {{
-            "certificate_authorities": {{
-                "local": {{
-                    "install_trust": false,
-                    "storage": {{
-                        "module": "file_system",
-                        "root": "/usr/share/scion/caddy-scion"
-                    }}
-                }}
-            }}
-        }},
+
         "tls": {{
             "certificates": {{
-                "automate": [
-                    "localhost",
-                    "forward-proxy.scion"
-                ]
-            }},
-            "automation": {{
-                "policies": [
+                "load_files": [
                     {{
-                        "issuers": [
-                            {{
-                                "module": "internal"
-                            }}
-                        ],
-                        "storage": {{
-                            "module": "file_system",
-                            "root": "/usr/share/scion/caddy-scion"
-                        }}
+                        "certificate": "{cert_path}",
+                        "key": "{key_path}",
+                         "tags": [
+                            "cert0"
+                        ]
                     }}
                 ]
             }}
@@ -460,7 +442,7 @@ WebServerFileTemplates['caddy_forward'] = '''\
     "logging": {{
         "logs": {{
             "default": {{
-                "level": "DEBUG"
+                "level": "{loglevel}"
             }}
         }}
     }}
@@ -488,6 +470,11 @@ class WebServerKind(Enum):
     NGINX = 0
     CADDY = 1
 
+class WebServerRole(Enum):
+    WEB = 0 # or "host" ?!
+    FWD_PROXY = 1
+    REV_PROXY = 2
+
 class WebServerBase(Server):
     """!
     @brief The WebServer class.
@@ -502,12 +489,16 @@ class WebServerBase(Server):
         """
         super().__init__()
         self.__port = 80
+        self.__role = WebServerRole.WEB
         self._server_name = ['_']
         self.__body = '<pre>{seedlogo}</pre>'.format(seedlogo=WebServerFileTemplates['seed_logo'])
         self.__index = '<h1>{nodeName} at {asn}</h1>{body}'
         self.__enable_https = False
         self.__enable_https_func = None
         self.__ca_server_kind = CAServerKind.NONE
+
+    def getRole(self) -> WebServerRole:
+        return self.__role
 
     def _getCAServerKind(self) -> CAServerKind:
         return self.__ca_server_kind
@@ -597,6 +588,20 @@ class WebServerBase(Server):
 
     def _getHTTPSFunc(self):
         return self.__enable_https_func
+
+    def makeForwardProxy(self):
+        """
+        configures this server instance to function as a forward proxy server
+        rather than an 'origin' or host server
+        """
+        self.__role = WebServerRole.FWD_PROXY
+
+    def makeReverseProxy(self):
+        """
+        configures this server instance to function as a reverse proxy server
+        """
+        self.__role = WebServerRole.REV_PROXY
+
 
     def install(self, node: Node, web: WebService):
         """!
@@ -723,9 +728,7 @@ class CaddyWebServer(WebServerBase):
             @details if node is found to be a SCION Node
                     the server will also listen on its SCION address (HTTP/3:8443)
         """
-        wh = web.getHelper()
-        wh.install(node, 'scion-caddy')
-
+        self._install_caddy_base(node, web)
 
         '''
         CONFIGURATION
@@ -747,19 +750,10 @@ class CaddyWebServer(WebServerBase):
         export SCION_DAEMON_ADDRESS="127.0.0.27:30255"; go run ./cmd/scion-caddy run --config ./_examples/reverse.json --watch
 
 
+        # NOTE: all requests to the forward proxy must contain "Proxy-Authorization" header with value  "Basic cG9saWN5Og==" !!!
+        curl -v "https://www.example.com:8443" --proxy "https://localhost:80" --proxy-header "Proxy-Authorization: Basic cG9saWN5Og=="
 
-        # test the local setup
-        curl -v "http://scion.local:7080" --proxy "https://localhost:9443" --proxy-insecure --proxy-header "Proxy-Authorization: Basic $(echo -n \"policy:\" | base64)"
-        curl -v "https://scion.local:7443" --insecure --proxy "https://localhost:9443" --proxy-insecure --proxy-header "Proxy-Authorization: Basic $(echo -n \"policy:\" | base64)"
 
-        # test SCIONLab setup
-        curl "http://localhost:8081" -v --insecure --proxy "http://localhost:8890" # HTTP over IP (skip-whoami)
-
-        curl "http://localhost:8080" -v --insecure --proxy "http://localhost:8890" # HTTP over IP (skip-web-whoami)
-        curl "https://localhost:8443" -v --insecure --proxy "http://localhost:8890" # HTTPS over IP (skip-web-whoami)
-
-        curl "http://whoami.dev:8080" -v --insecure --proxy "http://localhost:8890" # HTTPS over SCION (skip-web-whoami)
-        curl "https://whoami.dev:8443" -v --insecure --proxy "http://localhost:8890" # HTTPS over SCION (skip-web-whoami)
         '''
 
         # https://caddyserver.com/docs/json/apps/http/
@@ -771,8 +765,46 @@ class CaddyWebServer(WebServerBase):
         # https://caddyserver.com/docs/json/apps/tls/
 
 
-        path_to_content = self._getRoot()
-        config_path = '/etc/caddy/config.json'
+        match self.getRole():
+            case WebServerRole.WEB:
+                self._install_web_server(node)
+            case WebServerRole.FWD_PROXY:
+                self._install_fwd_proxy(node)
+            case _:
+                raise NotImplementedError
+
+    def _install_fwd_proxy(self, node: Node):
+        shortname = self.getServerNames()[0].replace('.','_') # www.example.com -> www_example_com
+        dname = ', '.join( [ f'"{s}"' for s in self.getServerNames()] )
+
+        listen = f'":{self.getPort()}", ":9443"'
+
+
+        if self.getHTTPSEnabled():
+            cert_path, key_path = self._get_crypto_paths()
+            match self._getCAServerKind():
+                case CAServerKind.MINICA:
+                    node.setFile(self._get_config_path(), WebServerFileTemplates['caddy_forward'].format(
+                                                                                     ports=listen,
+                                                                                     hosts_list=dname,
+                                                                                     server_block_name=shortname,
+                                                                                     loglevel='DEBUG',
+                                                                                     key_path=key_path,
+                                                                                     cert_path=cert_path) )
+                case _:
+                    # ACME TLS automation currently  not implemented
+                    raise NotImplementedError
+
+
+    def _get_crypto_paths(self) -> Tuple[str,str]:
+        key_path = '/etc/ssl/private/caddy.key'
+        cert_path = '/etc/ssl/certs/caddy.crt'
+        return (cert_path, key_path)
+
+    def _get_config_path(self) -> str:
+        return '/etc/caddy/config.json'
+
+    def _install_web_server(self, node: Node):
 
         super()._installContents(node)
 
@@ -785,21 +817,13 @@ class CaddyWebServer(WebServerBase):
             scion_addr = node.getLabel()['scion_address']
             listen += f', "scion/[{scion_addr}]:8443"'
 
-        if self.getHTTPSEnabled():
-            key_path = '/etc/ssl/private/caddy.key'
-            cert_path = '/etc/ssl/certs/caddy.crt'
-            assert (self._getCAServerKind() != CAServerKind.NONE
-                    and self._getHTTPSFunc() != None), 'set a CAServer in order to use HTTPS'
-            self._getHTTPSFunc()(node = node,
-                                 context = 'caddy',
-                                 server_names = self.getServerNames(),
-                                 dst_cert_path = cert_path,
-                                 dst_key_path = key_path)
 
+        if self.getHTTPSEnabled():
+            cert_path, key_path = self._get_crypto_paths()
             match self._getCAServerKind():
                 case CAServerKind.MINICA:
-                    node.setFile(config_path, WebServerFileTemplates['caddy_file_server_https'].format(ports=listen,
-                                                                                     path_to_index=path_to_content,
+                    node.setFile(self._get_config_path(), WebServerFileTemplates['caddy_file_server_https'].format(ports=listen,
+                                                                                     path_to_index=self._getRoot(),
                                                                                      server_block_name=shortname,
                                                                                      domain_names=dname,
                                                                                      loglevel='DEBUG',
@@ -809,13 +833,27 @@ class CaddyWebServer(WebServerBase):
                     #TODO use caddy tls automation ACME
                     raise NotImplementedError
         else:
-            node.setFile(config_path, WebServerFileTemplates['caddy_file_server'].format(ports=f":{self.getPort()}",
-                                                                                     path_to_index=path_to_content,
+            node.setFile(self._get_config_path(), WebServerFileTemplates['caddy_file_server'].format(ports=f":{self.getPort()}",
+                                                                                     path_to_index=self._getRoot(),
                                                                                      server_block_name=shortname,
                                                                                      domain_names=dname) )
 
+    def _install_caddy_base(self, node: Node, web: WebService):
+        wh = web.getHelper()
+        wh.install(node, 'scion-caddy')
+
+        if self.getHTTPSEnabled():
+            cert_path, key_path = self._get_crypto_paths()
+            assert (self._getCAServerKind() != CAServerKind.NONE
+                    and self._getHTTPSFunc() != None), 'set a CAServer in order to use HTTPS'
+            self._getHTTPSFunc()(node = node,
+                                 context = 'caddy',
+                                 server_names = self.getServerNames(),
+                                 dst_cert_path = cert_path,
+                                 dst_key_path = key_path)
+
         node.addSoftware('apache2-utils')
-        node.appendStartCommand(f'scion-caddy run --config {config_path} 2>&1 | rotatelogs -n 2 /var/log/caddy.log 1M', fork=True)
+        node.appendStartCommand(f'scion-caddy run --config {self._get_config_path()} 2>&1 | rotatelogs -n 2 /var/log/caddy.log 1M', fork=True)
         node.appendClassName("WebService")
 
 
@@ -833,6 +871,13 @@ class NginxWebServer(WebServerBase):
         out += 'Nginx Web server object.\n'
 
         return out
+
+    def makeForwardProxy(self):
+        # TODO implement Nginx forward proxy
+        raise NotImplementedError
+    def makeReverseProxy(self):
+        # TODO implement Nginx reverse proxy
+        raise NotImplementedError
 
     def install(self, node: Node, web: WebService):
         """!
