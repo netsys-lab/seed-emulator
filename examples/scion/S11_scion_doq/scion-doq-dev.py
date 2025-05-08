@@ -84,11 +84,12 @@ def run(dumpfile = None):
                     #               	github.com/quic-go/quic-go v0.50.1
                       ),
 
-            # DEPRECATED: obsolete ! our miekg/dns fork uses the latest upstream scion-apps
-            #GitRepo( repo_url = 'https://github.com/netsys-lab/scion-apps',
-            #        repo_branch = 'master',
-            #        repo_path = '/repos/netsys-scion-apps',
-            #        notes =' ' ),
+            #  our miekg/dns fork uses the latest upstream scion-apps !!
+            # This is only required for the 'bat' tools to query a caddy SCION HTTPS server
+            GitRepo( repo_url = 'https://github.com/netsys-lab/scion-apps',
+                    repo_branch = 'attempt-master-rebase',# TODO rename branch into sth. meaningful like: seed-doq or ngi-search
+                    repo_path = '/repos/netsys-scion-apps',
+                    notes =' ' ),
 
             GitRepo( repo_url = 'https://github.com/netsys-lab/exdns',
                      repo_branch = 'master', # master-rebased
@@ -164,7 +165,7 @@ def run(dumpfile = None):
 
     sdns = DomainNameCachingService(do_enc=True)
 
-    # TODO code duplication - reuse code from 'scion-doq.py'
+    # TODO code duplication - reuse code from 'scion-doq.py' (unittest)
     def create_as(isd, asn, is_core=False, issuer=None):
         as_ = base.createAutonomousSystem(asn)
         scion_isd.addIsdAs(isd, asn, is_core)
