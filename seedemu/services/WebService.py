@@ -7,6 +7,25 @@ from seedemu.utilities.BuildtimeDocker import BuildtimeDockerFile, BuildtimeDock
 
 WebServerFileTemplates: Dict[str, str] = {}
 
+WebServerFileTemplates['seed_logo'] = '''\
+   SSSSSSSSSSSSSSS EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEDDDDDDDDDDDDD
+ SS:::::::::::::::SE::::::::::::::::::::EE::::::::::::::::::::ED::::::::::::DDD
+S:::::SSSSSS::::::SE::::::::::::::::::::EE::::::::::::::::::::ED:::::::::::::::DD
+S:::::S     SSSSSSSEE::::::EEEEEEEEE::::EEE::::::EEEEEEEEE::::EDDD:::::DDDDD:::::D
+S:::::S              E:::::E       EEEEEE  E:::::E       EEEEEE  D:::::D    D:::::D     eeeeeeeeeeee       mmmmmmm    mmmmmmm   uuuuuu    uuuuuu
+S:::::S              E:::::E               E:::::E               D:::::D     D:::::D  ee::::::::::::ee   mm:::::::m  m:::::::mm u::::u    u::::u
+ S::::SSSS           E::::::EEEEEEEEEE     E::::::EEEEEEEEEE     D:::::D     D:::::D e::::::eeeee:::::eem::::::::::mm::::::::::mu::::u    u::::u
+  SS::::::SSSSS      E:::::::::::::::E     E:::::::::::::::E     D:::::D     D:::::De::::::e     e:::::em::::::::::::::::::::::mu::::u    u::::u
+    SSS::::::::SS    E:::::::::::::::E     E:::::::::::::::E     D:::::D     D:::::De:::::::eeeee::::::em:::::mmm::::::mmm:::::mu::::u    u::::u
+       SSSSSS::::S   E::::::EEEEEEEEEE     E::::::EEEEEEEEEE     D:::::D     D:::::De:::::::::::::::::e m::::m   m::::m   m::::mu::::u    u::::u
+            S:::::S  E:::::E               E:::::E               D:::::D     D:::::De::::::eeeeeeeeeee  m::::m   m::::m   m::::mu::::u    u::::u
+            S:::::S  E:::::E       EEEEEE  E:::::E       EEEEEE  D:::::D    D:::::D e:::::::e           m::::m   m::::m   m::::mu:::::uuuu:::::u
+SSSSSSS     S:::::SEE::::::EEEEEEEE:::::EEE::::::EEEEEEEE:::::EDDD:::::DDDDD:::::D  e::::::::e          m::::m   m::::m   m::::mu:::::::::::::::uu
+S::::::SSSSSS:::::SE::::::::::::::::::::EE::::::::::::::::::::ED:::::::::::::::DD    e::::::::eeeeeeee  m::::m   m::::m   m::::m u:::::::::::::::u
+S:::::::::::::::SS E::::::::::::::::::::EE::::::::::::::::::::ED::::::::::::DDD       ee:::::::::::::e  m::::m   m::::m   m::::m  uu::::::::uu:::u
+ SSSSSSSSSSSSSSS   EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEDDDDDDDDDDDDD            eeeeeeeeeeeeee  mmmmmm   mmmmmm   mmmmmm    uuuuuuuu  uuuu
+'''
+
 WebServerFileTemplates['nginx_site'] = '''\
 server {{
     {listen_http}
@@ -484,7 +503,8 @@ class WebServerBase(Server):
         super().__init__()
         self.__port = 80
         self._server_name = ['_']
-        self.__index = '<h1>{nodeName} at {asn}</h1>'
+        self.__body = '<pre>{seedlogo}</pre>'.format(seedlogo=WebServerFileTemplates['seed_logo'])
+        self.__index = '<h1>{nodeName} at {asn}</h1>{body}'
         self.__enable_https = False
         self.__enable_https_func = None
         self.__ca_server_kind = CAServerKind.NONE
@@ -531,7 +551,9 @@ class WebServerBase(Server):
     def _installContents(self, node: Node):
         """! installs the static web page contents/files onto the given node
         """
-        node.setFile( f'{self._getRoot()}index.html', self.getIndexContent().format(asn = node.getAsn(), nodeName = node.getName()))
+        node.setFile( f'{self._getRoot()}index.html', self.getIndexContent().format(asn = node.getAsn(),
+                                                                                    nodeName = node.getName(),
+                                                                                    body = self.__body))
 
     def getServerNames(self) -> List[str]:
         return self._server_name
@@ -688,7 +710,6 @@ class CaddyHelper(InstallHelperBase):
 
         """
         # mount shared folder with  binaries from docker host to node's container
-
         if node not in CaddyHelper.__seen_nodes:
             CaddyHelper.__seen_nodes.append(node)
             path_to_binaries = "/bin/caddy"
@@ -792,39 +813,7 @@ class CaddyWebServer(WebServerBase):
         node.addSoftware('apache2-utils')
         node.appendStartCommand(f'scion-caddy run --config {config_path} 2>&1 | rotatelogs -n 2 /var/log/caddy.log 1M', fork=True)
         node.appendClassName("WebService")
-        pass
 
-'''
-./bat 1-172,10.172.0.71:8443 -v -i
-2025/05/07 18:31:30.344317 bat.go:238: Error Get "http://[1-172,10.172.0.71]:8443": CRYPTO_ERROR 0x178 (remote): tls: no application protocol
-
-
-"args": [ "-servername",  "www.example.com",  "https://1-172,10.172.0.71:8443"]
-5/05/07 19:23:50.456308 bat.go:249: Error Get "https://[1-172,10.172.0.71]:8443":
- CRYPTO_ERROR 0x12a (local): tls: failed to verify certificate: x509: certificate is valid for www.example.com, not 1-172,10.172.0.71
-
-
-/repos/caddy-scion/build/scion-caddy run --config /etc/caddy/config.json
-2025/05/07 18:53:47.536 INFO    using config from file  {"file": "/etc/caddy/config.json"}
-2025/05/07 18:53:47.540 INFO    admin   admin endpoint started  {"address": "localhost:2019", "enforce_origin": false, "origins": ["//localhost:2019", "//[::1]:2019", "//127.0.0.1:2019"]}
-2025/05/07 18:53:47.542 INFO    tls.cache.maintenance   started background certificate maintenance      {"cache": "0xc000399400"}
-2025/05/07 18:53:47.544 WARN    tls     stapling OCSP   {"error": "no OCSP stapling for [www.example.com]: no OCSP server specified in certificate"}
-2025/05/07 18:53:47.544 INFO    http.auto_https enabling automatic HTTP->HTTPS redirects        {"server_name": "www_example_com"}
-2025/05/07 18:53:47.545 WARN    http    HTTP/3 skipped because it requires TLS  {"network": "tcp", "addr": ":80"}
-2025/05/07 18:53:47.546 WARN    http    HTTP/2 skipped because it requires TLS  {"network": "tcp", "addr": ":80"}
-2025/05/07 18:53:47.546 INFO    http    enabling HTTP/3 listener        {"addr": ":443"}
-2025/05/07 18:53:47.549 INFO    tls     storage cleaning happened too recently; skipping for now        {"storage": "FileStorage:/root/.local/share/caddy", "instance": "9527a235-2843-434f-a0ec-e20de0117a23", "try_again": "2025/05/08 18:53:47.549", "try_again_in": 86399.999998114}
-2025/05/07 18:53:47.549 INFO    tls     finished cleaning storage units
-2025/05/07 18:53:47.549 INFO    http    enabling HTTP/3 listener        {"addr": "1-172,10.172.0.71:8443"}
-2025/05/07 18:53:47.554 INFO    connection doesn't allow setting of receive buffer size. Not a *net.UDPConn?. See https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes for details.
-2025/05/07 18:53:47.554 INFO    http.log        server running  {"name": "www_example_com", "protocols": ["h1", "h2", "h3"]}
-2025/05/07 18:53:47.554 WARN    http    HTTP/3 skipped because it requires TLS  {"network": "scion", "addr": "1-172,10.172.0.71:80"}
-2025/05/07 18:53:47.554 WARN    http    HTTP/2 skipped because it requires TLS  {"network": "scion", "addr": "1-172,10.172.0.71:80"}
-2025/05/07 18:53:47.554 INFO    http.log        server running  {"name": "remaining_auto_https_redirects", "protocols": ["h1", "h2", "h3"]}
-2025/05/07 18:53:47.554 INFO    autosaved config (load with --resume flag)      {"file": "/root/.config/caddy/autosave.json"}
-2025/05/07 18:53:47.554 INFO    serving initial configuration
-
-'''
 
 class NginxWebServer(WebServerBase):
     """
