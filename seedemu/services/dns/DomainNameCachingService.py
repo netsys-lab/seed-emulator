@@ -229,27 +229,6 @@ options {
 };
 '''
 
-def getNodeAddr(node: Node) -> str:
-    address = getIpAddr(node)
-    if 'scion_address' in node.getLabel():
-        scion_addr = node.getLabel()['scion_address']
-        ia_str = scion_addr.split(',')[0]
-        ip_str = scion_addr.split(',')[1]
-        assert ip_str==str(address), 'implementation error'
-        return scion_addr
-    else:
-        return str(address)
-
-def getIpAddr(node: Node) -> str:
-    ifaces = node.getInterfaces()
-    assert len(ifaces) > 0, 'Node {} has no IP address.'.format(node.getName())
-    assert len(ifaces) == 1, f'Node {node.getName()} is not and end-host'
-    for iface in ifaces:
-        net = iface.getNet()
-        if net.getType() == NetworkType.Local:
-            address = iface.getAddress()
-            return address
-    return ""
 
 class DomainNameCachingServer(Server, Configurable):
     """!
@@ -385,8 +364,7 @@ class DomainNameCachingServer(Server, Configurable):
         self.__emulator = emulator
         self.__node = node
 
-        address = getNodeAddr(node)
-
+        address = node.getNodeAddr()
         assert address != "", 'address is not configured.'
 
         if node.getOption('dns_setup').value in [DNSStack.SCION, DNSStack.SCION_DEV]:
@@ -482,7 +460,7 @@ class DomainNameCachingServer(Server, Configurable):
 
     def bindDoQAddrPort(self, node: Node) -> str:
         """where to listen for public resolver"""
-        return f'{self.getNodeAddr(node)}:{self.__doq_port}'
+        return f'{node.getNodeAddr()}:{self.__doq_port}'
 
     def _do_install_sdns(self, node: Node, helper: DNSStackHelperBase):
         """
@@ -565,7 +543,7 @@ class DomainNameCachingServer(Server, Configurable):
         reg = self.__emulator.getRegistry()
         (scope, _, _) = node.getRegistryInfo()
         sr = ScopedRegistry(scope, reg)
-        addr = getNodeAddr(node)
+        addr = node.getNodeAddr()
 
         for rnode in sr.getByType('rnode'):
             rnode.appendFile('/etc/resolv.conf.new', 'nameserver {}\n'.format(addr))
@@ -659,7 +637,7 @@ class DomainNameCachingService(Service):
         for (server, node) in targets:
             server.configure(emulator, node)
 
-            address = getNodeAddr(node)
+            address = node.getNodeAddr()
             assert address != "", 'address is not configured.'
             addrs.append((address, server))
 

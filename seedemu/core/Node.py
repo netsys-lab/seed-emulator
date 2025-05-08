@@ -412,6 +412,24 @@ class Node(Printable, Registrable, Configurable, Vertex, Customizable):
         self.__host_names.append(name)
         return self
 
+
+    def getNodeAddr(self) -> str:
+        """
+        returns this node's address on it's local network.
+        If it's a SCION node, it's SCION address will be returned.
+        @note only call after node is configured
+        """
+        address = self.getLocalIPAddress()
+        assert address != None, 'logic error: node is not an end host'
+        if 'scion_address' in self.getLabel():
+            scion_addr = self.getLabel()['scion_address']
+            ia_str = scion_addr.split(',')[0]
+            ip_str = scion_addr.split(',')[1]
+            assert ip_str==str(address), 'implementation error'
+            return scion_addr
+        else:
+            return str(address)
+
     def getLocalIPAddress(self) -> Optional[str]:
         """!
         @brief Get the IP address of the local interface for this node.
