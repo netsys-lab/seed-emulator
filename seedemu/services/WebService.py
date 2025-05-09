@@ -7,6 +7,11 @@ from seedemu.utilities.BuildtimeDocker import BuildtimeDockerFile, BuildtimeDock
 
 WebServerFileTemplates: Dict[str, str] = {}
 
+WebServerFileTemplates['default_index'] = '''\
+<h1>{nodeName} at {asn}</h1>
+{body}
+'''
+
 WebServerFileTemplates['seed_logo'] = '''\
    SSSSSSSSSSSSSSS EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEDDDDDDDDDDDDD
  SS:::::::::::::::SE::::::::::::::::::::EE::::::::::::::::::::ED::::::::::::DDD
@@ -492,7 +497,7 @@ class WebServerBase(Server):
         self.__role = WebServerRole.WEB
         self._server_name = ['_']
         self.__body = '<pre>{seedlogo}</pre>'.format(seedlogo=WebServerFileTemplates['seed_logo'])
-        self.__index = '<h1>{nodeName} at {asn}</h1>{body}'
+        self.__index = WebServerFileTemplates['default_index']
         self.__enable_https = False
         self.__enable_https_func = None
         self.__ca_server_kind = CAServerKind.NONE
@@ -751,7 +756,7 @@ class CaddyWebServer(WebServerBase):
 
 
         # NOTE: all requests to the forward proxy must contain "Proxy-Authorization" header with value  "Basic cG9saWN5Og==" !!!
-        curl -v "https://www.example.com:8443" --proxy "https://localhost:80" --proxy-header "Proxy-Authorization: Basic cG9saWN5Og=="
+        curl -v "https://www.example.com:7443" --proxy "https://localhost:9443" --proxy-header "Proxy-Authorization: Basic cG9saWN5Og=="
 
 
         '''
@@ -815,7 +820,13 @@ class CaddyWebServer(WebServerBase):
         if 'scion_address' in node.getLabel():
             assert self.getHTTPSEnabled(), 'configuration error: No unencrypted HTTP supported with SCION'
             scion_addr = node.getLabel()['scion_address']
+            # HTTP/3 native SCION QUIC -> shttp3 go package
+            # ALPN token: 'h3'
             listen += f', "scion/[{scion_addr}]:8443"'
+            # HTTP/1,2 -> shttp go packge [single QUIC stream mimics a TCP conn]
+            # required for interoperability with old tech i.e. 'curl' and http forward proxy server
+            # ALPN token: 'qs'
+            listen += f', "scion+single-stream/[{scion_addr}]:7443"'
 
 
         if self.getHTTPSEnabled():
