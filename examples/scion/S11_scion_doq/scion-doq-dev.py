@@ -429,6 +429,7 @@ def run(dumpfile = None):
 
     # on the docker-host with the SCION browser extensions do:
     # sudo cp  /tmp/seedemu-minica-wtqc23j8/minica.pem /usr/local/share/ca-certificates/minica.crt && sudo update-ca-certificates
+    # NOTE: in order to use the scion-browser-extensions you must additionally add minica.crt to chrome's trusted certs under chrome://settings/certificates !!!
     caStore = RootMiniCAStore(caDomain='seedemu.internal.')
 
     caServer: MiniCAServer = minica.install('ca-vnode')
@@ -443,7 +444,7 @@ def run(dumpfile = None):
     # curl "https://www.example.com:7443" --proxy "https://localhost:9443"
     #            --proxy-header "Proxy-Authorization: Basic cG9saWN5Og==" 
     host_a = base.getAutonomousSystem(102).getHost('host_0')
-    host_a.addPortForwarding(8888, 8888, 'tcp')
+    host_a.addPortForwarding(9080, 9080, 'tcp')
     host_a.addPortForwarding(9443, 9443, 'tcp')
 
     sdns_server = sdns.install('sdns-vnode')
