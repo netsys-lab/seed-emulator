@@ -1,3 +1,38 @@
+# Future SCION Internet
+
+The predominant workload of web browsing and content delivery is poised to persist and even intensify in the next generation internet.
+So do the core technologies that enable it, HTTP and DNS, which will continue to - stand at the heart of it/ assume a pivotal role/ serve as a cornerstone/ take on a central function.
+
+Apart from/ Beside the continutiy of these core technologies in principal, the transition to SCION provides the opportunity,
+ to retire/clean-sweap/clear up/  outdated/anachronistic weak points of today's Internet like i.e. unencrypted DNS (Do53) that have become an increasing burden.
+
+SCION also takes a turn at the Internet's web PKI and ...  
+.. where today's Internet falls short
+- improved transparency . . who issued and signed a TLS certificate for a given domain
+- multiple trust anchors
+
+Support for unencrypted Do53 will be phased out in favor of DNS over Encryption (DoE), ensuring end-to-end privacy for all DNS queries.  
+
+
+The core technologies in today's Internet that enable the predominant workload of web browsing HTTP and DNS are poised to persist and even intensify in the future Internet. (und weiterhin eine wichtige schluesselrolle uebernehmen werden ..)
+
+This example shows how the predominant technologies in today's internet, HTTPS and DNS, enable web browsing also in the next-generation SCION Internet.
+
+Although the essential/fundamental/principal continuity of core technologies (HTTPs and DNS) 
+
+.. this provides the opportunity to retire some outdated burdens like i.e. unencrypted DNS (Do53).
+
+
+This example showcases how web technologies will evolve with the adoption of SCION in the future internet.
+
+## Details
+
+In order to resolve domain names to SCION addresses, the hosts run a modified SCION capable sdns recursive resolver (listening at `127.0.0.127`) instead of the default one provided by docker (listening at `127.0.0.11`).
+Because most browsers are currently neither SCION nor HTTP/3 capable, a forward proxy is required to access native websites, hosted in the SCION Internet (web server listening on a SCION address).
+It translates HTTP/2 requests from the browser (client) received over legacy TCP/IP transport and forwards them to the web servers over SCION QUIC and vice versa with the response.
+
+- port forwarding into/out of the emulation
+
 ## DNS Support for SCION
 
 To achieve backward compatibility and low overheads, the
