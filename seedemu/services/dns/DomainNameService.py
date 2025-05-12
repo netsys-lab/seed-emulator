@@ -6,7 +6,9 @@ from re import sub
 import inspect
 import requests
 from seedemu.core import CAServerBase
-from .DNSCommon import  ResourceRecord, _getRRforNode, _getNsAddrRecord, _getSoaRR , NS_RR, DNSStack, A_RR, TXT_RR, rrname2Type, DNSStackHelperBase
+from .DNSCommon import ( ResourceRecord, _getRRforNode, _getNsAddrRecord, _getSoaRR,
+                         NS_RR, DNSStack, A_RR, TXT_RR, rrname2Type, DNSStackHelperBase,
+                         DNSAuth)
 
 
 DomainNameServiceFileTemplates: Dict[str, str] = {}
@@ -43,12 +45,29 @@ http local-http-server {
 DomainNameServiceFileTemplates['coredns_config'] = '''\
 {schema}://{zone}:{port} {{
 tls {tls_cert} {tls_key}
-file {zonefile} {zone}
+{file}
 debug
 log
 errors
 }}
 '''
+
+DomainNameServiceFileTemplates['coredns_file'] = '''\
+file {zonefile} {zone}
+'''
+
+DomainNameServiceFileTemplates['coredns_rhine'] = '''\
+rhine {zonefile} {zone} {{
+    scion on
+}}
+
+sign {zonefile} {zone} {{
+    rcert file {rcertfile}
+    key file {sign_key_base_path}
+    directory {out_dir}
+}}
+'''
+
 
 
 class Zone(Printable):
@@ -308,7 +327,7 @@ class DomainNameServer(Server):
     __is_master: bool
     __is_real_root: bool
 
-    def __init__(self, do_enc: bool):
+    def __init__(self, do_enc: bool, dns_auth: DNSAuth):
         """!
         @brief DomainNameServer constructor.
         """
@@ -320,6 +339,18 @@ class DomainNameServer(Server):
         self.__ns_server_name = {}
         self.__enable_https_func = None
         self.__do_enc = do_enc
+        self.__dns_auth = dns_auth
+
+    @staticmethod
+    def _getRhineCertName() -> str:
+        """the subject name of the RHINE certificate"""
+        return 'rhine.'
+
+    @staticmethod
+    def _getRhineCertBase() -> str:
+        """ base path to  rhine_cert.pem & rhine_private.pem
+        """
+        return '/etc/coredns/rhine/rhine'
 
     def _getCryptoPathsForZone(self, zone: str, ns_name: str = None) ->Tuple[str,str]:
         """
@@ -505,6 +536,15 @@ class DomainNameServer(Server):
             if zone.getName() == "." and self.__is_real_root:
                 for record in self.__getRealRootRecords():
                     zone.addRecord(record)
+        # TODO generate RHINE cert
+        rcert_path = f'{self._getRhineCertBase()}_cert.pem'
+        rkey_path = f'{self._getRhineCertBase()}_private.pem'
+        rcert_names = self._getRhineCertName()
+        self.__enable_https_func(node = node,
+                                 context = 'rhine',
+                                 server_names = rcert_names,
+                                 dst_cert_path = rcert_path,
+                                 dst_key_path = rkey_path)
 
 
 
@@ -524,11 +564,30 @@ class DomainNameServer(Server):
             if self.__do_enc:
                 #'bind9 is only capable of DNS-over-HTTPS (DoH) and DNS-over-TLS (DoT) not DNS-over-QUIC (DoQ) yet'
                 raise NotImplementedError
+            if self.__dns_auth != DNSAuth.NONE:
+                raise NotImplementedError
 
             self._do_install_bind9(node, dns)
         elif val in [DNSStack.SCION, DNSStack.SCION_DEV]:
             assert self.__do_enc, 'No support for unencrypted DNS in the Future Next Generation Internet anymore !'
+            # TODO: maybe mandate "RHINE" here .. ?!
+            assert self.__dns_auth in [DNSAuth.NONE, DNSAuth.RHINE], 'legacy DNSSEC not supported in the NextGen Internet!'
             self._do_install_coredns(node, dns, val.getHelper())
+
+    def _do_generate_zone_signing_keys(self, node: Node, dns: DomainNameService, zone_signing_keys_path: str):
+        """ generate a zone signing key pair for each of the zones 
+        
+        """
+
+        for (_zonename, auto_ns_soa) in self.__zones:
+            zone = dns.getZone(_zonename)
+            zonename = filename = zone.getName()
+            if zonename == '' or zonename == '.':
+                filename = 'root'
+                zonename = '.'
+            keypath = f'{zone_signing_keys_path}/{filename}'
+            node.appendStartCommand(f'coredns-keygen {zone.getName()}')
+            #node.setFile(zonepath, '\n'.join(zone.getRecords()))
 
     def _do_generate_zonefiles(self, node: Node, dns: DomainNameService, zones_path: str):
         """ generate a zonefile for each of the zones under /etc/coredns/zones
@@ -544,7 +603,11 @@ class DomainNameServer(Server):
             zonepath = f'{zones_path}/{filename}'
             node.setFile(zonepath, '\n'.join(zone.getRecords()))
 
-    def _do_generate_corefile(self, node: Node, dns: DomainNameService, corefile_path: str, zones_path: str):
+    def _do_generate_corefile(self, node: Node, dns: DomainNameService,
+                               corefile_path: str,
+                               zones_path: str,
+                               signed_zones: str,
+                               zone_signing_keys_path: str):
         """ add a server-block to Corefile for each zone
         """
 
@@ -558,11 +621,22 @@ class DomainNameServer(Server):
 
             #  TLS certificate and private key for zone are generated by _enableHttpsFunc
             cert_path, key_path = self._getCryptoPathsForZone(zonename, self.getServerName(zonename) )
-
+            
             zonefile_path = f'{zones_path}/{filename}'
+
+            signed_zonefile_path = f'{signed_zones}/{filename}'
+
+            _file = ( DomainNameServiceFileTemplates['coredns_file'].format(zonefile=zonefile_path, zone=zonename) 
+                      if self.__dns_auth == DNSAuth.NONE else 
+                       DomainNameServiceFileTemplates['coredns_rhine'].format(zonefile=signed_zonefile_path,
+                                                                              zone=zonename,
+                                                                              rcertfile=self._getRhineCertBase(),
+                                                                              sign_key_base_path=f'{zone_signing_keys_path}/K{zonename}',
+                                                                              out_dir=signed_zones ) )
+            
             server_block = DomainNameServiceFileTemplates['coredns_config'].format(
-                schema='squic', # SCION QUIC or change to DoQ sth.
-                zonefile=zonefile_path,
+                schema='squic', # SCION QUIC or change to DoQ sth. 
+                file=_file,
                 zone= zonename,
                 port=853,# standard DoQ port,
                 tls_cert=cert_path,
@@ -579,10 +653,16 @@ class DomainNameServer(Server):
         helper.install(node, 'coredns')
 
         corefile_path = f'/etc/coredns/Corefile'
-        zones_path = '/etc/coredns/zones'
+        zones_path = '/etc/coredns/zones' # 'raw' zonesfiles without 'DNSKEY, RRSIG etc.'
+        signed_zones_path = '/etc/coredns/signed_zones' # zonefiles with additional RRSIG entries
+        zone_signing_keys_path = '/etc/coredns/keys'
         self._do_generate_zonefiles(node, dns, zones_path)
+        self._do_generate_zone_signing_keys(node, dns, zone_signing_keys_path)
         # TODO move corefile generation to after-configure() when server-name is known
-        self._do_generate_corefile(node, dns, corefile_path, zones_path)
+        self._do_generate_corefile(node, dns, corefile_path,
+                                   zones_path,
+                                   signed_zones=signed_zones_path,
+                                   zone_signing_keys_path=zone_signing_keys_path)
         node.addSoftware('apache2-utils') # for rotatelogs
         node.appendStartCommand(f'coredns -conf {corefile_path} 2>&1 | rotatelogs -n 2 /var/log/coredns.log 1M', fork=True)
 
@@ -664,15 +744,18 @@ class DomainNameService(Service):
         from seedemu.core import OptionRegistry
         return [OptionRegistry().dns_setup()]
 
-    def __init__(self, autoNameServer: bool = True, dns_setup: BaseOption = None, do_enc: bool = True):
+    def __init__(self, autoNameServer: bool = True, dns_setup: BaseOption = None,
+                 do_enc: bool = True, dns_auth: DNSAuth = DNSAuth.NONE):
         """!
         @brief DomainNameService constructor.
         @param do_enc enable DNS over Encrypted Transport.
                 (requires DNS nameservers to have TLS certs, and clients to posess the root cert to verify them)
         @param autoNameServer add gule records to parents automatically.
+        @param dns_auth enable authentication of DNS RR's i.e. via DNSSEC
         """
         from seedemu.core.OptionRegistry import OptionRegistry
         super().__init__()
+        self.__dsn_auth = dns_auth
         self.__autoNs = autoNameServer
         self.__rootZone = Zone('.')
         self.__masters = {}
@@ -719,7 +802,7 @@ class DomainNameService(Service):
             self.__resolvePendingRecords(emulator, subzone)
 
     def _createServer(self) -> Server:
-        return DomainNameServer(self.__do_enc)
+        return DomainNameServer(self.__do_enc, self.__dsn_auth)
 
     def _doConfigure(self, node: Node, server: DomainNameServer):
         server.configure(node, self)

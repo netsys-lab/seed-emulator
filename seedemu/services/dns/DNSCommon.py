@@ -108,6 +108,7 @@ class DNSStackHelper(DNSStackHelperBase):
     # target-name, url, branch, checkout-dir, do-build
     __dns_urls = [('dns', 'https://github.com/netsys-lab/dns', 'master-rebase', '/repos/dns', False),
                   ('coredns', 'https://github.com/netsys-lab/scion-coredns-doq', 'attempt-rebase', '/repos/coredns', True),
+                  ('coredns-utils', 'https://github.com/coredns/coredns-utils.git', 'master', '/repos/coredns-utils', True)
                   ('sdns', 'https://github.com/netsys-lab/scion-sdns', 'new-main', '/repos/sdns', True),
                   ('exdns', 'https://github.com/netsys-lab/exdns', 'master-rebased', '/repos/exdns', True)
                 ]
@@ -134,6 +135,8 @@ class DNSStackHelper(DNSStackHelperBase):
                 if target[4]:
                     if target[0] == 'exdns':
                         DNS_BUILD_TEMPLATE += f'RUN cd {target[3]}/q && go mod tidy && go build -o ../bin/{target[0]} .\n'
+                    elif target[0] == 'coredns-utils':
+                        DNS_BUILD_TEMPLATE += f'RUN cd {target[3]}/coredns-keygen && go mod tidy && go build -o ../bin/{target[0]} .\n'
                     else:
                         DNS_BUILD_TEMPLATE += f'RUN cd {target[3]} && go mod tidy && go build -o bin/{target[0]} .\n'
 
@@ -168,10 +171,17 @@ class DNSStackHelper(DNSStackHelperBase):
             node.addDockerCommand(f'ENV PATH={path_to_binaries}:$PATH ')
 
 
+class DNSAuth(Enum):
+    # no authentication of DNS RR's whatsoever
+    NONE = 0
+    # DNSSEC 
+    DNSSEC = 1
+    RHINE = 2
+
 class DNSStack(Enum):
     """
     user choice whether the naming system in the emulation
-    shall support Next-Gen Internet addresses or not
+    shall support Next-Gen Internet addresses or not and if so how
     """
     # legacy IP only
     DEFAULT = 0 # implemented with bind9

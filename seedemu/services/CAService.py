@@ -66,12 +66,19 @@ class RootMiniCAStore(RootCAStoreBase):
         with cd(self.__caDir):
             self.__container = BuildtimeDockerImage("minica").build(BuildtimeDockerFile(self._dockerfile_contents)).container()
             self.__container.user(f"{os.getuid()}:{os.getuid()}").mountVolume( self.__caDir, "/certs" )
+        
+        self.__seen_names = {}
 
     def generateCert(self, server_names: List[str]):
         """
         generates a key pair and certificate for the given domain
         """
         assert not any([' ' in ns for ns in server_names]), 'invalid input: server_names must be valid fully qualified domain names.'
+
+        if any([s in self.__seen_names for s in server_names]):
+            # don't generate certificates twice
+            return
+
         dnames = ','.join( s for s in server_names if s != None and s != '')
         self.__container.run(f'minica --domains "{dnames}"') # cert & key is output to ./{domain.name}/
 
@@ -128,7 +135,8 @@ class MiniCAServer(CAServerBase):
 
 
 
-    def enableHTTPSFunc(self, context: str, node: Node, server_names: List[str], dst_cert_path: str, dst_key_path: str):
+    def enableHTTPSFunc(self, context: str, node: Node, server_names: List[str],
+                        dst_cert_path: str, dst_key_path: str, update: bool = True):
         """
         unlike StepCA requires no ACME at runtime,
         because it copies all required stuff into containers at build time
@@ -158,7 +166,8 @@ class MiniCAServer(CAServerBase):
                     raise Exception('implementation error')
 
         node.addSoftware("ca-certificates")
-        node.appendStartCommand("update-ca-certificates")
+        if update:
+            node.appendStartCommand("update-ca-certificates")
 
 class MiniCAService(CAServiceBase):
 
@@ -195,7 +204,9 @@ class StepCAServer(CAServerBase):
         node.appendStartCommand("update-ca-certificates")
 
 
-    def enableHTTPSFunc(self, context: str, node: Node, server_names: List[str], dst_cert_path: str = None, dst_key_path:str = None):
+    def enableHTTPSFunc(self, context: str, node: Node, server_names: List[str],
+                        dst_cert_path: str = None, dst_key_path:str = None,
+                        update: bool = True):
         """!
         @brief Enable HTTPS for the web server.
         This is not supposed to be called directly. The WebService will call this function.
@@ -203,6 +214,9 @@ class StepCAServer(CAServerBase):
         @param node The node to enable HTTPS.
         @pram context a hint from the caller, what the certificate is needed for i.e. 'nginx'
         @param web The web server to enable HTTPS.
+        @param update ignored by impl.
+        @param dst_cert_path ignored
+        @param dst_key_path ignored
         """
         node.addSoftware("certbot").addSoftware("python3-certbot-nginx").addSoftware(
             "cron"

@@ -167,7 +167,9 @@ class CAServerBase(Server):
         return self
 
 
-    def enableHTTPSFunc(self, context: str, node: Node, server_names: List[str], dst_cert_path: str = None, dst_key_path: str = None):
+    def enableHTTPSFunc(self, context: str, node: Node, server_names: List[str],
+                        dst_cert_path: str = None, dst_key_path: str = None,
+                        update: bool = True):
         """
         a callback that web servers can invoke to equip themselves with a TLS certificate
         issued by this CAServer
@@ -175,6 +177,7 @@ class CAServerBase(Server):
               Some CA service implementations might not require this argument or ignore it.
         @param dst_key_path path and filename where to place the web servers private key corresponding to the certificate.
         @param node onto which the web server is installed and whose filesystem must contain the servers certificate
+        @param update whether to call 'update-ca-certificates
         """
 
     def _installRootCertToClient(self, node: Node):

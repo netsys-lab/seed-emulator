@@ -247,10 +247,12 @@ class DomainNameCachingServer(Server, Configurable):
     __asn_range: List[int]
     __is_range_all: bool
 
-    def __init__(self, do_enc: bool, server_name: str = None, wipe_docker_resolv_conf: bool = False):
+    def __init__(self, do_enc: bool, dns_auth: DNSAuth,
+                 server_name: str = None, wipe_docker_resolv_conf: bool = False):
         """!
         @brief DomainNameCachingServer constructor.
-        @param do_enc enable DNS over encrypted transport
+        @param do_enc enable DNS over encrypted transport (DoE)
+        @param dns_auth enable validation/authentication of DNS RR's
         @param wipe_docker_resolv_conf  whether to wipe out the default docker container configuration
                 'nameserver 127.0.0.11' (system resolver)
         """
@@ -260,6 +262,7 @@ class DomainNameCachingServer(Server, Configurable):
         self.__wipe_docker_resolv_conf = wipe_docker_resolv_conf
         self.__server_name = server_name
         self.__do_enc = do_enc
+        self.__dns_auth = dns_auth
         self.__root_servers = []
         self.__enable_https_func = None
         self.__configure_resolvconf = False
@@ -448,9 +451,13 @@ class DomainNameCachingServer(Server, Configurable):
         if (val:=node.getOption('dns_setup').value) == DNSStack.DEFAULT:
             if self.__do_enc:
                 raise NotImplementedError
+            if self.__dns_auth != DNSAuth.NONE:
+                raise NotImplementedError
             self._do_install_bind9(node)
         elif val in [DNSStack.SCION, DNSStack.SCION_DEV]:
             assert self.__do_enc, 'No support for unencrypted DNS (Do53) in the Future Next Generation Internet anymore !'
+            assert self.__dns_auth != DNSAuth.RHINE, 'legacy DNSSEC not supported in the Next Gen Internet'
+            # TODO maybe mandate RHINE here ... 
             self._do_install_sdns(node, val.getHelper())
 
     def bindDo53AddrPort(self) -> str:
@@ -472,6 +479,7 @@ class DomainNameCachingServer(Server, Configurable):
         cert_path, key_path = self._getCryptoPaths()
 
 
+        # FIXME use the right RHINE cert here -> from the CAServer
         # use MiniCA root certificate which is installed in every host's trust store
         # as rhine certificate to verify RHINE records
         rcert = '/usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA.crt'
@@ -592,6 +600,7 @@ class DomainNameCachingService(Service):
 
     def __init__(self, autoRoot: bool = True,
                  do_enc: bool = False,
+                 dns_auth: DNSAuth = DNSAuth.NONE,
                  wipe_docker_resolv_conf: bool = False):
         """!
         @brief DomainNameCachingService constructor.
@@ -600,6 +609,7 @@ class DomainNameCachingService(Service):
         True by default, if true, DomainNameCachingService will find root NS in
         DomainNameService and use them as root.
         @param do_enc  support encrypted DNS (DNS privacy)
+        @param dns_auth whether the resolver shall validate any retrieved RR's i.e. with DNSSEC
         @param wipe_docker_resolve_conf whether the default docker /etc/resolv.conf config
                     shall be kept or overridden
         """
@@ -608,6 +618,7 @@ class DomainNameCachingService(Service):
         self.__auto_root = autoRoot
         self.__wipe_docker_resolv_conf = wipe_docker_resolv_conf
         self.__do_enc = do_enc
+        self.__dns_auth = dns_auth
         self.addDependency('Base', False, False)
         if autoRoot:
             self.addDependency('DomainNameService', False, False)
@@ -615,6 +626,7 @@ class DomainNameCachingService(Service):
 
     def _createServer(self) -> DomainNameCachingServer:
         return DomainNameCachingServer(self.__do_enc,
+                                       self.__dns_auth,
                                        wipe_docker_resolv_conf=self.__wipe_docker_resolv_conf)
 
     def getName(self) -> str:
