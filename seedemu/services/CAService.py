@@ -67,7 +67,7 @@ class RootMiniCAStore(RootCAStoreBase):
             self.__container = BuildtimeDockerImage("minica").build(BuildtimeDockerFile(self._dockerfile_contents)).container()
             self.__container.user(f"{os.getuid()}:{os.getuid()}").mountVolume( self.__caDir, "/certs" )
         
-        self.__seen_names = {}
+        self.__seen_names = set()
 
     def generateCert(self, server_names: List[str]):
         """
@@ -78,6 +78,9 @@ class RootMiniCAStore(RootCAStoreBase):
         if any([s in self.__seen_names for s in server_names]):
             # don't generate certificates twice
             return
+        else:
+            for s in server_names:
+                self.__seen_names.add(s)
 
         dnames = ','.join( s for s in server_names if s != None and s != '')
         self.__container.run(f'minica --domains "{dnames}"') # cert & key is output to ./{domain.name}/
@@ -136,14 +139,17 @@ class MiniCAServer(CAServerBase):
 
 
     def enableHTTPSFunc(self, context: str, node: Node, server_names: List[str],
-                        dst_cert_path: str, dst_key_path: str, update: bool = True):
+                        dst_cert_path: str = None, dst_key_path: str = None, update: bool = True):
         """
         unlike StepCA requires no ACME at runtime,
         because it copies all required stuff into containers at build time
         @param node  the Node onto which the (Web/Dns whatever)Server which requires TLS is installed
         @param context minica server is context agnostic. This argument is ignored.
         @param server_name domain-name/s of the Server for which it needs a certificate
-        @param dst_cert_path destination path on 'node' where to place the generated cert and key
+        @param dst_cert_path destination path on 'node' where to place the generated cert.
+                If unspecified, no copy of the cert onto the node is performed.
+        @param dst_key_path destinatino path on 'node' where to place the generated private key.
+                If None the key isn't copied to 'node' (but only the public cert).
         """
 
         store: RootMiniCAStore = self.getCAStore()
@@ -154,17 +160,15 @@ class MiniCAServer(CAServerBase):
         cert_dir = os.path.join(store.getStorePath(), server_names[0])
         for root, _, files in os.walk(cert_dir):
             for file in files:
-                if file == 'cert.pem':
+                if file == 'cert.pem' and dst_cert_path != None:
                     node.importFile(
                         os.path.join(root, file),
                         dst_cert_path)
-                elif file == 'key.pem':
+                elif file == 'key.pem' and dst_key_path != None:
                     node.importFile(
                         os.path.join(root, file),
                         dst_key_path)
-                else:
-                    raise Exception('implementation error')
-
+                
         node.addSoftware("ca-certificates")
         if update:
             node.appendStartCommand("update-ca-certificates")

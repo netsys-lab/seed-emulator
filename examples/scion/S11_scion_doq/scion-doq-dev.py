@@ -95,6 +95,13 @@ def run(dumpfile = None):
     devsvc = GolangDevService( 'amdfxlucas', 'saculolissat@gmx.de' )
 
     repos = [
+        GitRepo(
+            repo_url = 'https://github.com/coredns/coredns-utils.git', 
+            repo_branch = 'master',
+             repo_path = '/repos/coredns-utils',
+             notes = 'coredns-keygen util is required for zone signing key generation\
+                    OBSOLETE!! we use bind9 dnssec utils instead, because it supports more keytypes.'),
+        
             GitRepo( repo_url = 'https://github.com/netsys-lab/pan-lua',
                     repo_branch = 'main',
                     repo_path = '/repos/pan-lua' ),
@@ -200,12 +207,12 @@ def run(dumpfile = None):
 
     # do not install CoreDNS, sdns etc. binaries since we provide them via the DevService
     # The DNS layers will only generate the config files and set up the certificates
-    dns_svc = DomainNameService(dns_setup=OptionRegistry().dns_setup(DNSStack.SCION_DEV))
+    dns_svc = DomainNameService(dns_setup=OptionRegistry().dns_setup(DNSStack.SCION_DEV), dns_auth=DNSAuth.RHINE)
     minica = MiniCAService()
 
     web = WebService(kind = WebServerKind.CADDY)
 
-    sdns = DomainNameCachingService(do_enc=True)
+    sdns = DomainNameCachingService(do_enc=True, dns_auth=DNSAuth.RHINE)
 
     # TODO code duplication - reuse code from 'scion-doq.py' (unittest)
     def create_as(isd, asn, is_core=False, issuer=None):

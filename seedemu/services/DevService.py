@@ -333,7 +333,7 @@ class GolangDevService(ContainerDevelopmentService):
 
     """
 
-    def __init__(self, uname: str, mail: str, goversion: str = '1.24.0'):
+    def __init__(self, uname: str, mail: str, goversion: str = '1.24.3'):
         """!
         @brief
         @param uname github user name

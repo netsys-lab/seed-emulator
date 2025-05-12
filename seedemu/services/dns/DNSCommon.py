@@ -3,7 +3,7 @@ from enum import Enum
 from dataclasses import dataclass
 from random import randint
 import os
-from typing import List
+from typing import List, Tuple
 from seedemu.utilities.BuildtimeDocker import BuildtimeDockerFile, BuildtimeDockerImage
 
 _default_name = '@'
@@ -108,7 +108,7 @@ class DNSStackHelper(DNSStackHelperBase):
     # target-name, url, branch, checkout-dir, do-build
     __dns_urls = [('dns', 'https://github.com/netsys-lab/dns', 'master-rebase', '/repos/dns', False),
                   ('coredns', 'https://github.com/netsys-lab/scion-coredns-doq', 'attempt-rebase', '/repos/coredns', True),
-                  ('coredns-utils', 'https://github.com/coredns/coredns-utils.git', 'master', '/repos/coredns-utils', True)
+                  ('coredns-utils', 'https://github.com/coredns/coredns-utils.git', 'master', '/repos/coredns-utils', True),
                   ('sdns', 'https://github.com/netsys-lab/scion-sdns', 'new-main', '/repos/sdns', True),
                   ('exdns', 'https://github.com/netsys-lab/exdns', 'master-rebased', '/repos/exdns', True)
                 ]
@@ -171,12 +171,72 @@ class DNSStackHelper(DNSStackHelperBase):
             node.addDockerCommand(f'ENV PATH={path_to_binaries}:$PATH ')
 
 
+
+class DNSAuthHelper:
+    # TODO look at what DNSSEC impl with bind9 has for requirements
+    #       and create a common interface with Rhine.
+    # i.e. 'getCertPaths() -> Tuple[str, str]
+    pass
+
+class RHINEAuthHelper(DNSAuthHelper):
+
+    def __init__(self, role: str):
+        self.__role = role
+
+    @staticmethod
+    def getRhineCertName() -> str:
+        """the subject name of the RHINE certificate"""
+        return 'rhine.'
+
+    def getRhinePathBase(self) -> str:
+        """ base path to  rhine_cert.pem & rhine_private.pem
+        @note location is identical for clients & server, only clients don't have the _key.pem
+        """        
+        return '/etc/rhine/rhine'
+        
+
+    def getRhinePaths(self) -> Tuple[str, str]:
+        """
+        returns where on the host the rhine cert and private key is located.
+        For clients, the private-key path will be None.
+        """
+        match self.__role:
+            case 'client':
+                return (f'{self.getRhinePathBase()}_cert.pem', None)
+            case 'server':
+                return (f'{self.getRhinePathBase()}_cert.pem',
+                         f'{self.getRhinePathBase()}_private.pem')
+
 class DNSAuth(Enum):
+    """
+    user choice whether the naming system in the emulation
+    shall support authentication of DNS RR's
+    """
     # no authentication of DNS RR's whatsoever
     NONE = 0
-    # DNSSEC 
+    # IP only
     DNSSEC = 1
+    # (SCION ONLY)
+    # CoreDNS nameservers auto generate additional RRSIG entries for the zonefiles (with 'sign' plugin).
+    # sdns recursive resolver and sdig query tool verify retrieved RRSIG 'extra' records in their DNS response's answer section
+    # with the help of the RHINE certificate
     RHINE = 2
+
+    def getClientHelper(self) -> DNSAuthHelper:
+        if self == DNSAuth.NONE:
+            raise RuntimeError # then you shouldn't have to ask for a helper in the fst place ^^
+        elif self == DNSAuth.DNSSEC:
+            raise NotImplementedError
+        elif self == DNSAuth.RHINE:
+            return RHINEAuthHelper('client')
+        
+    def getServerHelper(self) -> DNSAuthHelper:
+        if self == DNSAuth.NONE:
+            raise RuntimeError # then you shouldn't have to ask for a helper in the fst place ^^
+        elif self == DNSAuth.DNSSEC:
+            raise NotImplementedError
+        elif self == DNSAuth.RHINE:
+            return RHINEAuthHelper('server')
 
 class DNSStack(Enum):
     """

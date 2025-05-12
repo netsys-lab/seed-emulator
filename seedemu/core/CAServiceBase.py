@@ -81,6 +81,9 @@ class RootCAStoreBase:
         """
         generates a key pair and certificate for the given domain/s
         @details called by CAServers to implement their client's CertRequests
+        @note implementation should be idempotent i.e. when called the second time
+            returns the existing cert for the domain name,
+            rather than generating a new one (and overriding the existing one)
         """
         pass
 

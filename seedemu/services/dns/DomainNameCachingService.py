@@ -390,6 +390,14 @@ class DomainNameCachingServer(Server, Configurable):
                                 server_names=[self.getServerName()],
                                 dst_cert_path=cert_path,
                                 dst_key_path=key_path)
+        # TODO: get RHINE certificate
+        h = self.__dns_auth.getClientHelper()
+        rcertpath, _ = h.getRhinePaths()
+        self.__enable_https_func(node=node,
+                                context='rhine',
+                                server_names=[h.getRhineCertName()],
+                                dst_cert_path=rcertpath,
+                                dst_key_path=None)
 
         if not self.__is_range_all and len(self.__asn_range) == 0:
             #quic out in case of empty catchment
@@ -456,7 +464,7 @@ class DomainNameCachingServer(Server, Configurable):
             self._do_install_bind9(node)
         elif val in [DNSStack.SCION, DNSStack.SCION_DEV]:
             assert self.__do_enc, 'No support for unencrypted DNS (Do53) in the Future Next Generation Internet anymore !'
-            assert self.__dns_auth != DNSAuth.RHINE, 'legacy DNSSEC not supported in the Next Gen Internet'
+            assert self.__dns_auth != DNSAuth.DNSSEC, 'legacy DNSSEC not supported in the Next Gen Internet'
             # TODO maybe mandate RHINE here ... 
             self._do_install_sdns(node, val.getHelper())
 
@@ -480,9 +488,8 @@ class DomainNameCachingServer(Server, Configurable):
 
 
         # FIXME use the right RHINE cert here -> from the CAServer
-        # use MiniCA root certificate which is installed in every host's trust store
-        # as rhine certificate to verify RHINE records
-        rcert = '/usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA.crt'
+        h = self.__dns_auth.getClientHelper()
+        rcert, _ = h.getRhinePaths()
 
         # on which address the resolver listens for requests
         bind_addrport = self.bindDo53AddrPort() # from local-host
