@@ -108,7 +108,7 @@ class DNSStackHelper(DNSStackHelperBase):
     # target-name, url, branch, checkout-dir, do-build
     __dns_urls = [('dns', 'https://github.com/netsys-lab/dns', 'master-rebase', '/repos/dns', False),
                   ('coredns', 'https://github.com/netsys-lab/scion-coredns-doq', 'attempt-rebase', '/repos/coredns', True),
-                  ('coredns-utils', 'https://github.com/coredns/coredns-utils.git', 'master', '/repos/coredns-utils', True),
+                  ('coredns-utils', 'https://github.com/coredns/coredns-utils.git', 'master', '/repos/coredns-utils', True), # TODO remove this! bind9 dnssec-utils is better
                   ('sdns', 'https://github.com/netsys-lab/scion-sdns', 'new-main', '/repos/sdns', True),
                   ('exdns', 'https://github.com/netsys-lab/exdns', 'master-rebased', '/repos/exdns', True)
                 ]
