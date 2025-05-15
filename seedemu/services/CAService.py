@@ -11,7 +11,7 @@ import tempfile
 from typing import Dict, List
 from seedemu.utilities import BuildtimeDockerImage, BuildtimeDockerFile
 
-from seedemu.core import CAServiceBase, CAServerBase, RootCAStoreBase, Node, Server
+from seedemu.core import CAServiceBase, CAServerBase, RootCAStoreBase, Node, Server, CaAlgorithm
 
 CaFileTemplates: Dict[str, str] = {}
 
@@ -58,8 +58,8 @@ class RootMiniCAStore(RootCAStoreBase):
     """
      # TODO maybe add 'debug' option here which makes generateCert() always issue '*' wildcard certificates
      #      then SNI errors shouldn't be a problem in the emulator anymore...
-    def __init__(self, caDomain: str):
-        super().__init__(caDomain)
+    def __init__(self, caDomain: str, algotype: CaAlgorithm = CaAlgorithm.ECDSASHA256):
+        super().__init__(caDomain, algotype)
 
         self._dockerfile_contents = CaFileTemplates['minica_docker']
         self.__caDir = tempfile.mkdtemp(prefix="seedemu-minica-")
@@ -69,6 +69,17 @@ class RootMiniCAStore(RootCAStoreBase):
             self.__container.user(f"{os.getuid()}:{os.getuid()}").mountVolume( self.__caDir, "/certs" )
         
         self.__seen_names = set()
+
+    def _getAlgoArgs(self) -> str:
+        match self.algorithm():
+            case CaAlgorithm.ECDSASHA256:
+                return '--ca-alg ecdsa --ecdsa-curve P256'
+            case CaAlgorithm.ECDSASHA384:
+                return '--ca-alg ecdsa --ecdsa-curve P384'
+            case CaAlgorithm.ED25519:
+                return '--ca-alg ed25519'
+            case _:
+                raise NotImplementedError
 
     def generateCert(self, server_names: List[str]):# TODO add ip-addresses argument here
         """
@@ -87,7 +98,7 @@ class RootMiniCAStore(RootCAStoreBase):
         dnames = ','.join( s for s in server_names if s != None and s != '')
         # cert.pem & key.pem is output to ./{domain.name}/
         # TODO could also specify '--ip-addresses' here for which the cert is valid
-        self.__container.run(f'minica --domains "{dnames}" --ca-alg ecdsa --ecdsa-curve P384')
+        self.__container.run(f'minica --domains "{dnames}" {self._getAlgoArgs()}')
 
 
     def getStorePath(self) -> str:
@@ -385,13 +396,14 @@ class RootStepCAStore(RootCAStoreBase):
     and makes the generated root certificates accessible on the docker host
     via  /tmp/seedemu-ca bind mount
     """
-    def __init__(self, caDomain: str = "ca.internal"):
+    def __init__(self, caDomain: str = "ca.internal", algotype: CaAlgorithm = CaAlgorithm.ECDSASHA256):
         """!
         @brief Create a new RootCAStore.
-
         @param caDomain The domain name of the CA.
         """
-        super().__init__(caDomain)
+        if algotype != CaAlgorithm.ECDSASHA256:
+            raise NotImplementedError
+        super().__init__(caDomain, algotype)
         self.__initialized = False
         self.__caDir = tempfile.mkdtemp(prefix="seedemu-ca-")
         self.setPassword( "".join(

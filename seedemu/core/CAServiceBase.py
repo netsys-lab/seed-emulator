@@ -4,6 +4,7 @@ from .Node import Node
 from .Binding import Filter
 from typing import List, Iterable
 from .Emulator import Emulator
+from enum import Enum
 import re
 from ipaddress import (
     IPv4Address,
@@ -46,6 +47,11 @@ def ipsInNetwork(ips: Iterable, network: str) -> bool:
     return False
 
 
+class CaAlgorithm(Enum):
+    ECDSASHA256 = 0
+    ECDSASHA384 = 1
+    ED25519 = 2
+
 class RootCAStoreBase:
     """
     common base interface for any means that can be used
@@ -54,13 +60,19 @@ class RootCAStoreBase:
     @details can be implemented i.e. with SmallstepCA, OpenSSL or MiniCA
     """
 
-    def __init__(self, caDomain: str = "ca.internal"):#TODO it must be possible to select the algorithm here !! i.e.browsers dont support Ed25519
+    def __init__(self, caDomain: str = "ca.internal", algotype: CaAlgorithm = CaAlgorithm.ECDSASHA256):
         """!
-        @brief Create a new RootCAStore.
-
+        @brief Create a new RootCAStore.        
         @param caDomain The domain name of the CA.
+        @param algotype which algorithm to use for asymmetric cryptography
+                Attention: The default is reasonable i.e. browsers dont support Ed25519 (as of 2025)
+                 so you better leave it alone unless you know exactly why you need sth. else.
         """
+        self._algo = algotype
         self._caDomain = caDomain
+
+    def algorithm(self) -> CaAlgorithm:
+        return self._algo
 
     def domain(self) -> str:
         return self._caDomain

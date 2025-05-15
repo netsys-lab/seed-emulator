@@ -111,7 +111,11 @@ WebServerFileTemplates['caddy_file_server'] = '''\
         "http": {{
             "servers": {{
                 "{server_block_name}": {{
+                    "automatic_https": {{
+                        "disable_redirects": true
+                    }},
                     "listen": [{ports}],
+                    "listen_protocols": [{listen_protos}],
                     "routes": [
                         {{
                             "match": [
@@ -145,7 +149,11 @@ WebServerFileTemplates['caddy_file_server_https'] = '''\
         "http": {{
             "servers": {{
                 "{server_block_name}": {{
+                    "automatic_https": {{
+                        "disable_redirects": true
+                    }},
                     "listen": [{ports}],
+                    "listen_protocols": [{listen_protos}],
                     "routes": [
                         {{
                             "match": [
@@ -675,8 +683,8 @@ class CaddyHelper(InstallHelperBase):
     build_path: str
     __seen_nodes: List[Node] = []
     # target-name, url, branch, checkout-dir, do-build
-    __dns_urls = [('scion-caddy', 'https://github.com/amdfxlucas/caddy-scion.git', 'seed', '/repos/scion-caddy', True),
-                  ('http-proxy', 'https://github.com/amdfxlucas/http-proxy.git', 'seed', '/repos/http-proxy', False)]
+    __dns_urls = [('http-proxy', 'https://github.com/amdfxlucas/http-proxy.git', 'seed', '/repos/http-proxy', False),
+                 ('scion-caddy', 'https://github.com/amdfxlucas/caddy-scion.git', 'seed', '/repos/scion-caddy', True)]
 
     def getGoBuildImage(self):
         return 'golang:1.24-alpine'
@@ -748,31 +756,10 @@ class CaddyWebServer(WebServerBase):
         """
         self._install_caddy_base(node, web)
 
-        '''
-        CONFIGURATION
-
-        #add the following to /etc/hosts
-            1-ff00:0:112,[127.0.0.1] scion.local   # for local setup
-
-            17-ffaa:1:1103,[192.168.56.1] whoami   # for SCIONLab setup
-            127.0.0.1 whoami
-
-        # run the backend service
-        docker run -p 8081:80 --name whoami --rm --detach traefik/whoami -verbose
-        curl localhost:8081 # whoami response over IP
-
-        # run skip-proxy (forward proxy)
-        export SCION_DAEMON_ADDRESS="127.0.0.19:30255"; go run ./cmd/scion-caddy run --config ./_examples/forward.json --watch
-
-        # run web-gateway (reverse proxy)
-        export SCION_DAEMON_ADDRESS="127.0.0.27:30255"; go run ./cmd/scion-caddy run --config ./_examples/reverse.json --watch
-
-
+     
         # NOTE: all requests to the forward proxy must contain "Proxy-Authorization" header with value  "Basic cG9saWN5Og==" !!!
-        curl -v "https://www.example.com:7443" --proxy "https://localhost:9443" --proxy-header "Proxy-Authorization: Basic cG9saWN5Og=="
+        #curl -v "https://www.example.com:7443" --proxy "https://localhost:9443" --proxy-header "Proxy-Authorization: Basic cG9saWN5Og=="
 
-
-        '''
 
         # https://caddyserver.com/docs/json/apps/http/
 
@@ -849,6 +836,7 @@ class CaddyWebServer(WebServerBase):
                     node.setFile(self._get_config_path(), WebServerFileTemplates['caddy_file_server_https'].format(ports=listen,
                                                                                      path_to_index=self._getRoot(),
                                                                                      server_block_name=shortname,
+                                                                                     listen_protos='["h1","h2","h3"], ["h1","h2","h3"], ["h3"], ["h1","h2"]',
                                                                                      domain_names=dname,
                                                                                      loglevel='DEBUG',
                                                                                      key_path=key_path,
@@ -859,6 +847,7 @@ class CaddyWebServer(WebServerBase):
         else:
             node.setFile(self._get_config_path(), WebServerFileTemplates['caddy_file_server'].format(ports=f":{self.getPort()}",
                                                                                      path_to_index=self._getRoot(),
+                                                                                     listen_protos = '["h1", "h2", "h3"]',
                                                                                      server_block_name=shortname,
                                                                                      domain_names=dname) )
 
@@ -877,7 +866,17 @@ class CaddyWebServer(WebServerBase):
                                  dst_key_path = key_path)
 
         node.addSoftware('apache2-utils')
-        node.appendStartCommand(f'scion-caddy run --config {self._get_config_path()} 2>&1 | rotatelogs -n 2 /var/log/caddy.log 1M', fork=True)
+
+        match self.getRole():
+            case WebServerRole.FWD_PROXY:
+                # the 
+                node.appendStartCommand(f'scion-caddy-forward run --config {self._get_config_path()} 2>&1 | rotatelogs -n 2 /var/log/caddy.log 1M', fork=True)
+            case WebServerRole.WEB:
+                # FIXME use scion-caddy-native and don't listen on the hacky 'scion+single_stream' which is unsupported by the -native binaries
+                node.appendStartCommand(f'scion-caddy-reverse run --config {self._get_config_path()} 2>&1 | rotatelogs -n 2 /var/log/caddy.log 1M', fork=True)
+            case WebServerRole.REV_PROXY:
+                # supports all scion-networks: scion, scion+udp, scion+single_stream
+                node.appendStartCommand(f'scion-caddy-reverse run --config {self._get_config_path()} 2>&1 | rotatelogs -n 2 /var/log/caddy.log 1M', fork=True)
         node.appendClassName("WebService")
 
 

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from seedemu.core import Node, Printable, Emulator, Service, Server, BaseOption
+from seedemu.core import Node, Printable, Emulator, Service, Server, BaseOption, CaAlgorithm
 from seedemu.core.enums import NetworkType
 from typing import List, Dict, Tuple, Set
 from re import sub
@@ -339,6 +339,7 @@ class DomainNameServer(Server):
         self.__enable_https_func = None
         self.__do_enc = do_enc
         self.__dns_auth = dns_auth
+        self.__algo = None
 
     def _getCryptoPathsForZone(self, zone: str, ns_name: str = None) ->Tuple[str,str]:
         """
@@ -362,7 +363,7 @@ class DomainNameServer(Server):
         # once we are configure()'d  and know our 'node' and server-name
         # we can invoke this callback and pass our node and svc-name as arguments
         self.__enable_https_func = ca.enableHTTPSFunc
-
+        self.__algo = ca.getCAStore().algorithm()
         return self
 
 
@@ -597,7 +598,18 @@ class DomainNameServer(Server):
             zn3 = zn2 if zn != '.' else 'root'
             
             # signing key type must match the one of RHINE cert !!
-            node.appendStartCommand(f"cd {keypath} && dnssec-keygen -a ED25519 -f KSK -n ZONE {zn} && ls | xargs -d '\\n' -n 1 rename 's/K{zn2}\.\+[0-9]+\+[0-9]+\./K{zn3}\./'") # rename signing key files to 'K{zonefilename}'
+            node.appendStartCommand(f"cd {keypath} && dnssec-keygen -a {self._caAlgoForKeygen()} -f KSK -n ZONE {zn} && ls | xargs -d '\\n' -n 1 rename 's/K{zn2}\.\+[0-9]+\+[0-9]+\./K{zn3}\./'") # rename signing key files to 'K{zonefilename}'
+
+    def _caAlgoForKeygen(self) -> str:
+        match self.__algo:
+            case CaAlgorithm.ECDSASHA256:
+                return 'ECDSAP256SHA256'
+            case CaAlgorithm.ECDSASHA384:
+                return 'ECDSAP384SHA384'
+            case CaAlgorithm.ED25519:
+                return 'ED25519'
+            case _:
+                raise NotImplemented
 
     def _do_generate_zonefiles(self, node: Node, dns: DomainNameService, zones_path: str):
         """ generate a zonefile for each of the zones under /etc/coredns/zones
