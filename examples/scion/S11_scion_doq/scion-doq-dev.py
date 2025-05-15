@@ -454,6 +454,8 @@ def run(dumpfile = None):
     host_a.addPortForwarding(9080, 9080, 'tcp')
     host_a.addPortForwarding(9443, 9443, 'tcp')
 
+    #  ./sdig -port=53 -rhine -rhinecert=/etc/rhine/rhine_cert.pem @127.0.0.127 IN ANY www.example.com 
+    # on the node where the sdns recursive resolver listens on 127.0.0.127
     sdns_server = sdns.install('sdns-vnode')
     sdns_server.setCAServer(caServer)
     emu.addBinding(Binding('sdns-vnode', filter=Filter(asn=102, nodeName='host_0', allowBound=True)))
@@ -461,7 +463,7 @@ def run(dumpfile = None):
     fwdpxy = web.install('fwd_pxy')
     fwdpxy.enableHTTPS()
     fwdpxy.makeForwardProxy()
-    fwdpxy.setServerNames(['localhost'])
+    fwdpxy.setServerNames(['localhost', 'forward-proxy.scion.'])
     fwdpxy.setCAServer(caServer)
     emu.addBinding(Binding('fwd_pxy', filter=Filter(asn=102, nodeName='host_0', allowBound=True)))
 

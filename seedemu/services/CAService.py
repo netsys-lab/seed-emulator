@@ -39,7 +39,8 @@ CaFileTemplates['minica_docker'] = """\
 FROM golang:1.24
 WORKDIR /
 RUN apt-get update && apt-get install -y git
-RUN git clone https://github.com/jsha/minica.git
+#RUN git clone https://github.com/jsha/minica.git
+RUN git clone https://github.com/amdfxlucas/minica.git --branch seed
 RUN cd minica && go build .
 RUN cd minica && go install .
 RUN mkdir /certs
@@ -69,10 +70,11 @@ class RootMiniCAStore(RootCAStoreBase):
         
         self.__seen_names = set()
 
-    def generateCert(self, server_names: List[str]):
+    def generateCert(self, server_names: List[str]):# TODO add ip-addresses argument here
         """
         generates a key pair and certificate for the given domain
         """
+        #  or (not ns.endswith('.') and ns != 'localhost')
         assert not any([' ' in ns for ns in server_names]), 'invalid input: server_names must be valid fully qualified domain names.'
 
         if any([s in self.__seen_names for s in server_names]):
@@ -83,7 +85,9 @@ class RootMiniCAStore(RootCAStoreBase):
                 self.__seen_names.add(s)
 
         dnames = ','.join( s for s in server_names if s != None and s != '')
-        self.__container.run(f'minica --domains "{dnames}"') # cert & key is output to ./{domain.name}/
+        # cert.pem & key.pem is output to ./{domain.name}/
+        # TODO could also specify '--ip-addresses' here for which the cert is valid
+        self.__container.run(f'minica --domains "{dnames}" --ca-alg ed25519')
 
 
     def getStorePath(self) -> str:
@@ -150,25 +154,33 @@ class MiniCAServer(CAServerBase):
                 If unspecified, no copy of the cert onto the node is performed.
         @param dst_key_path destinatino path on 'node' where to place the generated private key.
                 If None the key isn't copied to 'node' (but only the public cert).
+        @param update whether to add 'update-ca-certificates' start command to the node
         """
 
         store: RootMiniCAStore = self.getCAStore()
         assert isinstance(store, RootMiniCAStore), 'logic error'
         store.generateCert(server_names)
 
+        have_cert = dst_cert_path == None
+        have_key = dst_key_path == None
+
         # copy generated certs from caDir to node
-        cert_dir = os.path.join(store.getStorePath(), server_names[0])
+        cert_dir = os.path.join(store.getStorePath(), server_names[0] if server_names[0] != '*' else '_' )
         for root, _, files in os.walk(cert_dir):
             for file in files:
                 if file == 'cert.pem' and dst_cert_path != None:
                     node.importFile(
                         os.path.join(root, file),
                         dst_cert_path)
+                    have_cert = True
                 elif file == 'key.pem' and dst_key_path != None:
                     node.importFile(
                         os.path.join(root, file),
                         dst_key_path)
-                
+                    have_key = True
+
+        assert have_cert and have_key, 'implementation error'
+
         node.addSoftware("ca-certificates")
         if update:
             node.appendStartCommand("update-ca-certificates")

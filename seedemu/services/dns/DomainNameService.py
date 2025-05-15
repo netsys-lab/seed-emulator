@@ -165,7 +165,6 @@ class Zone(Printable):
         if fqdn[-1] != '.': fqdn += '.'
         zonename = self.__zonename if self.__zonename != '' else '.'
         self.__gules.append(_getRRforNode(fqdn, addr, node))
-        #self.__gules.append('{} NS {}'.format(zonename, fqdn))
         self.__gules.append( NS_RR(zonename=zonename, nsname=fqdn) )
 
         return self
@@ -522,20 +521,30 @@ class DomainNameServer(Server):
                 zone.addRecord(_getNsAddrRecord(node, ns_number, zonename, str(addr) ))
                 zone.addRecord( NS_RR(zonename='@', nsname=ns_name) )
 
+                # TODO if parent zone doesn't have a DS record yet add one (if self.dns_auth != DNSAuth.NONE)
+
             if zone.getName() == "." and self.__is_real_root:
                 for record in self.__getRealRootRecords():
                     zone.addRecord(record)
-        # TODO generate RHINE cert
+
+        self._installRHINEcert(node)
+
+    def _installRHINEcert(self, node: Node):
+        # generate RHINE cert
         h = self.__dns_auth.getServerHelper()
         rcert_path, rkey_path = h.getRhinePaths()
         rcert_names = h.getRhineCertName()
+        dnames = [ z for z,_ in self.__zones] # Rcert should be valid for all of the servers zones
+
+        # TODO use /usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA.crt"
+        # MiniCA root cert on the client side to verify the server's RHINE cert
+
         self.__enable_https_func(node = node,
                                  context = 'rhine',
-                                 server_names = [rcert_names],
+                                 #server_names = [rcert_names],
+                                 server_names = ['*'],
                                  dst_cert_path = rcert_path,
                                  dst_key_path = rkey_path)
-
-
 
     def install(self, node: Node, dns: DomainNameService):
         """!
@@ -582,14 +591,9 @@ class DomainNameServer(Server):
             # ns.example.com. -> ns\.example\.com\.
             zn2 = '\.'.join( zone.getName().split('.')).rstrip('\.') if zn!='.' else ''
             zn3 = zn2 if zn != '.' else 'root'
-            #node.appendStartCommand(f"mkdir -p {keypath} && cd {keypath} && coredns-keygen {zn} && rename 's/K{zn}\.\+[0-9]+\+[0-9]+\./K{zn}\./' K{zn}.+*+*.*")
-                                    # rename 's/K\.\+[0-9]+\+[0-9]+\./K\./' K.+*+*.*
-                                    # rename 's/Kcom\.\+[0-9]+\+[0-9]+\./Kcom\./' Kcom.+*+*.*
-                                    # | xargs -n 1 rename 's/K\.\+[0-9]+\+[0-9]+\./K\./'
+            
             # signing key type must match the one of RHINE cert !!
-            #node.appendStartCommand(f"cd {keypath} && dnssec-keygen -a ECDSAP384SHA384 -f KSK -n ZONE {zn} && rename 's/K{zn2}\.\+[0-9]+\+[0-9]+\./K{zn2}\./' K{zn2}.+*+*.*")                                    
-            #node.appendStartCommand(f"cd {keypath} && dnssec-keygen -a ECDSAP384SHA384 -f KSK -n ZONE {zn} | xargs -n 1 rename 's/K\.\+[0-9]+\+[0-9]+\./K\./'")
-            node.appendStartCommand(f"cd {keypath} && dnssec-keygen -a ECDSAP384SHA384 -f KSK -n ZONE {zn} && ls | xargs -d '\\n' -n 1 rename 's/K{zn2}\.\+[0-9]+\+[0-9]+\./K{zn3}\./'") # rename signing key files to 'K{zonefilename}'
+            node.appendStartCommand(f"cd {keypath} && dnssec-keygen -a ED25519 -f KSK -n ZONE {zn} && ls | xargs -d '\\n' -n 1 rename 's/K{zn2}\.\+[0-9]+\+[0-9]+\./K{zn3}\./'") # rename signing key files to 'K{zonefilename}'
 
     def _do_generate_zonefiles(self, node: Node, dns: DomainNameService, zones_path: str):
         """ generate a zonefile for each of the zones under /etc/coredns/zones
@@ -789,17 +793,33 @@ class DomainNameService(Service):
             prefix = getattr(opt_cls, '__prefix') if hasattr(opt_cls, '__prefix') else None
             OptionRegistry().register(opt_cls, prefix)
 
-    def __autoNameServer(self, zone: Zone):
+    def __autoNameServer(self, zone: Zone, lvl: int =0):
         """!
-        @brief Try to automatically add NS records of children to parent zones.
-
+        @brief Try to automatically add NS & DS records of children to parent zones.
+        @param lvl the current level in the qname starting from the right. (0 is '.' root, 1 is 'com.' etc.)
         @param zone root zone reference.
         """
         if (len(zone.getSubZones().values()) == 0): return
         self._log('Collecting subzones NSes of "{}"...'.format(zone.getName()))
         for subzone in zone.getSubZones().values():
-            for gule in subzone.getGuleRecords(): zone.addRecord(gule)
-            self.__autoNameServer(subzone)
+            for gule in subzone.getGuleRecords(): 
+                zone.addRecord(gule)
+            # add zone delegation records for DNSSEC/RHINE
+            if self.__dsn_auth == DNSAuth.DNSSEC:
+                # TODO add DS RR
+                raise NotImplementedError
+            if self.__dsn_auth == DNSAuth.RHINE:
+                # _dsp.	    604800	IN	TXT	"com"     # in '.' zone
+                # _dsp.com.	604800	IN	TXT	"example" # in 'com.' zone
+                nexttokens = subzone.getName().rstrip('.').split('.')
+                token = zone.getName().rstrip('.').split('.')
+                # assert len(nexttokens) == len(token)+1, 'logic error - subzone must have Lvl of parent zone plus ones'
+                nextlvlname = nexttokens[len(nexttokens)-1-lvl]
+                
+                lvlname = token[len(token)-1] if lvl!=0 else ''
+                zone.addRecord(TXT_RR(name=f'_dsp.{lvlname}', text=f"{nextlvlname}"))
+                
+            self.__autoNameServer(subzone, lvl+1)
 
     def __resolvePendingRecords(self, emulator: Emulator, zone: Zone):
         zone.resolvePendingRecords(emulator)
