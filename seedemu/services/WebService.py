@@ -675,10 +675,21 @@ class CaddyHelper(InstallHelperBase):
     build_path: str
     __seen_nodes: List[Node] = []
     # target-name, url, branch, checkout-dir, do-build
-    __dns_urls = [('scion-caddy', 'https://github.com/scionproto-contrib/caddy-scion.git', 'main', '/repos/scion-caddy', True)]
+    __dns_urls = [('scion-caddy', 'https://github.com/amdfxlucas/caddy-scion.git', 'seed', '/repos/scion-caddy', True),
+                  ('http-proxy', 'https://github.com/amdfxlucas/http-proxy.git', 'seed', '/repos/http-proxy', False)]
 
     def getGoBuildImage(self):
         return 'golang:1.24-alpine'
+
+    def _check_directory_contents(self, directory, expected_items):
+        # Get the list of items in the directory
+        actual_items = os.listdir(directory)
+
+        # Check if all expected items are present
+        for item in expected_items:
+            if item not in actual_items:
+                print(f"Missing item: {item}")
+                return False
 
     def __init__(self):
         # create buildtime docker container
@@ -713,6 +724,8 @@ class CaddyHelper(InstallHelperBase):
             CaddyHelper.container.entrypoint("sh").mountVolume(output_dir, "/build").run(
                full_cp_cmd
             )
+            # TODO assert that output_dir is NON empty !!!
+            self._check_directory_contents(output_dir, ['scion-caddy', 'scion-caddy-forward'])
 
     def install(self, node: Node, context: str):
         """
@@ -722,7 +735,7 @@ class CaddyHelper(InstallHelperBase):
         # mount shared folder with  binaries from docker host to node's container
         if node not in CaddyHelper.__seen_nodes:
             CaddyHelper.__seen_nodes.append(node)
-            path_to_binaries = "/bin/caddy"
+            path_to_binaries = "/usr/bin/caddy"
             node.addSharedFolder(path_to_binaries, CaddyHelper.out_dir)
             node.addDockerCommand(f'ENV PATH={path_to_binaries}:$PATH ')
 

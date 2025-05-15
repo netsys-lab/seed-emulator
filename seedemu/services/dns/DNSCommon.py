@@ -202,7 +202,10 @@ class RHINEAuthHelper(DNSAuthHelper):
         """
         match self.__role:
             case 'client':
-                return (f'{self.getRhinePathBase()}_cert.pem', None)
+              #  return (f'{self.getRhinePathBase()}_cert.pem', None)
+              # clients use the MiniCa root cert from their trust store to verify the RHINE cert presented by the server
+              return '/usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA.crt', None
+            
             case 'server':
                 return (f'{self.getRhinePathBase()}_cert.pem',
                          f'{self.getRhinePathBase()}_private.pem')

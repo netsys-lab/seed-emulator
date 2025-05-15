@@ -390,15 +390,7 @@ class DomainNameCachingServer(Server, Configurable):
                                 server_names=[self.getServerName()],
                                 dst_cert_path=cert_path,
                                 dst_key_path=key_path)
-        # TODO: get RHINE certificate
-        h = self.__dns_auth.getClientHelper()
-        rcertpath, _ = h.getRhinePaths()
-        self.__enable_https_func(node=node,
-                                context='rhine',
-                                server_names=[h.getRhineCertName()],
-                                dst_cert_path=rcertpath,
-                                dst_key_path=None)
-
+        
         if not self.__is_range_all and len(self.__asn_range) == 0:
             #quic out in case of empty catchment
             return

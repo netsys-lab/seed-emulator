@@ -54,7 +54,7 @@ class RootCAStoreBase:
     @details can be implemented i.e. with SmallstepCA, OpenSSL or MiniCA
     """
 
-    def __init__(self, caDomain: str = "ca.internal"):
+    def __init__(self, caDomain: str = "ca.internal"):#TODO it must be possible to select the algorithm here !! i.e.browsers dont support Ed25519
         """!
         @brief Create a new RootCAStore.
 

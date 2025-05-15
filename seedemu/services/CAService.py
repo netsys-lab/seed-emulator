@@ -87,7 +87,7 @@ class RootMiniCAStore(RootCAStoreBase):
         dnames = ','.join( s for s in server_names if s != None and s != '')
         # cert.pem & key.pem is output to ./{domain.name}/
         # TODO could also specify '--ip-addresses' here for which the cert is valid
-        self.__container.run(f'minica --domains "{dnames}" --ca-alg ed25519')
+        self.__container.run(f'minica --domains "{dnames}" --ca-alg ecdsa --ecdsa-curve P384')
 
 
     def getStorePath(self) -> str:
@@ -163,23 +163,29 @@ class MiniCAServer(CAServerBase):
 
         have_cert = dst_cert_path == None
         have_key = dst_key_path == None
+        success = have_cert and have_key
 
         # copy generated certs from caDir to node
-        cert_dir = os.path.join(store.getStorePath(), server_names[0] if server_names[0] != '*' else '_' )
-        for root, _, files in os.walk(cert_dir):
-            for file in files:
-                if file == 'cert.pem' and dst_cert_path != None:
-                    node.importFile(
-                        os.path.join(root, file),
-                        dst_cert_path)
-                    have_cert = True
-                elif file == 'key.pem' and dst_key_path != None:
-                    node.importFile(
-                        os.path.join(root, file),
-                        dst_key_path)
-                    have_key = True
-
-        assert have_cert and have_key, 'implementation error'
+        for i in range(len(server_names)):
+            if success:
+                break
+            cert_dir = os.path.join(store.getStorePath(), server_names[i] if server_names[i] != '*' else '_' )
+            for root, _, files in os.walk(cert_dir):
+                for file in files:
+                    if file == 'cert.pem' and dst_cert_path != None:
+                        node.importFile(
+                            os.path.join(root, file),
+                            dst_cert_path)
+                        # TODO here i had to check that this is in fact the right cert for the server_names
+                        #  os.subprocess.run(f'openssl x509 -in {cert_dir}/cert.pem -noout -subject -ext subjectAltName')
+                        have_cert = True
+                    elif file == 'key.pem' and dst_key_path != None:
+                        node.importFile(
+                            os.path.join(root, file),
+                            dst_key_path)
+                        have_key = True
+            success = have_cert and have_key
+        assert success, 'implementation error'
 
         node.addSoftware("ca-certificates")
         if update:

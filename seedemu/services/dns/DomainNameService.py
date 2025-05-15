@@ -530,11 +530,15 @@ class DomainNameServer(Server):
         self._installRHINEcert(node)
 
     def _installRHINEcert(self, node: Node):
-        # generate RHINE cert
+        """ generate RHINE cert
+        """
+        # for simplicity we could just re-use the TLS certificates..
+
         h = self.__dns_auth.getServerHelper()
         rcert_path, rkey_path = h.getRhinePaths()
         rcert_names = h.getRhineCertName()
-        dnames = [ z for z,_ in self.__zones] # Rcert should be valid for all of the servers zones
+        # Rcert should be valid for all of the servers zones
+        dnames = [ z for z,_ in self.__zones] + [ self.getServerName(z) for z,_ in self.__zones ]
 
         # TODO use /usr/local/share/ca-certificates/SEEDEMU_Internal_Root_CA.crt"
         # MiniCA root cert on the client side to verify the server's RHINE cert
@@ -542,7 +546,7 @@ class DomainNameServer(Server):
         self.__enable_https_func(node = node,
                                  context = 'rhine',
                                  #server_names = [rcert_names],
-                                 server_names = ['*'],
+                                 server_names = dnames,
                                  dst_cert_path = rcert_path,
                                  dst_key_path = rkey_path)
 
