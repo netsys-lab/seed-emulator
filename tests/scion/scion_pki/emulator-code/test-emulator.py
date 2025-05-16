@@ -3,7 +3,7 @@
 
 
 from seedemu.services import (GolangDevService, AccessMode,
-                              DomainNameService, DomainNameServer,
+                              DomainNameService, DomainNameServer, WebService, WebServerKind,
                               MiniCAService, RootMiniCAStore, MiniCAServer,
                               DomainNameCachingService, DomainNameCachingServer)
 from seedemu.services.dns.DNSCommon import *
@@ -41,60 +41,14 @@ def run(dumpfile = None):
             print(f"Usage:  {script_name} amd|arm")
             sys.exit(1)
 
-
-
-    @dataclass
-    class GitRepo:
-        repo_url: str
-        repo_branch: str
-        repo_path: str
-        notes: str = ''
-
-    devsvc = GolangDevService( 'amdfxlucas', 'saculolissat@gmx.de' )
-
-    repos = [
-            GitRepo( repo_url = 'https://github.com/netsys-lab/pan-lua',
-                    repo_branch = 'main',
-                    repo_path = '/repos/pan-lua' ),
-
-            GitRepo( repo_url = 'https://github.com/netsys-lab/panapi',
-                    repo_branch = 'main',
-                    repo_path = '/repos/panapi' ),
-
-
-            GitRepo(repo_url = 'https://github.com/scionproto-contrib/http-proxy.git',
-                    repo_branch = 'main',
-                    repo_path = '/repos/http-proxy',
-                    notes='a caddy server module for SCION HTTP-proxy functionality' ),
-
-
-            GitRepo(repo_url = 'https://github.com/scionproto-contrib/caddy-scion',
-                    repo_branch = 'main',
-                    repo_path = '/repos/caddy-scion',
-                    notes='caddy server plugins' )
-
-            ]
-
-    def install_dev_svc(emu: Emulator, node: Node, devsvc, repos: List[GitRepo] ):
-
-        vnodename = f'dev_{node.getAsn()}_{node.getName()}'
-        svc = devsvc.install(vnodename)
-
-        for r in repos:
-            svc.checkoutRepo(r.repo_url,r.repo_path, r.repo_branch, AccessMode.shared)
-
-        emu.addBinding(Binding(vnodename, filter=Filter(nodeName=node.getName(),
-                                                        asn=node.getAsn(),
-                                                        allowBound=True)))
-
     ases = {}
     brs = defaultdict()
     cses = defaultdict()
 
-    dns_svc = DomainNameService(dns_setup=OptionRegistry().dns_setup(DNSStack.SCION))
+    dns_svc = DomainNameService(dns_setup=OptionRegistry().dns_setup(DNSStack.SCION), dns_auth=DNSAuth.RHINE)
     minica = MiniCAService()
 
-    sdns = DomainNameCachingService(do_enc=True)
+    sdns = DomainNameCachingService(do_enc=True, dns_auth=DNSAuth.RHINE)
 
     def create_as(isd, asn, is_core=False, issuer=None):
         as_ = base.createAutonomousSystem(asn)
@@ -314,7 +268,7 @@ def run(dumpfile = None):
         hnode = as_.getHost('host_0')
         dev_targets.append(hnode)
 
-
+    web = WebService(kind = WebServerKind.CADDY)
     caStore = RootMiniCAStore(caDomain='seedemu.internal.')
 
     caServer: MiniCAServer = minica.install('ca-vnode')
@@ -327,23 +281,48 @@ def run(dumpfile = None):
     # HTTP FWD proxy and sdns rec. resolver
     # 'entrypoint' into the simulation for browser-extension
     host_a = base.getAutonomousSystem(102).getHost('host_0')
-    host_a.addPortForwarding(8888, 8888, 'tcp')
+    host_a.addPortForwarding(9080, 9080, 'tcp')
+    host_a.addPortForwarding(9443, 9443, 'tcp')
 
     sdns_server = sdns.install('sdns-vnode')
     sdns_server.setCAServer(caServer)
     # add binding to host_a
     emu.addBinding(Binding('sdns-vnode', filter=Filter(asn=102, nodeName='host_0', allowBound=True)))
 
+
+    fwdpxy = web.install('fwd_pxy')
+    fwdpxy.enableHTTPS()
+    fwdpxy.makeForwardProxy()
+    fwdpxy.setServerNames(['localhost', 'forward-proxy.scion.'])
+    fwdpxy.setCAServer(caServer)
+    emu.addBinding(Binding('fwd_pxy', filter=Filter(asn=102, nodeName='host_0', allowBound=True)))
+
     # HTTP web server and HTTP reverse proxy ...........................
 
     # 'www.example.com'
     host_web_1 = base.getAutonomousSystem(172).getHost('host_0')
+    w1 = web.install('web1')
+    w1.enableHTTPS()    
+    w1.setServerNames(['www.example.com'])
+    w1.setCAServer(caServer)
+    emu.addBinding(Binding('web1', filter=Filter(asn=172, nodeName='host_0')))
 
     # 'www.example.net'
     host_web_2 = base.getAutonomousSystem(173).getHost('host_0')
+    w2 = web.install('web2')
+    w2.enableHTTPS()    
+    w2.setServerNames(['www.example.net'])
+    w2.setCAServer(caServer)
+    emu.addBinding(Binding('web2', filter=Filter(asn=173, nodeName='host_0')))
 
     # 'www.example.edu'
     host_web_3 = base.getAutonomousSystem(241).getHost('host_0')
+
+    w3 = web.install('web3')
+    w3.enableHTTPS()
+    w3.setServerNames(['www.example.edu'])
+    w3.setCAServer(caServer)    
+    emu.addBinding(Binding('web3', filter=Filter(asn=241, nodeName='host_0')))
 
 
     # coredns DoQ nameservers ..........................................
@@ -415,23 +394,17 @@ def run(dumpfile = None):
 
     dns_svc.getZone('example.edu.').addRecord(TXT_RR(text='scion=2-241,10.241.0.71', name='www.example.edu.'))
 
-    for node in dev_targets:
-        install_dev_svc(emu, node, devsvc, repos )
-
 
     # Rendering
     emu.addLayer(base)
     emu.addLayer(routing)
     emu.addLayer(scion_isd)
     emu.addLayer(scion)
+    emu.addLayer(web)
     emu.addLayer(etc_hosts)
     emu.addLayer(dns_svc)
     emu.addLayer(sdns)
     emu.addLayer(minica)
-    emu.addLayer(devsvc)
-
-
-
 
     if dumpfile is not None:
         emu.dump(dumpfile)

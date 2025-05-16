@@ -22,6 +22,9 @@ CaFileTemplates['certutil_importer'] = """\
 ### Script installs {certfile} to certificate trust store of applications using NSS
 ### (e.g. Firefox, Thunderbird, Chromium)
 ### Mozilla uses cert8, Chromium and Chrome use cert9
+### Alternatively you can do this manually under chrome://settings/certificates
+### In order to use tools other than the browser i.e. curl you have to add the cert to your host's system trust store as well.
+### sudo cp  {certfile} /usr/local/share/ca-certificates/minica.crt && sudo update-ca-certificates
 
 ###
 ### Requirement: apt install libnss3-tools
