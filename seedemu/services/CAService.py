@@ -15,6 +15,46 @@ from seedemu.core import CAServiceBase, CAServerBase, RootCAStoreBase, Node, Ser
 
 CaFileTemplates: Dict[str, str] = {}
 
+
+CaFileTemplates['certutil_importer'] = """\
+#!/bin/bash
+### @copyright Thomas Leister https://thomas-leister.de/en/how-to-import-ca-root-certificate/
+### Script installs {certfile} to certificate trust store of applications using NSS
+### (e.g. Firefox, Thunderbird, Chromium)
+### Mozilla uses cert8, Chromium and Chrome use cert9
+
+###
+### Requirement: apt install libnss3-tools
+###
+
+###
+### CA file to install (CUSTOMIZE!)
+###
+
+certfile="{certfile}"
+certname="{certname}"
+
+###
+### For cert8 (legacy - DBM)
+###
+
+for certDB in $(find ~/ -name "cert8.db")
+do
+    certdir=$(dirname ${{certDB}});
+    certutil -A -n "${{certname}}" -t "TCu,Cu,Tu" -i ${{certfile}} -d dbm:${{certdir}}
+done
+
+###
+### For cert9 (SQL)
+###
+
+for certDB in $(find ~/ -name "cert9.db")
+do
+    certdir=$(dirname ${{certDB}});
+    certutil -A -n "${{certname}}" -t "TCu,Cu,Tu" -i ${{certfile}} -d sql:${{certdir}}
+done
+"""
+
 CaFileTemplates["certbot_renew_cron"] = """\
 # /etc/cron.d/certbot: crontab entries for the certbot package
 #
@@ -58,7 +98,11 @@ class RootMiniCAStore(RootCAStoreBase):
     """
      # TODO maybe add 'debug' option here which makes generateCert() always issue '*' wildcard certificates
      #      then SNI errors shouldn't be a problem in the emulator anymore...
-    def __init__(self, caDomain: str, algotype: CaAlgorithm = CaAlgorithm.ECDSASHA256):
+    def __init__(self, caDomain: str, algotype: CaAlgorithm = CaAlgorithm.ECDSASHA256, browser_support: bool = True):
+        """
+        @param browser_support whether to generate a helper script which automatically adds the CA Root cert
+                to the browser's trust store using certutil. (linux only) requires libnss3-tools apt package
+        """
         super().__init__(caDomain, algotype)
 
         self._dockerfile_contents = CaFileTemplates['minica_docker']
@@ -67,7 +111,17 @@ class RootMiniCAStore(RootCAStoreBase):
         with cd(self.__caDir):
             self.__container = BuildtimeDockerImage("minica").build(BuildtimeDockerFile(self._dockerfile_contents)).container()
             self.__container.user(f"{os.getuid()}:{os.getuid()}").mountVolume( self.__caDir, "/certs" )
-        
+        if browser_support:
+            _path = ".minica_output"
+            script_name = 'cert_import_helper.sh'
+            current_dir = os.getcwd()
+            output_dir = os.path.join(current_dir, _path)
+            os.mkdir(output_dir)
+            browser_script = CaFileTemplates['certutil_importer'].format(certfile=f'{self.__caDir}/minica.pem',
+                                                                         certname=caDomain)
+            with open(f'{output_dir}/{script_name}', 'w') as file:
+                file.write(browser_script)
+
         self.__seen_names = set()
 
     def _getAlgoArgs(self) -> str:
