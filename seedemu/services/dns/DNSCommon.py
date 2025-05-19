@@ -154,7 +154,17 @@ class DNSStackHelper(DNSStackHelperBase):
             DNSStackHelper.container.entrypoint("sh").mountVolume(output_dir, "/build").run(
                full_cp_cmd
             )
+        self._check_directory_contents(output_dir, ['sdns', 'coredns', 'exdns'])
 
+    def _check_directory_contents(self, directory, expected_items):
+        # Get the list of items in the directory
+        actual_items = os.listdir(directory)
+
+        # Check if all expected items are present
+        for item in expected_items:
+            if item not in actual_items:
+                print(f"Missing item: {item}")
+                return False
 
 
     def install(self, node: Node, context: str):

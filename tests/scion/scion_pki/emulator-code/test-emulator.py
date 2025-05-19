@@ -9,7 +9,7 @@ from seedemu.services import (GolangDevService, AccessMode,
 from seedemu.services.dns.DNSCommon import *
 from dataclasses import dataclass
 from typing import List
-from seedemu.core import Emulator, Binding, Filter, Node, OptionRegistry
+from seedemu.core import Emulator, Binding, Filter, Node, OptionRegistry, promote_to_real_world_router
 from seedemu.layers import (
     ScionBase, ScionRouting, ScionIsd, Scion, SetupSpecification, CheckoutSpecification, EtcHosts)
 from seedemu.layers import ScionBase, ScionRouting, ScionIsd, Scion
@@ -315,13 +315,20 @@ def run(dumpfile = None):
     w2.setCAServer(caServer)
     emu.addBinding(Binding('web2', filter=Filter(asn=173, nodeName='host_0')))
 
-    # 'www.example.edu'
-    host_web_3 = base.getAutonomousSystem(241).getHost('host_0')
+    # 'www.scionlab.org' Reverse Proxy to RealWorld hosted webpage
+    as241 = base.getAutonomousSystem(241)
+    host_web_3 = as241.getHost('host_0')
+    br0_241 = as241.getRouter('br0')
+    br0_241 = promote_to_real_world_router(br0_241, False)
+    br0_241.addRealWorldRoute('0.0.0.0/1', str(as241.getNetwork('net0').getPrefix()))
+    br0_241.addRealWorldRoute('128.0.0.0/1', str(as241.getNetwork('net0').getPrefix()))
+    
 
     w3 = web.install('web3')
-    w3.enableHTTPS()
-    w3.setServerNames(['www.example.edu'])
-    w3.setCAServer(caServer)    
+    #w3.enableHTTPS()
+    w3.setServerNames(['www.scionlab.org'])
+    w3.makeReverseProxy('scionlab.org:443')
+    #w3.setCAServer(caServer)    
     emu.addBinding(Binding('web3', filter=Filter(asn=241, nodeName='host_0')))
 
 
@@ -354,13 +361,13 @@ def run(dumpfile = None):
     ns_net.addZone('net.', createNsAndSoa=True).setMaster()
     emu.addBinding(Binding('ns-net', filter=Filter(asn=203, nodeName='host_0')))
 
-    # 'edu.'
+    # 'org.'
     host_ns_4 = base.getAutonomousSystem(231).getHost('host_0')
 
-    ns_edu = dns_svc.install('ns-edu')
+    ns_edu = dns_svc.install('ns-org')
     ns_edu.setCAServer(caServer)
-    ns_edu.addZone('edu.', createNsAndSoa=True).setMaster()
-    emu.addBinding(Binding('ns-edu', filter=Filter(asn=231, nodeName='host_0')))
+    ns_edu.addZone('org.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('ns-org', filter=Filter(asn=231, nodeName='host_0')))
 
     # second level zones name servers
 
@@ -384,15 +391,15 @@ def run(dumpfile = None):
 
     dns_svc.getZone('example.net.').addRecord(TXT_RR(text='scion=1-173,10.173.0.71', name='www.example.net.'))
 
-    # 'example.edu.'
+    # 'scionlab.org.'
     host_ns_7 = base.getAutonomousSystem(242).getHost('host_0')
 
-    ns_example_edu = dns_svc.install('ns-example.edu')
+    ns_example_edu = dns_svc.install('ns-scionlab.org')
     ns_example_edu.setCAServer(caServer)
-    ns_example_edu.addZone('example.edu.', createNsAndSoa=True).setMaster()
-    emu.addBinding(Binding('ns-example.edu', filter=Filter(asn=242, nodeName='host_0')))
+    ns_example_edu.addZone('scionlab.org.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('ns-scionlab.org', filter=Filter(asn=242, nodeName='host_0')))
 
-    dns_svc.getZone('example.edu.').addRecord(TXT_RR(text='scion=2-241,10.241.0.71', name='www.example.edu.'))
+    dns_svc.getZone('scionlab.org.').addRecord(TXT_RR(text='scion=2-241,10.241.0.71', name='www.scionlab.org.'))
 
 
     # Rendering

@@ -200,6 +200,62 @@ WebServerFileTemplates['caddy_file_server_https'] = '''\
     }}
 }}
 '''
+# no "tls" section required, because the TLS connection is
+# not terminated by/at the proxy, but forwarded to the upstream destination instead
+WebServerFileTemplates['caddy_l4passthrough'] = """\
+{{
+    "admin": {{
+        "disabled": true,
+        "config": {{
+            "persist": false
+        }}
+    }},
+    "apps": {{
+        "scion": {{}},
+        "layer4": {{
+            "servers": {{
+                "scion": {{
+                    "listen": [
+                        {listen}
+                    ],
+                    "routes": [
+                        {{
+                            "match": [
+                                {{
+                                    "tls": {{
+                                        "sni": [
+                                        {domain_names}
+                                        ]
+                                    }}
+                                }}
+                            ],
+                            "handle": [
+                                {{
+                                    "handler": "proxy",
+                                    "upstreams": [
+                                        {{
+                                            "dial": [
+                                                {upstream}
+                                            ]
+                                        }}
+                                    ]
+                                }}
+                            ]
+                        }}
+                    ]
+                }}
+            }}
+        }}
+    }},
+    "logging": {{
+        "logs": {{
+            "default": {{
+                "level": "{loglevel}"
+            }}
+        }}
+    }}
+}}
+"""
 
 WebServerFileTemplates['caddy_reverse'] = '''\
 {{
@@ -609,12 +665,18 @@ class WebServerBase(Server):
         """
         self.__role = WebServerRole.FWD_PROXY
 
-    def makeReverseProxy(self):
+    def makeReverseProxy(self, upstream: str):
         """
         configures this server instance to function as a reverse proxy server
+        @param upstream domain-name or IP address potentially with :port
         """
         self.__role = WebServerRole.REV_PROXY
-
+        self.__upstream = upstream
+    
+    def _getUpstream(self) -> str:
+        """get the upstream of a reverse proxy"""
+        assert self.__role == WebServerRole.REV_PROXY
+        return ', '.join( [ f'"{u.strip('"')}"' for u in self.__upstream.split(',') ] )
 
     def install(self, node: Node, web: WebService):
         """!
@@ -733,7 +795,7 @@ class CaddyHelper(InstallHelperBase):
                full_cp_cmd
             )
             # TODO assert that output_dir is NON empty !!!
-            self._check_directory_contents(output_dir, ['scion-caddy', 'scion-caddy-forward'])
+        self._check_directory_contents(output_dir, ['scion-caddy', 'scion-caddy-forward'])
 
     def install(self, node: Node, context: str):
         """
@@ -775,8 +837,25 @@ class CaddyWebServer(WebServerBase):
                 self._install_web_server(node)
             case WebServerRole.FWD_PROXY:
                 self._install_fwd_proxy(node)
+            case WebServerRole.REV_PROXY:
+                self._install_rev_proxy(node)
             case _:
                 raise NotImplementedError
+
+    def _install_rev_proxy(self, node: Node):
+        listen = '":4443"'
+        if 'scion_address' in node.getLabel():
+            addr = f"scion+single-stream/[{node.getLabel()['scion_address']}]"
+            listen += f', "{addr}:443"'
+
+        dname = ', '.join( [ f'"{s}"' for s in self.getServerNames()] )
+        node.setFile(self._get_config_path(),
+                     WebServerFileTemplates['caddy_l4passthrough'].format(listen=listen,
+                                                                          domain_names=dname,
+                                                                          upstream=self._getUpstream(),
+                                                                          loglevel="DEBUG"
+                                                                          )
+                     )
 
     def _install_fwd_proxy(self, node: Node):
         shortname = self.getServerNames()[0].replace('.','_') # www.example.com -> www_example_com

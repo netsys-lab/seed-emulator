@@ -119,7 +119,7 @@ class RootMiniCAStore(RootCAStoreBase):
             script_name = 'cert_import_helper.sh'
             current_dir = os.getcwd()
             output_dir = os.path.join(current_dir, _path)
-            os.mkdir(output_dir)
+            os.makedirs(output_dir, exist_ok=True)
             browser_script = CaFileTemplates['certutil_importer'].format(certfile=f'{self.__caDir}/minica.pem',
                                                                          certname=caDomain)
             with open(f'{output_dir}/{script_name}', 'w') as file:
