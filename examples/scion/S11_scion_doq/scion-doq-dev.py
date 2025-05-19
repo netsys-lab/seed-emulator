@@ -95,13 +95,7 @@ def run(dumpfile = None):
     devsvc = GolangDevService( 'amdfxlucas', 'saculolissat@gmx.de' )
 
     repos = [
-        GitRepo(
-            repo_url = 'https://github.com/coredns/coredns-utils.git', 
-            repo_branch = 'master',
-             repo_path = '/repos/coredns-utils',
-             notes = 'coredns-keygen util is required for zone signing key generation\
-                    OBSOLETE!! we use bind9 dnssec utils instead, because it supports more keytypes.'),
-        
+                
             GitRepo( repo_url = 'https://github.com/netsys-lab/pan-lua',
                     repo_branch = 'main',
                     repo_path = '/repos/pan-lua' ),
@@ -111,7 +105,7 @@ def run(dumpfile = None):
                     repo_path = '/repos/panapi' ),
 
              GitRepo( repo_url = 'https://github.com/netsys-lab/scion-sdns',
-                    repo_branch = 'main', # new-main
+                    repo_branch = 'new-main',
                     repo_path = '/repos/scion-sdns',
                     notes= 'the recursive resolver that must run on the host \
                             instead of the default systemd-resolved.service \
@@ -122,15 +116,11 @@ def run(dumpfile = None):
 
 
             GitRepo( repo_url = 'https://github.com/netsys-lab/scion-coredns-doq',
-                    repo_branch = 'main', # attempt-rebase
+                    repo_branch = 'attempt-rebase',
                     repo_path = '/repos/scion-coredns-doq',
                     notes = 'SCION DoQ capable coredns nameserver fork based on caddy  \
                             Also includes RHINE through a modified file plugin \
                         '
-
-                    # upstream coredns: https://github.com/coredns/coredns
-                    #       depends on github.com/miekg/dns v1.1.65 (latest version as of 03.05.2025)
-                    #               	github.com/quic-go/quic-go v0.50.1
                       ),
 
             #  our miekg/dns fork uses the latest upstream scion-apps !!
@@ -141,7 +131,7 @@ def run(dumpfile = None):
                     notes =' ' ),
 
             GitRepo( repo_url = 'https://github.com/netsys-lab/exdns',
-                     repo_branch = 'master', # master-rebased
+                     repo_branch = 'master-rebased',
                      repo_path = '/repos/exdns',
                      notes='dig like CLI program for issuing test DNS requests to the resolver or NS \
                           forked from https://github.com/miekg/exdns \
@@ -152,20 +142,20 @@ def run(dumpfile = None):
 
 
             GitRepo( repo_url = 'https://github.com/netsys-lab/dns',
-                    repo_branch = 'master', # master-rebase
+                    repo_branch = 'master-rebase',
                     repo_path = '/repos/dns',
                     notes='fork of miekg/dns with SCION support'
                     ),
 
 
-            GitRepo(repo_url = 'https://github.com/scionproto-contrib/http-proxy.git',
-                    repo_branch = 'main',
+            GitRepo(repo_url = 'https://github.com/amdfxlucas/http-proxy.git',
+                    repo_branch = 'seed',
                     repo_path = '/repos/http-proxy',
                     notes='SCION HTTP-proxy functionality' ),
 
 
-            GitRepo(repo_url = 'https://github.com/scionproto-contrib/caddy-scion',
-                    repo_branch = 'main',
+            GitRepo(repo_url = 'https://github.com/amdfxlucas/caddy-scion.git',
+                    repo_branch = 'seed',
                     repo_path = '/repos/caddy-scion',
                     notes='caddy server plugins using the http-proxy module' )
 
