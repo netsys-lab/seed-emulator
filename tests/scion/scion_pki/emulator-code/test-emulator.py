@@ -307,13 +307,17 @@ def run(dumpfile = None):
     w1.setCAServer(caServer)
     emu.addBinding(Binding('web1', filter=Filter(asn=172, nodeName='host_0')))
 
-    # 'www.example.net'
-    host_web_2 = base.getAutonomousSystem(173).getHost('host_0')
-    w2 = web.install('web2')
-    w2.enableHTTPS()    
-    w2.setServerNames(['www.example.net'])
-    w2.setCAServer(caServer)
+    # 'www.netsys.ovgu.de/'
+    as173 = base.getAutonomousSystem(173)
+    host_web_2 = as173.getHost('host_0')
+    w2 = web.install('web2')    
+    w2.setServerNames(['www.netsys.ovgu.de'])
+    w2.makeReverseProxy('www.netsys.ovgu.de:443')    
     emu.addBinding(Binding('web2', filter=Filter(asn=173, nodeName='host_0')))
+    br0_173 = as173.getRouter('br0')
+    br0_173 = promote_to_real_world_router(br0_173, False)
+    br0_173.addRealWorldRoute('0.0.0.0/1', str(as173.getNetwork('net0').getPrefix()))
+    br0_173.addRealWorldRoute('128.0.0.0/1', str(as173.getNetwork('net0').getPrefix()))
 
     # 'www.scionlab.org' Reverse Proxy to RealWorld hosted webpage
     as241 = base.getAutonomousSystem(241)
@@ -324,11 +328,9 @@ def run(dumpfile = None):
     br0_241.addRealWorldRoute('128.0.0.0/1', str(as241.getNetwork('net0').getPrefix()))
     
 
-    w3 = web.install('web3')
-    #w3.enableHTTPS()
+    w3 = web.install('web3')    
     w3.setServerNames(['www.scionlab.org'])
-    w3.makeReverseProxy('scionlab.org:443')
-    #w3.setCAServer(caServer)    
+    w3.makeReverseProxy('scionlab.org:443')    
     emu.addBinding(Binding('web3', filter=Filter(asn=241, nodeName='host_0')))
 
 
@@ -353,13 +355,13 @@ def run(dumpfile = None):
     emu.addBinding(Binding('ns-com', filter=Filter(asn=234, nodeName='host_0')))
 
 
-    # 'net.'
+    # 'de.'
     host_ns_3 = base.getAutonomousSystem(203).getHost('host_0')
 
-    ns_net = dns_svc.install('ns-net')
+    ns_net = dns_svc.install('ns-de')
     ns_net.setCAServer(caServer)
-    ns_net.addZone('net.', createNsAndSoa=True).setMaster()
-    emu.addBinding(Binding('ns-net', filter=Filter(asn=203, nodeName='host_0')))
+    ns_net.addZone('de.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('ns-de', filter=Filter(asn=203, nodeName='host_0')))
 
     # 'org.'
     host_ns_4 = base.getAutonomousSystem(231).getHost('host_0')
@@ -381,15 +383,15 @@ def run(dumpfile = None):
 
     dns_svc.getZone('example.com.').addRecord(TXT_RR(text='scion=1-172,10.172.0.71', name='www.example.com.'))
 
-    # 'example.net.'
+    # 'ovgu.de.'
     host_ns_6 = base.getAutonomousSystem(240).getHost('host_0')
 
-    ns_example_net = dns_svc.install('ns-example.net')
+    ns_example_net = dns_svc.install('ns-ovgu.de')
     ns_example_net.setCAServer(caServer)
-    ns_example_net.addZone('example.net.', createNsAndSoa=True).setMaster()
-    emu.addBinding(Binding('ns-example.net', filter=Filter(asn=240, nodeName='host_0')))
+    ns_example_net.addZone('ovgu.de.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('ns-ovgu.de', filter=Filter(asn=240, nodeName='host_0')))
 
-    dns_svc.getZone('example.net.').addRecord(TXT_RR(text='scion=1-173,10.173.0.71', name='www.example.net.'))
+    dns_svc.getZone('ovgu.de.').addRecord(TXT_RR(text='scion=1-173,10.173.0.71', name='www.netsys.ovgu.de.'))
 
     # 'scionlab.org.'
     host_ns_7 = base.getAutonomousSystem(242).getHost('host_0')
