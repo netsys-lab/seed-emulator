@@ -15,7 +15,7 @@ from .Customizable import Customizable
 from .Hook import Hook
 from .Layer import Layer
 from .Service import Server, Service
-from .CAServiceBase import CAServiceBase, CAServerBase, RootCAStoreBase
+from .CAServiceBase import CAServiceBase, CAServerBase, RootCAStoreBase, CaAlgorithm
 from .Binding import Binding, Action
 from .Filter import Filter
 from .Component import Component

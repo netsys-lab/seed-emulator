@@ -263,8 +263,8 @@ class ScionBuilder():
             case SetupSpecification.LOCAL_BUILD:
                 self.__installFromBuild(node, s.checkout_spec)
                 self._addSCIONLabPackages(node)
-                node.addBuildCommand("apt-get update && apt download scion-apps-bwtester"
-                                     " && dpkg --ignore-depends=scion-daemon,scion-dispatcher -i scion-apps-bwtester_3.4.2_amd64.deb")
+                #node.addBuildCommand("apt-get update && apt download scion-apps-bwtester"
+                #                     " && dpkg --ignore-depends=scion-daemon,scion-dispatcher -i scion-apps-bwtester_3.4.2_amd64.deb")
 
 
             case SetupSpecification.PACKAGES:

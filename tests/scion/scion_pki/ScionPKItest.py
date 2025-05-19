@@ -159,6 +159,9 @@ class SCIONPKITestCase(ScionTestCase):
         test_suite.addTest(cls('test_nameserver_certs'))
         test_suite.addTest(cls('test_sdns_resolver'))
         #test_suite.addTest(cls('test_web_integration'))
+        # TODO perform a curl request from the docker-host into the simulation:
+        #sudo cp  /tmp/seedemu-minica-wtqc23j8/minica.pem /usr/local/share/ca-certificates/minica.crt && sudo update-ca-certificates
+        # curl "https://www.example.com:7443" --proxy "https://localhost:9443" --proxy-header "Proxy-Authorization: Basic cG9saWN5Og==" 
         return test_suite
 
 if __name__ == "__main__":
