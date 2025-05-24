@@ -92,8 +92,9 @@ class TXT_RR(ResourceRecord):
 
 
 class DNSStackHelperBase:
-    """"""
+    """a helper that installs nameserver binaries onto nodes"""
     def install(self, node: Node, context: str):
+        """default impl is NoOp"""
         pass
 
 class DNSStackHelper(DNSStackHelperBase):
@@ -260,7 +261,7 @@ class DNSStack(Enum):
     DEFAULT = 0 # implemented with bind9
     # Next-Generation Internet
     SCION = 1 # CoreDNS nameserver + sdns resolver installation
-    # only configuration is generated,
+    # only configuration (coredns 'Corefile' + zonefiles & certs) is generated,
     #  and user must provide binaries via DevService herself
     SCION_DEV = 2
 

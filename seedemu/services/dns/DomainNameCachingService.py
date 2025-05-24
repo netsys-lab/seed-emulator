@@ -515,7 +515,7 @@ class DomainNameCachingServer(Server, Configurable):
         # start sdns process
         node.addSoftware('apache2-utils') # for rotatelogs
         # sdns needs scion paths for root server update on startup # maybe SDNS_DEBUG=true
-        node.appendStartCommand('sleep 60; echo "resolver started"; SDNS_DEBUG=true SDNS_PPROF=true sdns --config /etc/sdns/sdns.conf 2>&1 | rotatelogs -n 2 /var/log/sdns.log 1M', fork=True)
+        node.appendStartCommand('sleep 180; echo "resolver started"; SDNS_DEBUG=true SDNS_PPROF=true sdns --config /etc/sdns/sdns.conf 2>&1 | rotatelogs -n 2 /var/log/sdns.log 1M', fork=True)
 
 
     def _do_install_bind9(self, node: Node):

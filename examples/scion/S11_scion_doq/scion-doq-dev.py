@@ -200,7 +200,7 @@ def run(dumpfile = None):
     dns_svc = DomainNameService(dns_setup=OptionRegistry().dns_setup(DNSStack.SCION_DEV), dns_auth=DNSAuth.RHINE)
     minica = MiniCAService()
 
-    web = WebService(kind = WebServerKind.CADDY)
+    web = WebService(kind = WebServerKind.CADDY_DEV)
 
     sdns = DomainNameCachingService(do_enc=True, dns_auth=DNSAuth.RHINE)
 

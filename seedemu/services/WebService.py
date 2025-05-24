@@ -538,6 +538,11 @@ class CAServerKind(Enum):
 class WebServerKind(Enum):
     NGINX = 0
     CADDY = 1
+    # XYZ_DEV prefix will generate respective configuration files,
+    # but no binaries. They have to be provided by user with DevelopmentService
+    CADDY_DEV = 2
+
+
 
 class WebServerRole(Enum):
     WEB = 0 # or "host" ?!
@@ -704,6 +709,8 @@ class WebService(Service):
         self._kind = kind
         if kind == WebServerKind.CADDY:
             WebService._helper = CaddyHelper()
+        else:
+            WebService._helper = InstallHelperBase()
         super().__init__()
         self.addDependency('Base', False, False)
         self.addDependency('Routing', False, False)
@@ -715,8 +722,10 @@ class WebService(Service):
         match self._kind:
             case WebServerKind.NGINX:
                 return NginxWebServer()
-            case WebServerKind.CADDY:
+            case WebServerKind.CADDY | WebServerKind.CADDY_DEV:
                 return CaddyWebServer()
+            case _:
+                assert False
 
     def getName(self) -> str:
         return 'WebService'
@@ -731,7 +740,9 @@ class WebService(Service):
         return out
 
 class InstallHelperBase:
+    """a helper that installs web server binaries onto a node"""
     def install(self, node: Node, context: str):
+        """default is a No-Op"""
         pass
 
 class CaddyHelper(InstallHelperBase):
@@ -817,20 +828,11 @@ class CaddyWebServer(WebServerBase):
                     the server will also listen on its SCION address (HTTP/3:8443)
         """
         self._install_caddy_base(node, web)
-
-     
-        # NOTE: all requests to the forward proxy must contain "Proxy-Authorization" header with value  "Basic cG9saWN5Og==" !!!
-        #curl -v "https://www.example.com:7443" --proxy "https://localhost:9443" --proxy-header "Proxy-Authorization: Basic cG9saWN5Og=="
-
-
+        # for relevant Caddy config see:
         # https://caddyserver.com/docs/json/apps/http/
-
         # https://caddyserver.com/docs/json/apps/http/servers/routes/handle/reverse_proxy/
-
         # https://caddyserver.com/docs/json/apps/pki/
-
         # https://caddyserver.com/docs/json/apps/tls/
-
 
         match self.getRole():
             case WebServerRole.WEB:
@@ -858,6 +860,10 @@ class CaddyWebServer(WebServerBase):
                      )
 
     def _install_fwd_proxy(self, node: Node):
+        """configure caddy server to act as forward-proxy"""
+        # NOTE: all requests to the forward proxy must contain "Proxy-Authorization" header with value  "Basic cG9saWN5Og==" !!!
+        #curl -v "https://www.example.com:7443" --proxy "https://localhost:9443" --proxy-header "Proxy-Authorization: Basic cG9saWN5Og=="
+
         shortname = self.getServerNames()[0].replace('.','_') # www.example.com -> www_example_com
         dname = ', '.join( [ f'"{s}"' for s in self.getServerNames()] )
 
@@ -889,6 +895,7 @@ class CaddyWebServer(WebServerBase):
         return '/etc/caddy/config.json'
 
     def _install_web_server(self, node: Node):
+        """configure caddy to serve a web page"""
 
         super()._installContents(node)
 
@@ -931,6 +938,9 @@ class CaddyWebServer(WebServerBase):
                                                                                      domain_names=dname) )
 
     def _install_caddy_base(self, node: Node, web: WebService):
+        """install the required binaries for the web server
+            and generate the TLS certs for HTTPS
+        """
         wh = web.getHelper()
         wh.install(node, 'scion-caddy')
 
