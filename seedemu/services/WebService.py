@@ -805,8 +805,8 @@ class CaddyHelper(InstallHelperBase):
             CaddyHelper.container.entrypoint("sh").mountVolume(output_dir, "/build").run(
                full_cp_cmd
             )
-            # TODO assert that output_dir is NON empty !!!
-        self._check_directory_contents(output_dir, ['scion-caddy', 'scion-caddy-forward'])
+
+        self._check_directory_contents(output_dir, ['scion-caddy', 'scion-caddy-forward', 'scion-caddy-reverse'])
 
     def install(self, node: Node, context: str):
         """

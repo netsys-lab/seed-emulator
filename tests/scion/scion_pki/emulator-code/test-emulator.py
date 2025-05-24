@@ -261,7 +261,7 @@ def run(dumpfile = None):
     from seedemu.utilities import createHostsOnNetwork
     # nodes who should have a DevService installed
     dev_targets = []
-    ases_with_hosts = [102, 172, 173, 231, 234, 203, 235, 150, 240 , 242, 241]
+    ases_with_hosts = [102, 172, 173, 231, 234, 203, 232, 235, 150, 240 , 242, 241]
     for asn in ases_with_hosts:
         as_ = base.getAutonomousSystem(asn)
         createHostsOnNetwork(emu, as_, 'net0', [])
@@ -333,6 +333,20 @@ def run(dumpfile = None):
     w3.makeReverseProxy('scionlab.org:443')    
     emu.addBinding(Binding('web3', filter=Filter(asn=241, nodeName='host_0')))
 
+     # 'www.ovgu.de' Reverse Proxy to RealWorld hosted webpage
+    as232 = base.getAutonomousSystem(232)
+    host_web_4 = as232.getHost('host_0')
+    br0_232 = as232.getRouter('br0')
+    br0_232 = promote_to_real_world_router(br0_232, False)
+    br0_232.addRealWorldRoute('0.0.0.0/1', str(as232.getNetwork('net0').getPrefix()))
+    br0_232.addRealWorldRoute('128.0.0.0/1', str(as232.getNetwork('net0').getPrefix()))
+    
+
+    w4 = web.install('web4')    
+    w4.setServerNames(['www.ovgu.de'])
+    w4.makeReverseProxy('ovgu.de:443')    
+    emu.addBinding(Binding('web4', filter=Filter(asn=232, nodeName='host_0')))
+
 
     # coredns DoQ nameservers ..........................................
     # root '.'
@@ -391,7 +405,11 @@ def run(dumpfile = None):
     ns_example_net.addZone('ovgu.de.', createNsAndSoa=True).setMaster()
     emu.addBinding(Binding('ns-ovgu.de', filter=Filter(asn=240, nodeName='host_0')))
 
-    dns_svc.getZone('ovgu.de.').addRecord(TXT_RR(text='scion=1-173,10.173.0.71', name='www.netsys.ovgu.de.'))
+    ovgu_zone = dns_svc.getZone('ovgu.de.')
+    ovgu_zone.addRecord(TXT_RR(text='scion=1-173,10.173.0.71', name='www.netsys.ovgu.de.'))
+    ovgu_zone.addRecord(TXT_RR(text='scion=2-232,10.232.0.71', name='www.ovgu.de.'))
+    # that's not enough..
+    #ovgu_zone.getSubZone("fin").addRecord(TXT_RR(text='scion=2-233,10.233.0.71', name='www.fin.ovgu.de.'))
 
     # 'scionlab.org.'
     host_ns_7 = base.getAutonomousSystem(242).getHost('host_0')
