@@ -9,7 +9,7 @@ from seedemu.services import (GolangDevService, AccessMode,
 from seedemu.services.dns.DNSCommon import *
 from dataclasses import dataclass
 from typing import List
-from seedemu.core import Emulator, Binding, Filter, Node, OptionRegistry, promote_to_real_world_router
+from seedemu.core import Emulator, Binding, Filter, Node, OptionRegistry
 from seedemu.layers import (
     ScionBase, ScionRouting, ScionIsd, Scion, SetupSpecification, CheckoutSpecification, EtcHosts)
 from seedemu.layers import ScionBase, ScionRouting, ScionIsd, Scion
@@ -19,6 +19,51 @@ import os, sys
 from ipaddress import IPv4Network
 from collections import defaultdict
 
+
+WebSiteContents = {}
+WebSiteContents['index_template'] = '''\
+<h1> {asn}-{nodeName} {domain} {address}</h1>
+<pre>
+{body}
+</pre>
+'''
+
+WebSiteContents['www_example_com'] ='''\
+                                                                                 ___
+                                                                                /\_ \ 
+ __  __  __  __  __  __  __  __  __        __   __  _    __      ___ ___   _____\//\ \      __        ___    ___     ___ ___
+/\ \/\ \/\ \/\ \/\ \/\ \/\ \/\ \/\ \     /'__`\/\ \/'\ /'__`\  /' __` __`\/\ '__`\\\\ \ \   /'__`\     /'___\ / __`\ /' __` __`\ 
+\ \ \_/ \_/ \ \ \_/ \_/ \ \ \_/ \_/ \ __/\  __/\/>  >//\ \L\.\_/\ \/\ \/\ \ \ \L\ \\\\_\ \_/\  __/  __/\ \__//\ \L\ \/\ \/\ \/\ \ 
+ \ \___x___/'\ \___x___/'\ \___x___/'/\_\ \____\/\_/\_\ \__/.\_\ \_\ \_\ \_\ \ ,__//\____\ \____\/\_\ \____\ \____/\ \_\ \_\ \_\ 
+  \/__//__/   \/__//__/   \/__//__/  \/_/\/____/\//\/_/\/__/\/_/\/_/\/_/\/_/\ \ \/ \/____/\/____/\/_/\/____/\/___/  \/_/\/_/\/_/
+                                                                             \ \_\ 
+                                                                              \/_/
+'''
+
+WebSiteContents['www_example_net'] = '''\
+                                                                                       888                          888
+                                                                                       888                          888
+                                                                                       888                          888
+888  888  888888  888  888888  888  888    .d88b. 888  888 8888b. 88888b.d88b. 88888b. 888 .d88b.   88888b.  .d88b. 888888
+888  888  888888  888  888888  888  888   d8P  Y8b`Y8bd8P'    "88b888 "888 "88b888 "88b888d8P  Y8b  888 "88bd8P  Y8b888
+888  888  888888  888  888888  888  888   88888888  X88K  .d888888888  888  888888  88888888888888  888  88888888888888
+Y88b 888 d88PY88b 888 d88PY88b 888 d88Pd8bY8b.    .d8""8b.888  888888  888  888888 d88P888Y8b.   d8b888  888Y8b.    Y88b.
+ "Y8888888P"  "Y8888888P"  "Y8888888P" Y8P "Y8888 888  888"Y888888888  888  88888888P" 888 "Y8888Y8P888  888 "Y8888  "Y888
+                                                                               888
+                                                                               888
+                                                                               888
+'''
+
+WebSiteContents['www_example_edu'] = '''\
+                                                                                    dP                            dP
+                                                                                    88                            88
+dP  dP  dP dP  dP  dP dP  dP  dP    .d8888b. dP.  .dP .d8888b. 88d8b.d8b.  88d888b. 88 .d8888b.    .d8888b. .d888b88 dP    dP
+88  88  88 88  88  88 88  88  88    88ooood8  `8bd8'  88'  `88 88'`88'`88  88'  `88 88 88ooood8    88ooood8 88'  `88 88    88
+88.88b.88' 88.88b.88' 88.88b.88' dP 88.  ...  .d88b.  88.  .88 88  88  88  88.  .88 88 88.  ... dP 88.  ... 88.  .88 88.  .88
+8888P Y8P  8888P Y8P  8888P Y8P  88 `88888P' dP'  `dP `88888P8 dP  dP  dP  88Y888P' dP `88888P' 88 `88888P' `88888P8 `88888P'
+oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo~88~oooooooooooooooooooooooooooooooooooooooooooooooo
+                                                                           dP
+'''
 
 
 def run(dumpfile = None):
@@ -302,50 +347,44 @@ def run(dumpfile = None):
     # 'www.example.com'
     host_web_1 = base.getAutonomousSystem(172).getHost('host_0')
     w1 = web.install('web1')
-    w1.enableHTTPS()    
+    w1.enableHTTPS()
+    w1.setIndexContent(WebSiteContents['index_template'].format(address='1-172,10.172.0.71',
+                                                                nodeName='host_0',
+                                                                domain='www.example.com',
+                                                                body=WebSiteContents['www_example_com'],
+                                                                asn=172))    
     w1.setServerNames(['www.example.com'])
     w1.setCAServer(caServer)
     emu.addBinding(Binding('web1', filter=Filter(asn=172, nodeName='host_0')))
 
-    # 'www.netsys.ovgu.de/'
-    as173 = base.getAutonomousSystem(173)
-    host_web_2 = as173.getHost('host_0')
-    w2 = web.install('web2')    
-    w2.setServerNames(['www.netsys.ovgu.de'])
-    w2.makeReverseProxy('www.netsys.ovgu.de:443')    
+   # 'www.example.net'
+    host_web_2 = base.getAutonomousSystem(173).getHost('host_0')
+
+    w2 = web.install('web2')
+    w2.enableHTTPS()
+    w2.setIndexContent(WebSiteContents['index_template'].format(address='1-173,10.173.0.71',
+                                                                nodeName='host_0',
+                                                                domain='www.example.net',
+                                                                body=WebSiteContents['www_example_net'],
+                                                                asn=173))
+    w2.setServerNames(['www.example.net'])
+    w2.setCAServer(caServer)
     emu.addBinding(Binding('web2', filter=Filter(asn=173, nodeName='host_0')))
-    br0_173 = as173.getRouter('br0')
-    br0_173 = promote_to_real_world_router(br0_173, False)
-    br0_173.addRealWorldRoute('0.0.0.0/1', str(as173.getNetwork('net0').getPrefix()))
-    br0_173.addRealWorldRoute('128.0.0.0/1', str(as173.getNetwork('net0').getPrefix()))
 
-    # 'www.scionlab.org' Reverse Proxy to RealWorld hosted webpage
-    as241 = base.getAutonomousSystem(241)
-    host_web_3 = as241.getHost('host_0')
-    br0_241 = as241.getRouter('br0')
-    br0_241 = promote_to_real_world_router(br0_241, False)
-    br0_241.addRealWorldRoute('0.0.0.0/1', str(as241.getNetwork('net0').getPrefix()))
-    br0_241.addRealWorldRoute('128.0.0.0/1', str(as241.getNetwork('net0').getPrefix()))
-    
 
-    w3 = web.install('web3')    
-    w3.setServerNames(['www.scionlab.org'])
-    w3.makeReverseProxy('scionlab.org:443')    
+    # 'www.example.edu'
+    host_web_3 = base.getAutonomousSystem(241).getHost('host_0')
+
+    w3 = web.install('web3')
+    w3.enableHTTPS()
+    w3.setServerNames(['www.example.edu'])
+    w3.setCAServer(caServer)
+    w3.setIndexContent(WebSiteContents['index_template'].format(address='2-241,10.241.0.71',
+                                                                nodeName='host_0',
+                                                                domain='www.example.edu',
+                                                                body=WebSiteContents['www_example_edu'],
+                                                                asn=241))
     emu.addBinding(Binding('web3', filter=Filter(asn=241, nodeName='host_0')))
-
-     # 'www.ovgu.de' Reverse Proxy to RealWorld hosted webpage
-    as232 = base.getAutonomousSystem(232)
-    host_web_4 = as232.getHost('host_0')
-    br0_232 = as232.getRouter('br0')
-    br0_232 = promote_to_real_world_router(br0_232, False)
-    br0_232.addRealWorldRoute('0.0.0.0/1', str(as232.getNetwork('net0').getPrefix()))
-    br0_232.addRealWorldRoute('128.0.0.0/1', str(as232.getNetwork('net0').getPrefix()))
-    
-
-    w4 = web.install('web4')    
-    w4.setServerNames(['www.ovgu.de'])
-    w4.makeReverseProxy('ovgu.de:443')    
-    emu.addBinding(Binding('web4', filter=Filter(asn=232, nodeName='host_0')))
 
 
     # coredns DoQ nameservers ..........................................
@@ -368,22 +407,23 @@ def run(dumpfile = None):
     ns_com.addZone('com.', createNsAndSoa=True).setMaster()
     emu.addBinding(Binding('ns-com', filter=Filter(asn=234, nodeName='host_0')))
 
-
-    # 'de.'
+     # 'net.'
     host_ns_3 = base.getAutonomousSystem(203).getHost('host_0')
 
-    ns_net = dns_svc.install('ns-de')
+    ns_net = dns_svc.install('ns-net')
     ns_net.setCAServer(caServer)
-    ns_net.addZone('de.', createNsAndSoa=True).setMaster()
-    emu.addBinding(Binding('ns-de', filter=Filter(asn=203, nodeName='host_0')))
+    ns_net.addZone('net.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('ns-net', filter=Filter(asn=203, nodeName='host_0')))
 
-    # 'org.'
+
+    # 'edu.'
     host_ns_4 = base.getAutonomousSystem(231).getHost('host_0')
 
-    ns_edu = dns_svc.install('ns-org')
+    ns_edu = dns_svc.install('ns-edu')
     ns_edu.setCAServer(caServer)
-    ns_edu.addZone('org.', createNsAndSoa=True).setMaster()
-    emu.addBinding(Binding('ns-org', filter=Filter(asn=231, nodeName='host_0')))
+    ns_edu.addZone('edu.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('ns-edu', filter=Filter(asn=231, nodeName='host_0')))
+
 
     # second level zones name servers
 
@@ -397,29 +437,26 @@ def run(dumpfile = None):
 
     dns_svc.getZone('example.com.').addRecord(TXT_RR(text='scion=1-172,10.172.0.71', name='www.example.com.'))
 
-    # 'ovgu.de.'
+    # 'example.net.'
     host_ns_6 = base.getAutonomousSystem(240).getHost('host_0')
 
-    ns_example_net = dns_svc.install('ns-ovgu.de')
+    ns_example_net = dns_svc.install('ns-example.net')
     ns_example_net.setCAServer(caServer)
-    ns_example_net.addZone('ovgu.de.', createNsAndSoa=True).setMaster()
-    emu.addBinding(Binding('ns-ovgu.de', filter=Filter(asn=240, nodeName='host_0')))
+    ns_example_net.addZone('example.net.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('ns-example.net', filter=Filter(asn=240, nodeName='host_0')))
 
-    ovgu_zone = dns_svc.getZone('ovgu.de.')
-    ovgu_zone.addRecord(TXT_RR(text='scion=1-173,10.173.0.71', name='www.netsys.ovgu.de.'))
-    ovgu_zone.addRecord(TXT_RR(text='scion=2-232,10.232.0.71', name='www.ovgu.de.'))
-    # that's not enough..
-    #ovgu_zone.getSubZone("fin").addRecord(TXT_RR(text='scion=2-233,10.233.0.71', name='www.fin.ovgu.de.'))
+    dns_svc.getZone('example.net.').addRecord(TXT_RR(text='scion=1-173,10.173.0.71', name='www.example.net.'))
 
-    # 'scionlab.org.'
+
+    # 'example.edu.'
     host_ns_7 = base.getAutonomousSystem(242).getHost('host_0')
 
-    ns_example_edu = dns_svc.install('ns-scionlab.org')
+    ns_example_edu = dns_svc.install('ns-example.edu')
     ns_example_edu.setCAServer(caServer)
-    ns_example_edu.addZone('scionlab.org.', createNsAndSoa=True).setMaster()
-    emu.addBinding(Binding('ns-scionlab.org', filter=Filter(asn=242, nodeName='host_0')))
+    ns_example_edu.addZone('example.edu.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('ns-example.edu', filter=Filter(asn=242, nodeName='host_0')))
 
-    dns_svc.getZone('scionlab.org.').addRecord(TXT_RR(text='scion=2-241,10.241.0.71', name='www.scionlab.org.'))
+    dns_svc.getZone('example.edu.').addRecord(TXT_RR(text='scion=2-241,10.241.0.71', name='www.example.edu.'))
 
 
     # Rendering
