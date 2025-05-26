@@ -2,6 +2,8 @@ from __future__ import annotations
 from seedemu.core import Node, Service, Server, CAServerBase
 from typing import Dict, List, Tuple
 import os
+import random
+import string
 from enum import Enum
 from seedemu.utilities.BuildtimeDocker import BuildtimeDockerFile, BuildtimeDockerImage
 
@@ -745,6 +747,19 @@ class InstallHelperBase:
         """default is a No-Op"""
         pass
 
+
+def singleton(cls):
+    instances = {}
+
+    def get_instance(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+
+    return get_instance
+
+
+
 class CaddyHelper(InstallHelperBase):
     """!@brief installs caddy web server with SCION plugin
         @note if you don't want to listen on SCION addresses,
@@ -756,7 +771,7 @@ class CaddyHelper(InstallHelperBase):
     build_path: str
     __seen_nodes: List[Node] = []
     # target-name, url, branch, checkout-dir, do-build
-    __dns_urls = [('http-proxy', 'https://github.com/amdfxlucas/http-proxy.git', 'seed', '/repos/http-proxy', False),
+    __repo_urls = [('http-proxy', 'https://github.com/amdfxlucas/http-proxy.git', 'seed', '/repos/http-proxy', False),
                  ('scion-caddy', 'https://github.com/amdfxlucas/caddy-scion.git', 'seed', '/repos/scion-caddy', True)]
 
     def getGoBuildImage(self):
@@ -774,8 +789,8 @@ class CaddyHelper(InstallHelperBase):
 
     def __init__(self):
         # create buildtime docker container
-
-        CaddyHelper.build_path = ".caddy_build_output"
+        tmp =  ''.join(random.choices(string.ascii_lowercase, k=6))
+        CaddyHelper.build_path = f".caddy_build_output_{tmp}"
         current_dir = os.getcwd()
         output_dir = os.path.join(current_dir, CaddyHelper.build_path)
         CaddyHelper.out_dir = output_dir
@@ -786,18 +801,19 @@ class CaddyHelper(InstallHelperBase):
             RUN apk add --no-cache git
             """
 
-            for target in CaddyHelper.__dns_urls:
+            for target in CaddyHelper.__repo_urls:
                 _BUILD_TEMPLATE += f'RUN git clone --branch {target[2]} {target[1]} {target[3]}\n'
                 if target[4]:
                     _BUILD_TEMPLATE += f'RUN cd {target[3]} && go mod tidy && CGO_ENABLED=0 go build -a -o bin/ ./cmd/scion-caddy ./cmd/scion-caddy-native ./cmd/scion-caddy-forward ./cmd/scion-caddy-reverse\n'
 
 
             CaddyHelper.dockerfile = BuildtimeDockerFile(_BUILD_TEMPLATE)
-            CaddyHelper.container = BuildtimeDockerImage(f"caddy-build-container").build(CaddyHelper.dockerfile).container()
+            
+            CaddyHelper.container = BuildtimeDockerImage(f"caddy-build-container-{tmp}").build(CaddyHelper.dockerfile, nocache=True).container()
 
             # copy from build container to docker host
             copy_command = []
-            for target in CaddyHelper.__dns_urls:
+            for target in CaddyHelper.__repo_urls:
                 if target[4]:
                     copy_command.append(f"cp -r {target[3]}/bin/* /build")
 

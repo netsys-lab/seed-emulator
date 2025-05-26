@@ -47,6 +47,7 @@ class BuildtimeDockerImage:
         dockerfile: BuildtimeDockerFile,
         context: str = None,
         args: Dict[str, str] = None,
+        nocache: bool = False
     ):
         if not context:
             context = tempfile.mkdtemp(prefix="seedemu-docker-")
@@ -55,6 +56,8 @@ class BuildtimeDockerImage:
             if args:
                 for arg, value in args.items():
                     build_command += f" --build-arg {arg}={value}"
+            if nocache:
+                build_command += " --no-cache"
             code = sh(build_command + " -", input=dockerfile.getContent().encode())
             if code != 0:
                 raise Exception("Failed to build docker image:\n" + build_command)

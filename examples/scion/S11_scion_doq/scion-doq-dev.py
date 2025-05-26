@@ -9,7 +9,7 @@ from seedemu.services import (GolangDevService, AccessMode,
 from seedemu.services.dns.DNSCommon import *
 from dataclasses import dataclass
 from typing import List
-from seedemu.core import Emulator, Binding, Filter, Node, OptionRegistry
+from seedemu.core import Emulator, Binding, Filter, Node, OptionRegistry, promote_to_real_world_router
 from seedemu.layers import (
     ScionBase, ScionRouting, ScionIsd, Scion, SetupSpecification, CheckoutSpecification, EtcHosts)
 from seedemu.layers import ScionBase, ScionRouting, ScionIsd, Scion
@@ -39,19 +39,6 @@ WebSiteContents['www_example_com'] ='''\
                                                                               \/_/
 '''
 
-WebSiteContents['www_example_net'] = '''\
-                                                                                       888                          888
-                                                                                       888                          888
-                                                                                       888                          888
-888  888  888888  888  888888  888  888    .d88b. 888  888 8888b. 88888b.d88b. 88888b. 888 .d88b.   88888b.  .d88b. 888888
-888  888  888888  888  888888  888  888   d8P  Y8b`Y8bd8P'    "88b888 "888 "88b888 "88b888d8P  Y8b  888 "88bd8P  Y8b888
-888  888  888888  888  888888  888  888   88888888  X88K  .d888888888  888  888888  88888888888888  888  88888888888888
-Y88b 888 d88PY88b 888 d88PY88b 888 d88Pd8bY8b.    .d8""8b.888  888888  888  888888 d88P888Y8b.   d8b888  888Y8b.    Y88b.
- "Y8888888P"  "Y8888888P"  "Y8888888P" Y8P "Y8888 888  888"Y888888888  888  88888888P" 888 "Y8888Y8P888  888 "Y8888  "Y888
-                                                                               888
-                                                                               888
-                                                                               888
-'''
 
 WebSiteContents['www_example_edu'] = '''\
                                                                                     dP                            dP
@@ -417,7 +404,7 @@ def run(dumpfile = None):
     from seedemu.utilities import createHostsOnNetwork
     # nodes who should have a DevService installed
     dev_targets = []
-    ases_with_hosts = [102, 172, 173, 231, 234, 203, 235, 150, 240 , 242, 241]
+    ases_with_hosts = [102, 172, 173, 231, 234, 203,232,235, 150, 240 , 242, 241]
     for asn in ases_with_hosts:
         as_ = base.getAutonomousSystem(asn)
         createHostsOnNetwork(emu, as_, 'net0', [])
@@ -473,19 +460,32 @@ def run(dumpfile = None):
     w1.setCAServer(caServer)
     emu.addBinding(Binding('web1', filter=Filter(asn=172, nodeName='host_0')))
 
-    # 'www.example.net'
-    host_web_2 = base.getAutonomousSystem(173).getHost('host_0')
-
-    w2 = web.install('web2')
-    w2.enableHTTPS()
-    w2.setIndexContent(WebSiteContents['index_template'].format(address='1-173,10.173.0.71',
-                                                                nodeName='host_0',
-                                                                domain='www.example.net',
-                                                                body=WebSiteContents['www_example_net'],
-                                                                asn=173))
-    w2.setServerNames(['www.example.net'])
-    w2.setCAServer(caServer)
+    # 'www.netsys.ovgu.de'
+    as173 = base.getAutonomousSystem(173)
+    host_web_2 = as173.getHost('host_0')
+    w2 = web.install('web2')    
+    w2.setServerNames(['www.netsys.ovgu.de'])
+    w2.makeReverseProxy('www.netsys.ovgu.de:443')    
     emu.addBinding(Binding('web2', filter=Filter(asn=173, nodeName='host_0')))
+    br0_173 = as173.getRouter('br0')
+    br0_173 = promote_to_real_world_router(br0_173, False)
+    br0_173.addRealWorldRoute('0.0.0.0/1', str(as173.getNetwork('net0').getPrefix()))
+    br0_173.addRealWorldRoute('128.0.0.0/1', str(as173.getNetwork('net0').getPrefix()))
+
+
+    # 'www.ovgu.de' Reverse Proxy to RealWorld hosted webpage
+    as232 = base.getAutonomousSystem(232)
+    host_web_4 = as232.getHost('host_0')
+    br0_232 = as232.getRouter('br0')
+    br0_232 = promote_to_real_world_router(br0_232, False)
+    br0_232.addRealWorldRoute('0.0.0.0/1', str(as232.getNetwork('net0').getPrefix()))
+    br0_232.addRealWorldRoute('128.0.0.0/1', str(as232.getNetwork('net0').getPrefix()))
+    
+
+    w4 = web.install('web4')    
+    w4.setServerNames(['www.ovgu.de'])
+    w4.makeReverseProxy('ovgu.de:443,matomo.ovgu.de:443')    # TODO: add matomo.ovgu.de ?!
+    emu.addBinding(Binding('web4', filter=Filter(asn=232, nodeName='host_0')))
 
     # 'www.example.edu'
     host_web_3 = base.getAutonomousSystem(241).getHost('host_0')
@@ -522,13 +522,13 @@ def run(dumpfile = None):
     emu.addBinding(Binding('ns-com', filter=Filter(asn=234, nodeName='host_0')))
 
 
-    # 'net.'
+    # 'de.'
     host_ns_3 = base.getAutonomousSystem(203).getHost('host_0')
 
-    ns_net = dns_svc.install('ns-net')
+    ns_net = dns_svc.install('ns-de')
     ns_net.setCAServer(caServer)
-    ns_net.addZone('net.', createNsAndSoa=True).setMaster()
-    emu.addBinding(Binding('ns-net', filter=Filter(asn=203, nodeName='host_0')))
+    ns_net.addZone('de.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('ns-de', filter=Filter(asn=203, nodeName='host_0')))
 
     # 'edu.'
     host_ns_4 = base.getAutonomousSystem(231).getHost('host_0')
@@ -550,15 +550,18 @@ def run(dumpfile = None):
 
     dns_svc.getZone('example.com.').addRecord(TXT_RR(text='scion=1-172,10.172.0.71', name='www.example.com.'))
 
-    # 'example.net.'
+    # 'ovgu.de.'
     host_ns_6 = base.getAutonomousSystem(240).getHost('host_0')
 
-    ns_example_net = dns_svc.install('ns-example.net')
-    ns_example_net.setCAServer(caServer)
-    ns_example_net.addZone('example.net.', createNsAndSoa=True).setMaster()
-    emu.addBinding(Binding('ns-example.net', filter=Filter(asn=240, nodeName='host_0')))
+    ns_ovgude = dns_svc.install('ns-ovgu.de')
+    ns_ovgude.setCAServer(caServer)
+    ns_ovgude.addZone('ovgu.de.', createNsAndSoa=True).setMaster()
+    emu.addBinding(Binding('ns-ovgu.de', filter=Filter(asn=240, nodeName='host_0')))
 
-    dns_svc.getZone('example.net.').addRecord(TXT_RR(text='scion=1-173,10.173.0.71', name='www.example.net.'))
+    ovgu_zone = dns_svc.getZone('ovgu.de.')
+    ovgu_zone.addRecord(TXT_RR(text='scion=1-173,10.173.0.71', name='www.netsys.ovgu.de.'))
+    ovgu_zone.addRecord(TXT_RR(text='scion=2-232,10.232.0.71', name='www.ovgu.de.')) # TODO add matomo.ovgu.de ?!
+    ovgu_zone.addRecord(TXT_RR(text='scion=2-232,10.232.0.71', name='matomo.ovgu.de.'))
 
     # 'example.edu.'
     host_ns_7 = base.getAutonomousSystem(242).getHost('host_0')

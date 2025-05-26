@@ -2,6 +2,8 @@ from seedemu.core import Node, Option
 from enum import Enum
 from dataclasses import dataclass
 from random import randint
+import random
+import string
 import os
 from typing import List, Tuple
 from seedemu.utilities.BuildtimeDocker import BuildtimeDockerFile, BuildtimeDockerImage
@@ -90,12 +92,22 @@ class TXT_RR(ResourceRecord):
 
 #ORIGIN
 
+def singleton(cls):
+    instances = {}
+
+    def get_instance(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+
+    return get_instance
 
 class DNSStackHelperBase:
     """a helper that installs nameserver binaries onto nodes"""
     def install(self, node: Node, context: str):
         """default impl is NoOp"""
         pass
+
 
 class DNSStackHelper(DNSStackHelperBase):
     """installs CoreDNS nameserver and sdns resolver onto nodes.
@@ -119,8 +131,8 @@ class DNSStackHelper(DNSStackHelperBase):
 
     def __init__(self):
         # create buildtime docker container
-
-        DNSStackHelper.build_path = ".dns_build_output"
+        tmp =  ''.join(random.choices(string.ascii_lowercase, k=6))
+        DNSStackHelper.build_path = f".dns_build_output_{tmp}"
         current_dir = os.getcwd()
         output_dir = os.path.join(current_dir, DNSStackHelper.build_path)
         DNSStackHelper.out_dir = output_dir
@@ -143,7 +155,7 @@ class DNSStackHelper(DNSStackHelperBase):
 
 
             DNSStackHelper.dockerfile = BuildtimeDockerFile(DNS_BUILD_TEMPLATE)
-            DNSStackHelper.container = BuildtimeDockerImage(f"dns-build-container").build(DNSStackHelper.dockerfile).container()
+            DNSStackHelper.container = BuildtimeDockerImage(f"dns-build-container-{tmp}").build(DNSStackHelper.dockerfile, nocache=True).container()
 
             # copy from build container to docker host
             copy_command = []
@@ -266,9 +278,11 @@ class DNSStack(Enum):
     SCION_DEV = 2
 
     def getHelper(self) -> DNSStackHelperBase:
+        if not getattr(DNSStack, '_dnsstack', None):
+            DNSStack._dnsstack = singleton(DNSStackHelper)
 
         if self == DNSStack.SCION:
-            return DNSStackHelper()
+            return DNSStack._dnsstack()
         else:
             return DNSStackHelperBase()
 
