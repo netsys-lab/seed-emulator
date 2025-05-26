@@ -340,6 +340,11 @@ class DomainNameServer(Server):
         self.__do_enc = do_enc
         self.__dns_auth = dns_auth
         self.__algo = None
+    
+    def setAuth(self, dns_auth: DNSAuth):
+        """setter to enable/disable DNS Authentication for an individual nameserver instance"""
+        #TODO: this should be per zone really
+        self.__dns_auth = dns_auth
 
     def _getCryptoPathsForZone(self, zone: str, ns_name: str = None) ->Tuple[str,str]:
         """
@@ -527,8 +532,8 @@ class DomainNameServer(Server):
             if zone.getName() == "." and self.__is_real_root:
                 for record in self.__getRealRootRecords():
                     zone.addRecord(record)
-
-        self._installRHINEcert(node)
+        if self.__dns_auth == DNSAuth.RHINE:
+            self._installRHINEcert(node)
 
     def _installRHINEcert(self, node: Node):
         """ generate RHINE cert
@@ -648,18 +653,19 @@ class DomainNameServer(Server):
             node.appendStartCommand(f'mkdir -p {signed_zones}')
             # signed_zonefile_path = f'{signed_zones}/db{ '.root' if zonename=='.' else f'.{zonename.rstrip('.')}' }.signed'
             suffix = '.root' if zonename == '.' else f".{zonename.rstrip('.')}"
-            signed_zonefile_path = f"{signed_zones}/db{suffix}.signed"
-            h = self.__dns_auth.getServerHelper()
-            rhinecertpath, _ = h.getRhinePaths()
-
-            _file = ( DomainNameServiceFileTemplates['coredns_file'].format(zonefile=zonefile_path, zone=zonename) 
-                      if self.__dns_auth == DNSAuth.NONE else 
-                       DomainNameServiceFileTemplates['coredns_rhine'].format(signed_zonefile=signed_zonefile_path,
+            signed_zonefile_path = f"{signed_zones}/db{suffix}.signed"            
+            _file = ""            
+            if self.__dns_auth == DNSAuth.NONE:                
+                _file = DomainNameServiceFileTemplates['coredns_file'].format(zonefile=zonefile_path, zone=zonename) 
+            else:
+                h = self.__dns_auth.getServerHelper()
+                rhinecertpath, _ = h.getRhinePaths()
+                _file = DomainNameServiceFileTemplates['coredns_rhine'].format(signed_zonefile=signed_zonefile_path,
                                                                               zonefile=zonefile_path,
                                                                               zone=zonename,
                                                                               rcertfile=rhinecertpath,
                                                                               sign_key_base_path=f"{zone_signing_keys_path}/K{filename.rstrip('.')}", # or use filename here ?
-                                                                              out_dir=signed_zones ) )
+                                                                              out_dir=signed_zones )
             
             server_block = DomainNameServiceFileTemplates['coredns_config'].format(
                 schema='squic', # SCION QUIC or change to DoQ sth. 

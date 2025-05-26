@@ -404,7 +404,7 @@ def run(dumpfile = None):
     from seedemu.utilities import createHostsOnNetwork
     # nodes who should have a DevService installed
     dev_targets = []
-    ases_with_hosts = [102, 172, 173, 231, 234, 203,232,235, 150, 240 , 242, 241]
+    ases_with_hosts = [102, 172, 173, 231, 234, 203,232,235, 150, 151, 230, 240 , 242, 241]
     for asn in ases_with_hosts:
         as_ = base.getAutonomousSystem(asn)
         createHostsOnNetwork(emu, as_, 'net0', [])
@@ -460,7 +460,7 @@ def run(dumpfile = None):
     w1.setCAServer(caServer)
     emu.addBinding(Binding('web1', filter=Filter(asn=172, nodeName='host_0')))
 
-    # 'www.netsys.ovgu.de'
+    # 'www.netsys.ovgu.de' Reverse Proxy to RealWorld hosted webpage
     as173 = base.getAutonomousSystem(173)
     host_web_2 = as173.getHost('host_0')
     w2 = web.install('web2')    
@@ -471,6 +471,30 @@ def run(dumpfile = None):
     br0_173 = promote_to_real_world_router(br0_173, False)
     br0_173.addRealWorldRoute('0.0.0.0/1', str(as173.getNetwork('net0').getPrefix()))
     br0_173.addRealWorldRoute('128.0.0.0/1', str(as173.getNetwork('net0').getPrefix()))
+
+    # 'www.fin.ovgu.de' Reverse Proxy to RealWorld hosted webpage
+    as151 = base.getAutonomousSystem(151)
+    host_web_5 = as151.getHost('host_0')
+    w5 = web.install('web5')    
+    w5.setServerNames(['www.fin.ovgu.de'])
+    w5.makeReverseProxy('www.fin.ovgu.de:443')    
+    emu.addBinding(Binding('web5', filter=Filter(asn=151, nodeName='host_0')))
+    br0_151 = as151.getRouter('br0')
+    br0_151 = promote_to_real_world_router(br0_151, False)
+    br0_151.addRealWorldRoute('0.0.0.0/1', str(as151.getNetwork('net0').getPrefix()))
+    br0_151.addRealWorldRoute('128.0.0.0/1', str(as151.getNetwork('net0').getPrefix()))
+
+    # 'www.magdeburg.de' Reverse Proxy to RealWorld hosted webpage
+    as230 = base.getAutonomousSystem(230)
+    host_web_6 = as230.getHost('host_0')
+    w6 = web.install('web6')    
+    w6.setServerNames(['www.magdeburg.de'])
+    w6.makeReverseProxy('www.magdeburg.de:443')    
+    emu.addBinding(Binding('web6', filter=Filter(asn=230, nodeName='host_0')))
+    br0_230 = as230.getRouter('br0')
+    br0_230 = promote_to_real_world_router(br0_230, False)
+    br0_230.addRealWorldRoute('0.0.0.0/1', str(as230.getNetwork('net0').getPrefix()))
+    br0_230.addRealWorldRoute('128.0.0.0/1', str(as230.getNetwork('net0').getPrefix()))
 
 
     # 'www.ovgu.de' Reverse Proxy to RealWorld hosted webpage
@@ -525,9 +549,11 @@ def run(dumpfile = None):
     # 'de.'
     host_ns_3 = base.getAutonomousSystem(203).getHost('host_0')
 
-    ns_net = dns_svc.install('ns-de')
-    ns_net.setCAServer(caServer)
-    ns_net.addZone('de.', createNsAndSoa=True).setMaster()
+    ns_de = dns_svc.install('ns-de')
+    ns_de.setAuth(DNSAuth.NONE) # disable RHINE for this NS
+    ns_de.setCAServer(caServer)
+    ns_de.addZone('de.', createNsAndSoa=True).setMaster()
+    dns_svc.getZone('de.').addRecord(TXT_RR(text='scion=2-230,10.230.0.71', name='www.magdeburg.de.'))
     emu.addBinding(Binding('ns-de', filter=Filter(asn=203, nodeName='host_0')))
 
     # 'edu.'
@@ -562,6 +588,7 @@ def run(dumpfile = None):
     ovgu_zone.addRecord(TXT_RR(text='scion=1-173,10.173.0.71', name='www.netsys.ovgu.de.'))
     ovgu_zone.addRecord(TXT_RR(text='scion=2-232,10.232.0.71', name='www.ovgu.de.')) # TODO add matomo.ovgu.de ?!
     ovgu_zone.addRecord(TXT_RR(text='scion=2-232,10.232.0.71', name='matomo.ovgu.de.'))
+    ovgu_zone.addRecord(TXT_RR(text='scion=1-151,10.151.0.71', name='www.fin.ovgu.de.'))
 
     # 'example.edu.'
     host_ns_7 = base.getAutonomousSystem(242).getHost('host_0')
