@@ -361,11 +361,11 @@ class Node(Printable, Registrable, Configurable, Vertex, Customizable):
             if issubclass(self.__class__, Router):
                     self.setBorderRouter(True)
 
-        if len(self.__name_servers) == 0:
+        if len(self.getNameServers()) == 0:
             return
 
         self.insertStartCommand(0,': > /etc/resolv.conf')
-        for idx, s in enumerate(self.__name_servers, start=1):
+        for idx, s in enumerate(self.getNameServers(), start=1):
             self.insertStartCommand(idx, 'echo "nameserver {}" >> /etc/resolv.conf'.format(s))
 
     def setNameServers(self, servers: List[str]) -> Node:
@@ -411,6 +411,24 @@ class Node(Printable, Registrable, Configurable, Vertex, Customizable):
         """
         self.__host_names.append(name)
         return self
+
+
+    def getNodeAddr(self) -> str:
+        """
+        returns this node's address on it's local network.
+        If it's a SCION node, it's SCION address will be returned.
+        @note only call after node is configured
+        """
+        address = self.getLocalIPAddress()
+        assert address != None, 'logic error: node is not an end host'
+        if 'scion_address' in self.getLabel():
+            scion_addr = self.getLabel()['scion_address']
+            ia_str = scion_addr.split(',')[0]
+            ip_str = scion_addr.split(',')[1]
+            assert ip_str==str(address), 'implementation error'
+            return scion_addr
+        else:
+            return str(address)
 
     def getLocalIPAddress(self) -> Optional[str]:
         """!
@@ -1277,8 +1295,14 @@ class RealWorldRouter(RouterExtension):
         if len(self.__realworld_routes) == 0: return
         self.get_node().setFile('/rw_configure_script', RouterFileTemplates['rw_configure_script'])
         # position 0-1 is '/interface_setup' (and chmod +x)
-        self.get_node().insertStartCommand(0, '/rw_configure_script')
-        self.get_node().insertStartCommand(0, 'chmod +x /rw_configure_script')
+        # It MUST preceede rw_configure!!
+        self.get_node().insertStartCommand(2, '/rw_configure_script')
+        self.get_node().insertStartCommand(2, 'chmod +x /rw_configure_script')
+
+        index1 = next((i for i, x in enumerate(self.get_node().getStartCommands()) if x[0] == '/interface_setup'), -1)
+        index2 = next((i for i, x in enumerate(self.get_node().getStartCommands()) if x[0] == '/rw_configure_script'), -1)
+        assert index1 < index2, 'implementation error: interface_setup must preceede rw_configure'
+
 
         for prefix, route_clientele in self.__realworld_routes:
             if route_clientele != None:
@@ -1335,14 +1359,15 @@ class RealWorldRouter(RouterExtension):
         return out
     '''
 
-def promote_to_real_world_router(node: Node, hideHops: bool):
+def promote_to_real_world_router(node: Router, hideHops: bool):
     """!@brief Dynamically inject RealWorldRouterMixin into a Node instance
                 to augment it by RealWorld routing capabilities
     """
-    extn = RealWorldRouter()
+    if not node.hasExtension('RealWorldRouter'):# Prevent double-mixing
+        extn = RealWorldRouter()
 
-    node.installExtension(extn)
-    extn.initRealWorld(hideHops)
+        node.installExtension(extn)
+        extn.initRealWorld(hideHops)
     return node
 
 class ScionRouter(RouterExtension):
@@ -1410,7 +1435,7 @@ class ScionRouter(RouterExtension):
         out += 'SCION border router'
         return out
 
-def promote_to_scion_router(node: Node):
+def promote_to_scion_router(node: Router):
     """!@brief Dynamically inject ScionRouterMixin into a Node instance"""
 
     if not node.hasExtension('ScionRouter'):# Prevent double-mixing

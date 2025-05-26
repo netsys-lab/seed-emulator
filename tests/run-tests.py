@@ -2,7 +2,7 @@
 
 from internet import IPAnyCastTestCase, MiniInternetTestCase, HostMgmtTestCase
 from ethereum import EthereumPOATestCase, EthereumPOSTestCase, EthereumPOWTestCase
-from scion import ScionBgpMixedTestCase, ScionBwtesterTestCase, ScionLargeASNTestCase
+from scion import ScionBgpMixedTestCase, ScionBwtesterTestCase, ScionLargeASNTestCase, SCIONPKITestCase
 from options import SEEDEmuOptionSystemTestCase
 from kubo import KuboTestCase, KuboUtilFuncsTestCase, DottedDictTestCase
 from pki import PKITestCase
@@ -33,6 +33,7 @@ test_case_list = [
     ScionLargeASNTestCase,
     ScionBgpMixedTestCase,
     ScionBwtesterTestCase,
+    SCIONPKITestCase,
     SEEDEmuOptionSystemTestCase,
     KuboTestCase,
     KuboUtilFuncsTestCase,
@@ -48,6 +49,7 @@ if args.ci:
         HostMgmtTestCase,
         ScionBgpMixedTestCase,
         ScionBwtesterTestCase,
+        SCIONPKITestCase,
         DottedDictTestCase,
         TrafficGeneratorTestCase
     ]

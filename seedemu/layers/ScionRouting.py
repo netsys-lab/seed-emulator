@@ -371,6 +371,8 @@ class ScionRouting(Routing):
         else:
             super().configure(emulator)
         reg = emulator.getRegistry()
+        scisd = emulator.getLayer('ScionIsd')
+
 
         for ((scope, type, name), obj) in reg.getAll().items():
 
@@ -378,13 +380,15 @@ class ScionRouting(Routing):
             nologrotate = obj.getOption('rotate_logs', prefix='scion').value == "false"
             useenvsubst = obj.getOption('use_envsubst', prefix='scion').value == 'true'
 
+            _ia = IA(scisd.getAsIsds(int(scope))[0][0], int(scope))
+
             # SCION inter-domain routing affects only border-routers
             if type == "brdnode":
                 rnode = obj
                 if not rnode.hasExtension('ScionRouter'):
                     rnode = promote_to_scion_router(rnode)
 
-                self.__install_scion(rnode)
+                self.__install_scion(rnode, _ia)
                 br_log = (">> /var/log/scion-border-router.log 2>&1"
                            if nologrotate
                            else "2>&1 | rotatelogs -n 2 /var/log/scion-border-router.log 1M ")
@@ -403,7 +407,7 @@ class ScionRouting(Routing):
 
             elif type == 'csnode':
                 csnode: Node = obj
-                self.__install_scion(csnode)
+                self.__install_scion(csnode, _ia)
                 self.__append_scion_command(csnode)
                 name = csnode.getName()
                 ctrl_log = (">> /var/log/scion-control-service.log 2>&1"
@@ -417,7 +421,7 @@ class ScionRouting(Routing):
 
             elif type == 'hnode':
                 hnode: Node = obj
-                self.__install_scion(hnode)
+                self.__install_scion(hnode, _ia)
                 self.__append_scion_command(hnode)
 
             if (cfg_vol := obj.getOption('scion_etc_config_vol')) != None:
@@ -432,9 +436,10 @@ class ScionRouting(Routing):
                         node.addPersistentStorage('/etc/scion',
                                                    f'etcscion_{node.getAsn()}-{node.getName()}')
 
-    def __install_scion(self, node: Node):
+    def __install_scion(self, node: Node, ia: IA):
         """Install SCION stack on the node."""
-
+        host_addr = node.getLocalIPAddress()
+        node.setLabel('scion_address', f'{ia},{host_addr}')
         self.getBuilder().installSCION(node)
 
     def getBuilder(self) -> ScionBuilder:
@@ -474,13 +479,20 @@ class ScionRouting(Routing):
                 as_: ScionAutonomousSystem = base_layer.getAutonomousSystem(asn)
                 isds = isd_layer.getAsIsds(asn)
                 assert len(isds) == 1, f"AS {hex(asn)} must be a member of exactly one ISD"
-
+                isd = isds[0][0]
                 # Install AS topology file
-                as_topology = as_.getTopology(isds[0][0])
+                as_topology = as_.getTopology(isd)
                 topo = json.dumps(as_topology, indent=2)
 
                 handleScionConfFile(node, 'topology.json', topo)
                 self._provision_base_config(node)
+
+                # generate /etc/scion/environment.json
+                # FIXME: use IA __repr__ for the dict keys here
+                env_json = {'ases': {
+                    f'{isd}-{asn}': {'daemon_address': '127.0.0.1:30255'}
+                }}
+                handleScionConfFile(node, 'environment.json', json.dumps(env_json, indent=2))
 
             if type == "brdnode":
                 self._provision_router_config(obj)

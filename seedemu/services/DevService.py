@@ -6,6 +6,7 @@ from  seedemu.core.enums import NodeRole, NetworkType
 from seedemu.core import Node, Server, Service, Emulator, Network, ExternalConnectivityProvider, promote_to_real_world_router
 from typing import List, Tuple, Dict, Set
 from enum import Enum
+import subprocess
 from  urllib.parse import urlparse,unquote
 from pathlib import PurePosixPath
 import os.path
@@ -194,6 +195,8 @@ class ContainerDevelopmentService(Service):
             self._shared_checkouts[(repourl, branch)] = node
             return None
 
+    def _teardown(self):
+        subprocess.run('docker volume rm gitconf sshkeys vscode vscodeserver')
 
     def _createServer(self) -> Server:
         d = DevServer(self, self.__dev_cnt)
@@ -239,11 +242,17 @@ class ContainerDevelopmentService(Service):
 
         for vnode in list(self.getPendingTargets().keys())[1:]:
             node = emu.getBindingFor(vnode)
+            node.addDockerCommand('RUN mkdir -p /root/.config/git/')
+            node.addDockerCommand('RUN git config -f /root/.config/git/config  user.name {}'.format( self.gitUser()) )
+            node.addDockerCommand('RUN git config -f /root/.config/git/config  user.email {}'.format(self.gitMail()) )
+
             node.addSoftware('openssh-client')
             node.appendStartCommand('eval "$(ssh-agent -s)"')
             node.appendStartCommand('ssh-add /root/.ssh/id_ed25519')
             node.addPersistentStorage('/root/.ssh', 'sshkeys')
             node.addPersistentStorage('/root/.config/git', 'gitconf')
+
+
     def _configureRealWorldAccess(self, emulator: Emulator):
         """ in order to able to git-push any changes made on the build/dev-container checkouts
             the nodes with a DevServer installation need external 'RealWorld' connectivity
@@ -324,17 +333,37 @@ class GolangDevService(ContainerDevelopmentService):
 
     """
 
-    def __init__(self, uname: str, mail: str): # TODO: maybe add golang-version argument here
+    def __init__(self, uname: str, mail: str, goversion: str = '1.24.3'):
         """!
         @brief
         @param uname github user name
         @param mail github email
+        @param goversion
         """
 
         super().__init__(uname, mail)
-
+        self._goversion = goversion
         self.addDependency('Base', False, False)
         self.addDependency('Scion', False, True)
+
+    def _teardown(self):
+        """
+        removes persistent docker volumes that might exist
+         from a previous simulation from the docker host
+        """
+        super()._teardown()
+        subprocess.run('docker volume rm usrlocalgo protobuf gopath goenv gocache')
+
+    def _setNodeENV(self, node: Node):
+        """
+        configures golang installation related environment variables on the host
+        """
+        # add $GOPATH/bin  to PATH  in order for 'go install' to work
+        node.addDockerCommand('ENV PATH=$PATH:/usr/local/go/bin:/go/bin:/root/.local/protoc-29.3-linux-x86_64/bin')
+
+        node.addDockerCommand('ENV GOPATH=/go')
+        node.addDockerCommand('ENV GOROOT=/usr/local/go')
+        node.addDockerCommand('ENV GOENV=/root/.config/go/env')
 
     def configure(self, emulator: Emulator):
         super().configure(emulator)
@@ -342,7 +371,7 @@ class GolangDevService(ContainerDevelopmentService):
         if len(targets) ==0:
             return
         # where to download Golang
-        go_url = 'https://go.dev/dl/go1.24.0.linux-amd64.tar.gz'
+        go_url = f'https://go.dev/dl/go{self._goversion}.linux-amd64.tar.gz'
 
         pnode = emulator.getBindingFor( targets[0] )
         # pnode has to initialize the named docker volumes with the Go installation
@@ -362,9 +391,7 @@ class GolangDevService(ContainerDevelopmentService):
         pnode.addDockerCommand('RUN mkdir /root/.local && wget https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-linux-x86_64.zip && unzip protoc-29.3-linux-x86_64.zip -d /root/.local ')
 
         pnode.addDockerCommand(f'RUN wget -O- "{go_url}" --connect-timeout 1.5 | tar  -xz -C /usr/local ')
-        pnode.addDockerCommand('ENV PATH=$PATH:/usr/local/go/bin:/go/bin:/root/.local/protoc-29.3-linux-x86_64/bin')
-
-        pnode.addDockerCommand('RUN go env -w GOPATH=/go')
+        self._setNodeENV(pnode)
         # language server for IDE
         pnode.addDockerCommand('RUN go install golang.org/x/tools/gopls@latest' )
         # protobuf compiler
@@ -380,22 +407,22 @@ class GolangDevService(ContainerDevelopmentService):
             # required for 'go install' to verify TLS certs
             node.addSoftware("ca-certificates ") #protobuf-compiler
 
-            node.addDockerCommand('ENV PATH=$PATH:/usr/local/go/bin:/go/bin:/root/.local/protoc-29.3-linux-x86_64/bin')
+            self._setNodeENV(node)
             # contains the protobuf installation
-            node.addPersistentStorage('/root/.local', 'protobuf',volume={'nocopy':True})
+            node.addPersistentStorage('/root/.local', 'protobuf', volume={'nocopy':True})
             # contains GOROOT (actual installation)
-            node.addPersistentStorage('/usr/local/go', 'usrlocalgo',volume={'nocopy':True})
+            node.addPersistentStorage('/usr/local/go', 'usrlocalgo', volume={'nocopy':True})
             # contains GOPATH  - downloaded modules, installed tools/executables
-            node.addPersistentStorage('/go', 'gopath',volume={'nocopy':True})
+            node.addPersistentStorage('/go', 'gopath', volume={'nocopy':True})
             # contains GOENV
-            node.addPersistentStorage('/root/.config/go', 'goenv',volume={'nocopy':True})
+            node.addPersistentStorage('/root/.config/go', 'goenv', volume={'nocopy':True})
             # contains GOCACHE
-            node.addPersistentStorage('/root/.cache/go-build', 'gocache',volume={'nocopy':True})
+            node.addPersistentStorage('/root/.cache/go-build', 'gocache', volume={'nocopy':True})
 
     def getName(self) -> str:
         return 'GolangDevService'
 
     def print(self, indent: int) -> str:
         out = ' ' * indent
-        out += 'GolangDevService\n'
+        out += f'GolangDevService(v{self._goversion})\n'
         return out

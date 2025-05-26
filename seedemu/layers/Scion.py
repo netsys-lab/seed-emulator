@@ -117,13 +117,14 @@ def handleScionConfFile( node, filename: str, filecontent: str, subdir: str = No
 
 
 @dataclass
-class CheckoutSpecification():#SetupSpecification
+class CheckoutSpecification():
     """
     Identifies a specific SCION release version or RepoCheckout
     """
     mode: str # 'release' or 'build'
     release_location: str
     version: str
+    goversion: str
     git_repo_url: str
     checkout: str
 
@@ -133,24 +134,67 @@ class CheckoutSpecification():#SetupSpecification
                   release_location: str = None,
                   version: str = None,
                   git_repo_url: str = None,
-                  checkout: str = None
+                  checkout: str = None,
+                  goversion: str = None
                   ):
-        if not mode:        self.mode = "release"
+        """
+        @param version SCION release version
+        @param mode either 'release' for precompiled binaries package
+                    or 'build' for local checkout build
+        @param release_location URL to the *linux.tar.gz binaries in 'release' mode
+        @param git_repo_url URL to GitRepository in 'build' mode
+        @param checkout the branch, tag or commit hash to check out in 'build' mode
+        @param goversion Golang version for the local build
+                        This has effect only for the build container (build time) and
+                        is independent of i.e. the Go version of the DevelopmentService at runtime.
+        """
+        if not mode:
+            self.mode = "release"
         else: self.mode = mode
-        if not release_location:
-            self.release_location = "https://github.com/scionproto/scion/releases/download/v0.12.0/scion_0.12.0_amd64_linux.tar.gz"
-        else: self.release_location = release_location
+
         if not version:
-            self.version = "v0.12.0"
-        else: self.version = version
+            self.version = "0.12.0"
+            # self.goversion = '1.22.7'
+        else:
+            self.version = version
+        if not release_location:
+            self.release_location = f"https://github.com/scionproto/scion/releases/download/v{self.version}/scion_0.12.0_amd64_linux.tar.gz"
+        else:
+            self.release_location = release_location
         # "mode": "build",
         if not git_repo_url:
             self.git_repo_url = "https://github.com/scionproto/scion.git"
         else: self.git_repo_url = git_repo_url
         if not checkout:
-            self.checkout = "v0.12.0" # could be tag, branch or commit (ex "efbbd5835f33ab52389976d4b69d68fa7c087230")
+            self.checkout = "v0.12.0"
         else: self.checkout = checkout
 
+        if goversion:
+            self.goversion = goversion
+        else:
+            self.goversion = self._goVersion4SCION(self.version)
+
+    @staticmethod
+    def _goVersion4SCION(scion_version: str ) -> str:
+        """ returns the right(minimum) Go version to build the given SCION release
+        """
+        scion_version = scion_version.lstrip('v')
+        versionMap = {'0.12.0': '1.22.7', # 11 Oct 2024 # 'dispatcher-less'
+                      '0.11.0': '1.21.10',# 14 May 2024
+                      '0.10.0': '1.21.3', # 27 Dec 2023
+                      '0.9.1':  '1.21.1'  # 30 Oct 2023
+                      }
+        return versionMap[scion_version]
+
+    @staticmethod
+    def _getGoBuildContainerImage(goversion: str) -> str:
+        images = {'1.22.7': 'golang:1.22-alpine',
+                  }
+        return images[goversion]
+
+    def getGoBuildImage(self) -> str:
+        """returns the right Golang build container base image name"""
+        return self._getGoBuildContainerImage(self.goversion)
 
 # InstallationPlan, InstallPolicy
 class SetupSpecification(Enum):
@@ -219,8 +263,8 @@ class ScionBuilder():
             case SetupSpecification.LOCAL_BUILD:
                 self.__installFromBuild(node, s.checkout_spec)
                 self._addSCIONLabPackages(node)
-                node.addBuildCommand("apt-get update && apt download scion-apps-bwtester"
-                                     " && dpkg --ignore-depends=scion-daemon,scion-dispatcher -i scion-apps-bwtester_3.4.2_amd64.deb")
+                #node.addBuildCommand("apt-get update && apt download scion-apps-bwtester"
+                #                     " && dpkg --ignore-depends=scion-daemon,scion-dispatcher -i scion-apps-bwtester_3.4.2_amd64.deb")
 
 
             case SetupSpecification.PACKAGES:
@@ -403,8 +447,10 @@ class ScionBuilder():
             else:
                 return spec.release_location
         else:
-            if not os.path.isdir(f".scion_build_output/scion_binaries_{spec.checkout}"):
-                SCION_BUILD_TEMPLATE = f"""FROM golang:1.22-alpine
+            build_path = f".scion_build_output/scion_binaries_{spec.checkout}"
+
+            if not os.path.isdir(build_path):
+                SCION_BUILD_TEMPLATE = f"""FROM {spec.getGoBuildImage()}
                 RUN apk add --no-cache git
                 RUN {self.__generateGitCloneString(spec.git_repo_url, spec.checkout)}
                 RUN cd scion && go mod tidy && CGO_ENABLED=0 go build -o bin ./router/... ./control/... ./dispatcher/... ./daemon/... ./scion/... ./scion-pki/... ./gateway/...
@@ -412,14 +458,14 @@ class ScionBuilder():
                 dockerfile = BuildtimeDockerFile(SCION_BUILD_TEMPLATE)
                 container = BuildtimeDockerImage(f"scion-build-container-{spec.checkout}").build(dockerfile).container()
                 current_dir = os.getcwd()
-                output_dir = os.path.join(current_dir, f".scion_build_output/scion_binaries_{spec.checkout}")
+                output_dir = os.path.join(current_dir, build_path)
                 container.entrypoint("sh").mountVolume(output_dir, "/build").run(
                    "-c \"cp -r scion/bin/* /build\""
                 )
                 return output_dir
 
             else:
-                output_dir = os.path.join(os.getcwd(), f".scion_build_output/scion_binaries_{spec.checkout}")
+                output_dir = os.path.join(os.getcwd(), build_path)
                 return output_dir
 
 

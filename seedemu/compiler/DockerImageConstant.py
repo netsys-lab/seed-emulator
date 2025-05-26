@@ -2,7 +2,7 @@ from .DockerImage import DockerImage
 from seedemu.core import BaseSystem
 from enum import Enum
 
-UBUNTU_IMAGE   = DockerImage(name='ubuntu:20.04',
+UBUNTU_IMAGE   = DockerImage(name='ubuntu:22.04',
                                 software=[],
                                 subset=None)
 

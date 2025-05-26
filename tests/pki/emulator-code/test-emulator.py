@@ -4,15 +4,16 @@
 from seedemu.compiler import Docker
 from seedemu.core import Binding, Emulator, Filter, Action
 from seedemu.layers import Base, Ebgp, Ibgp, Ospf, Routing, PeerRelationship
-from seedemu.services import DomainNameCachingService, DomainNameService, CAService, CAServer, WebService, WebServer, RootCAStore
-
+from seedemu.services import DomainNameCachingService, DomainNameService, StepCAService,  MiniCAServer, MiniCAService, RootMiniCAStore, StepCAServer, WebService, WebServer, RootStepCAStore
+from seedemu.services.dns.DNSCommon import *
 emu = Emulator()
 base = Base()
 routing = Routing()
 ebgp = Ebgp()
 ibgp = Ibgp()
 ospf = Ospf()
-ca = CAService()
+ca1 = StepCAService()
+ca2 = MiniCAService()
 web = WebService()
 
 ###########################################################
@@ -33,16 +34,16 @@ as2.createNetwork('net0')
 as2.createRouter('r1').joinNetwork('net0').joinNetwork('ix100')
 as2.createRouter('r2').joinNetwork('net0').joinNetwork('ix101')
 
-caStore1 = RootCAStore(caDomain='ca1.internal')
-caStore2 = RootCAStore(caDomain='ca2.internal')
+caStore1 = RootStepCAStore(caDomain='ca1.internal')
+caStore2 = RootMiniCAStore(caDomain='ca2.internal')
 
-caServer1: CAServer = ca.install('ca1-vnode')
+caServer1: StepCAServer = ca1.install('ca1-vnode')
 caServer1.setCAStore(caStore1)
-caServer1.installCACert(Filter(asn=150))
+caServer1.installCACert(Filter())
 
-caServer2: CAServer = ca.install('ca2-vnode')
+caServer2: MiniCAServer = ca2.install('ca2-vnode')
 caServer2.setCAStore(caStore2)
-caServer2.installCACert(Filter(asn=151))
+caServer2.installCACert(Filter())
 
 as150 = base.createAutonomousSystem(150)
 as150.createNetwork('net0')
@@ -84,7 +85,8 @@ emu.addLayer(routing)
 emu.addLayer(ebgp)
 emu.addLayer(ibgp)
 emu.addLayer(ospf)
-emu.addLayer(ca)
+emu.addLayer(ca1)
+emu.addLayer(ca2)
 emu.addLayer(web)
 
 ###########################################################
@@ -97,17 +99,17 @@ dns.install('b-root-server').addZone('.')               # Slave server
 
 # Create nameservers for TLD and ccTLD zones
 # https://itp.cdn.icann.org/en/files/root-system/identification-tld-private-use-24-01-2024-en.pdf
-dns.install('a-internal-server').addZone('internal.').setMaster()  
+dns.install('a-internal-server').addZone('internal.').setMaster()
 dns.install('b-internal-server').addZone('internal.')
 
 dns.install('ns-ca-internal').addZone('ca1.internal.').addZone('ca2.internal.')
 dns.install('ns-user-internal').addZone('user1.internal.').addZone('user2.internal')
 
 # Add records to zones
-dns.getZone('ca1.internal.').addRecord('@ A 10.150.0.7')
-dns.getZone('ca2.internal.').addRecord('@ A 10.150.0.8')
-dns.getZone('user1.internal.').addRecord('@ A 10.150.0.9')
-dns.getZone('user2.internal.').addRecord('@ A 10.151.0.7')
+dns.getZone('ca1.internal.').addRecord(A_RR(address='10.150.0.7'))
+dns.getZone('ca2.internal.').addRecord(A_RR(address='10.150.0.8'))
+dns.getZone('user1.internal.').addRecord(A_RR(address='10.150.0.9'))
+dns.getZone('user2.internal.').addRecord(A_RR(address='10.151.0.7'))
 
 emu.addLayer(dns)
 

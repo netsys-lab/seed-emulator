@@ -1,5 +1,5 @@
 from __future__ import annotations
-from .DomainNameService import DomainNameService
+from .dns.DomainNameService import DomainNameService
 from seedemu.core import Node, Network, Emulator, Service, Server
 from typing import List, Tuple
 from ipaddress import IPv4Network
@@ -19,7 +19,7 @@ class CymruIpOriginService(Service):
     Cymru's IP info service is used by various traceroute utilities to map IP
     address to ASN (using DNS). This service loads the prefix list within the
     simulation and creates ASN mappings for them, so with proper local DNS
-    configured, nodes can see the ASN when doing traceroute. 
+    configured, nodes can see the ASN when doing traceroute.
 
     This layer hosts the domain cymru.com.
     """
@@ -100,7 +100,7 @@ class CymruIpOriginService(Service):
 
         return self
 
-    def _doInstall(self, node: Node, server: Server): 
+    def _doInstall(self, node: Node, server: Server):
         assert False, 'CymruIpOriginService is not a real service and should not be installed this way. Please install a DomainNameService on the node and host the zone "cymru.com." yourself.'
 
 
@@ -108,14 +108,14 @@ class CymruIpOriginService(Service):
         reg = emulator.getRegistry()
 
         mappings: List[Tuple[str, str]] = []
-        
+
         self._log('Collecting all networks in the simulation...')
         for regobj in reg.getAll().items():
             [(asn, type, name), obj] = regobj
             if type != 'net': continue
             net: Network = obj
             if asn == 'ix': asn = name.replace('ix', '')
-            
+
             asn_val = 0
             try:
                 asn_val = int(asn)
@@ -137,7 +137,7 @@ class CymruIpOriginService(Service):
         for record in self.__records:
             zone.addRecord(record)
 
-        return super().configure(emulator)        
+        return super().configure(emulator)
 
     def print(self, indent: int) -> str:
         out = ' ' * indent

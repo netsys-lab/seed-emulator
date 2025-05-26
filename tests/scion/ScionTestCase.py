@@ -32,13 +32,13 @@ class ScionTestCase(SeedEmuTestCase):
         or no working paths match the predicate.
         """
 
-        exit_code, _ = container.exec_run(f"scion ping {dst} -c {count} --sequence='{pred}'")
+        exit_code, out = container.exec_run(f"scion ping {dst} -c {count} --sequence='{pred}'")
         self.printLog(f"CMD: scion ping {dst} -c {count} --sequence='{pred}'")
         if exit_code == 0:
             self.printLog(f"scion ping test {dst} succeeded")
             return True
         else:
-            self.printLog(f"scion ping test {dst} failed")
+            self.printLog(f"scion ping test {dst} failed: {out}")
             return False
 
     def scion_path_test(self, container, dst: str, pred: str = "0*", ret_paths: bool = False
@@ -59,7 +59,7 @@ class ScionTestCase(SeedEmuTestCase):
         exit_code, output = container.exec_run(
             f"scion showpaths {dst} --format json --sequence='{pred}'")
         assert 0 <= exit_code < 2, "got unexpected exit code from 'scion showpaths'"
-        
+
         self.printLog(f"CMD: scion showpaths {dst} --format json --sequence='{pred}'")
         paths = json.loads(output).get('paths', [])
 
