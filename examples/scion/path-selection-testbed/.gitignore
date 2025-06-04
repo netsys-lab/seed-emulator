@@ -1,0 +1,5 @@
+*.log
+*.pprof
+paths.json
+helper_scripts/*
+config.yaml

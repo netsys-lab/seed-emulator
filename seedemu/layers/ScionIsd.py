@@ -166,7 +166,7 @@ class ScionIsd(Layer): # could be made a Customizable as well ..
         self._log("Calling scion-pki")
         try:
             result = subprocess.run(
-                ["scion-pki", "testcrypto", "-t", topofile, "-o", tempdir, "--as-validity", "30d"],
+                ["scion-pki", "testcrypto", "-t", topofile, "-o", tempdir, "--as-validity", "365d"],
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
             )
         except FileNotFoundError:
