@@ -11,7 +11,7 @@ PRIVATE_KEY_HEX=$(base64 -d client2.key | xxd -p -c 256)
 SERVER_PUBLIC_KEY_HEX=$(base64 -d server.pub | xxd -p -c 256)
 
 # Start wireguard-go
-USE_SCION=1 ./wireguard-go $INTERFACE
+USE_SCION=1 USE_BATCH=0 ./wireguard-go $INTERFACE
 
 # Configure interface
 ip address add "$ADDRESS" dev "$INTERFACE"
