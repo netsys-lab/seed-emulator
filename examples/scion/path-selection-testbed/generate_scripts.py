@@ -42,8 +42,8 @@ def generate_scripts(topo):
     server_isd = get_isd(topo["dashboard_asn"], topo)
     server_asn = topo["dashboard_asn"]
     dashboard_asn = topo["dashboard_asn"]
-    dashboard_url= f"http://10.{dashboard_asn}.0.71:8050"
-    get_detailed_paths_url = f"http://10.{dashboard_asn}.0.71:8050/get_paths"
+    dashboard_url= f"http://localhost:8050"
+    get_detailed_paths_url = f"http://localhost:8050/get_paths"
 
     create_directory("helper_scripts")
 
@@ -85,9 +85,9 @@ def generate_scripts(topo):
 
     bash_script += '''
     echo -e "\\033[1mLink Properties\\033[0m"
-    echo -e "\\n\\033[1mSet Link Properties: POST http://10.{dashboard_asn}.0.71:8050/set_link\\033[0m"
+    echo -e "\\n\\033[1mSet Link Properties: POST http://localhost:8050/set_link\\033[0m"
     echo -e "Example Request:"
-    echo -e "  curl -X POST \\"http://10.{dashboard_asn}.0.71:8050/set_link\\" -H 'Content-Type: application/json' -d '{{\\"link\\": "ix201", \\"bw\\": 30, \\"latency\\": 10, \\"loss\\": 5}}'\\n"
+    echo -e "  curl -X POST \\"http://localhost:8050/set_link\\" -H 'Content-Type: application/json' -d '{{\\"link\\": "ix201", \\"bw\\": 30, \\"latency\\": 10, \\"loss\\": 5}}'\\n"
     echo -e "Response: OK"
     echo "----------------"
     '''
@@ -169,6 +169,16 @@ def generate_scripts(topo):
 
     docker exec -it {} /bin/zsh -c "ping 10.78.0.1 -c 1"
     docker exec -it {} /bin/zsh -c "ping 10.78.0.1 -c 1"
+
+    echo "Paths API:\n"
+    echo "Get all paths: curl -X GET \"http://localhost:<port>/paths?ia=<ia>\"\n"
+
+    echo "Set path:\n"
+    echo "curl -X POST -H \"Content-Type: application/json\" \
+    -d '{{\"ia\": \"<ia>\", \"path_index\": <path_index>}}' \
+    \"http://localhost:28015/path\""
+
+    echo "Ports: Server: 28015, Client1: 28016, Client2: 28017"
     
     '''.format(server_cont, client1_cont, client2_cont, client1_cont, client2_cont)
 

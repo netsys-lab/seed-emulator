@@ -19,9 +19,9 @@ def init_tc(interfaces):
             # Apply new qdisc rules
             cmd = [
                 "tc", "qdisc", "add", "dev", interface, "root", "netem",
-                # "rate", params['bw'],
+                "rate", params['bw'],
                 "delay", f"{params['latency']}", f"{params['jitter']}",
-                # "loss", params['loss']
+                "loss", params['loss']
             ]
             subprocess.run(cmd, check=True)
             print(f"Initialized tc settings for {interface}")
@@ -39,9 +39,9 @@ def control_bandwidth_and_latency(interface, params):
     try:
         cmd = [
             "tc", "qdisc", "change", "dev", interface, "root", "netem",
-            # "rate", params['bw'],
+            "rate", params['bw'],
             "delay", f"{params['latency']}", f"{params['jitter']}",
-            # "loss", params['loss']
+            "loss", params['loss']
         ]
         subprocess.run(cmd, check=True)
         print(f"Updated tc settings for {interface}")

@@ -74,9 +74,11 @@ network = []
 for as_ in topo["ASes"]:
     label = f"{as_['isd']}-{as_['label']}"
     if as_['asn'] == client1_asn:
-        label = "Sender"
+        label = "Player1"
     elif as_['asn'] == client2_asn:
-        label = "Receiver"
+        label = "Player2"
+    elif as_['asn'] == topo['dashboard_asn']:
+        label = "Server"
     network.append({'data': {'id': f"{as_['asn']}", 'label': label}})
 
 for link in topo['links']:
@@ -388,4 +390,4 @@ mqtt_thread = Thread(target=mqtt_client.loop_forever)
 mqtt_thread.start()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8050, debug=True)
+    app.run(host='0.0.0.0', port=8050, debug=False)

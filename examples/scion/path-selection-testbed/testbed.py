@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 
 from seedemu.compiler import Docker, Graphviz
-from seedemu.core import Emulator
+from seedemu.core import Emulator, OptionMode, OptionRegistry
 from seedemu.layers import (
     ScionBase, ScionRouting, ScionIsd, Scion, SetupSpecification, CheckoutSpecification, Ospf, Ibgp, Ebgp, PeerRelationship)
 from seedemu.layers.Scion import LinkType as ScLinkType
 import json
 from generate_scripts import generate_scripts
-from seedemu.core import OptionRegistry
 
 # Initialize
 emu = Emulator()
@@ -30,7 +29,7 @@ for isd in topo['ISDs']:
 
 # Create ixs
 for link in topo['links']:
-    base.createInternetExchange(link['id'])
+    base.createInternetExchange(link['id'], create_rs=True)
 
 dashboard_asn = topo['dashboard_asn']
 client1_asn = topo['client1_asn']
@@ -72,7 +71,7 @@ for as__ in topo['ASes']:
         # h1.addBuildCommand('pip3 install psutil pyserial pygame requests numpy deap token-bucket')
         h1.addBuildCommand('pip3 install dash dash-cytoscape dash-bootstrap-components dash-daq numpy')
         h1.addPortForwarding(1883, 1883)
-        h1.addPortForwarding(8050, 8050)
+        h1.addPortForwarding(8050 , 8050)
         h1.addPortForwarding(28015, 28015)
         h1.addSharedFolder("/topo", "../topo")
         h1.addSharedFolder("/dashboard", "../dashboard")
@@ -131,8 +130,7 @@ for link in topo['links']:
         link_type_bgp = PeerRelationship.Peer
     
     scion.addIxLink(id, (source_isd, source_asn), (dest_isd, dest_asn), link_type)
-    ebgp.addPrivatePeering(id, source_asn, dest_asn, abRelationship=link_type_bgp)
-
+    ebgp.addPrivatePeering(id, source_asn, dest_asn, PeerRelationship.Provider)
 
 # Rendering
 emu.addLayer(base)
