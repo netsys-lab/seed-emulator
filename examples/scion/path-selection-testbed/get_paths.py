@@ -30,6 +30,7 @@ def get_topology(container_name):
     else:
         print("Failed to execute command. Error:", error)
         return None
+
     return result_dict
 
 def get_paths_from_host(dst_isd, dst_asn, container_name):
@@ -46,6 +47,7 @@ def get_paths_from_host(dst_isd, dst_asn, container_name):
     else:
         print("Failed to execute command. Error:", error)
         return None
+    
     return result_dict
 
 def build_paths_links(topo, paths):
@@ -93,7 +95,7 @@ def build_paths_links(topo, paths):
             "fingerprint": path['fingerprint']
         }
         path_id = path_id + 1
-        return paths_links
+    return paths_links
 
 
 if __name__ == "__main__":
@@ -128,3 +130,4 @@ if __name__ == "__main__":
     with open('../topo/paths2.json', 'w') as f:
         json.dump(paths2_links, f, indent=4)
 
+# docker exec as101h-h1-10.101.0.71 /bin/zsh -c "scion showpaths 1-106 --format json -m 100"

@@ -29,10 +29,15 @@ cat << EOF | socat - UNIX-CONNECT:"$UAPI_SOCKET"
 set=1
 public_key=$CLIENT1_PUBLIC_KEY_HEX
 allowed_ip=10.78.0.2/32
+allowed_ip=172.16.0.0/24
 EOF
 
 cat << EOF | socat - UNIX-CONNECT:"$UAPI_SOCKET"
 set=1
 public_key=$CLIENT2_PUBLIC_KEY_HEX
 allowed_ip=10.78.0.3/32
+allowed_ip=172.18.0.0/24
 EOF
+
+ip route add 172.16.0.0/24 via 10.78.0.2 dev wg0
+ip route add 172.18.0.0/24 via 10.78.0.3 dev wg0

@@ -171,21 +171,25 @@ def generate_scripts(topo):
     docker exec -it {} /bin/zsh -c "ping 10.78.0.1 -c 1"
 
     echo "Paths API:\n"
-    echo "Get all paths: curl -X GET \"http://localhost:<port>/paths?ia=<ia>\"\n"
+    echo "Get all paths: curl -X GET \\"http://localhost:<port>/paths?ia=<ia>\\"\n"
 
     echo "Set path:\n"
     echo "curl -X POST -H \"Content-Type: application/json\" \
-    -d '{{\"ia\": \"<ia>\", \"path_index\": <path_index>}}' \
-    \"http://localhost:28015/path\""
+    -d '{{\\"ia\\": \\"<ia>\\", \\"path_index\\": <path_index>}}' \
+    \\"http://localhost:28015/path\\""
 
     echo "Ports: Server: 28015, Client1: 28016, Client2: 28017"
     
     '''.format(server_cont, client1_cont, client2_cont, client1_cont, client2_cont)
-
-
-
     # Write the bash script to a file
     with open('helper_scripts/start_wireguard.sh', 'w') as f:
+        f.write(bash_script)
+
+    bash_script = '''#!/bin/bash
+    docker exec -d {} /bin/zsh -c "supertuxkart --server-config=/server/stk_config.xml --lan-server=scion_supertuxkart --track=olivermath > /dev/null 2>&1 &"
+    '''.format(server_cont)
+    # Write the bash script to a file
+    with open('helper_scripts/start_stk_server.sh', 'w') as f:
         f.write(bash_script)
 
     print("Bash script generated: start_wireguard.sh")

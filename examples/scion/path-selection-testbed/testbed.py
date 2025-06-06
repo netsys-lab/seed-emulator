@@ -3,10 +3,11 @@
 from seedemu.compiler import Docker, Graphviz
 from seedemu.core import Emulator, OptionMode, OptionRegistry
 from seedemu.layers import (
-    ScionBase, ScionRouting, ScionIsd, Scion, SetupSpecification, CheckoutSpecification, Ospf, Ibgp, Ebgp, PeerRelationship)
+    ScionBase, ScionRouting, ScionIsd, Scion, SetupSpecification, Ospf, Ibgp, Ebgp, PeerRelationship)
 from seedemu.layers.Scion import LinkType as ScLinkType
 import json
 from generate_scripts import generate_scripts
+import shutil
 
 # Initialize
 emu = Emulator()
@@ -19,6 +20,13 @@ scion_isd = ScionIsd()
 scion = Scion()
 ibgp = Ibgp()
 ebgp = Ebgp()
+
+INSTALL_STK_SERVER = True
+SETUP_MACVLAN = False
+
+if INSTALL_STK_SERVER:
+    from utils import init_db, svn_checkout, git_clone, init_db, add_macvlan_docker_compose
+
 
 # load topo.json to dict
 topo = json.load(open('topo/topo.json'))
@@ -77,6 +85,18 @@ for as__ in topo['ASes']:
         h1.addSharedFolder("/dashboard", "../dashboard")
         h1.addSharedFolder("/wireguard", "../wireguard")
         h1.addSharedFolder("/server", "../server")
+        if INSTALL_STK_SERVER:
+            h1.addDockerCommand('COPY stk-code /src/stk-code')
+            h1.addDockerCommand('COPY stk-assets /src/stk-assets')
+            h1.addSoftware("git cmake make g++ libenet-dev libssl-dev libsdl2-dev build-essential")
+            h1.addSoftware("libogg-dev libvorbis-dev libopenal-dev libfreetype6-dev subversion")
+            h1.addSoftware("libgl1-mesa-dev libcurl4-openssl-dev libsqlite3-dev pkg-config")
+            h1.addBuildCommand('mkdir -p /src/stk-code/build && \
+                cd /src/stk-code/build && \
+                cmake .. -DSERVER_ONLY=ON -DUSE_SQLITE3=ON -DCMAKE_BUILD_TYPE=Release && \
+                make -j$(nproc) && \
+                make install')
+            h1.addPortForwarding(2759, 2759, proto="udp")
     if asn == client1_asn:
         h1 = as_.createHost('h1').joinNetwork('net0')  
         h1.addSoftware("iperf3")
@@ -148,3 +168,31 @@ emu.compile(Docker(), './output', override=True)
 emu.compile(Graphviz(), "./output/graphs", override=True)
 
 generate_scripts(topo)
+
+if INSTALL_STK_SERVER:
+    svn_repo = "https://svn.code.sf.net/p/supertuxkart/code/stk-assets"
+    svn_dest = "stk-assets"
+    git_repo = "https://github.com/supertuxkart/stk-code"
+    git_dest = "stk-code"
+
+    svn_checkout(svn_repo, svn_dest)
+    git_clone(git_repo, git_dest)
+    init_db("server/stkservers.db", "server/stk_schema.sql")
+
+    shutil.copytree(svn_dest, "output/hnode_{}_h1/stk-assets".format(dashboard_asn))
+    shutil.copytree(git_dest, "output/hnode_{}_h1/stk-code".format(dashboard_asn))
+
+    if SETUP_MACVLAN:
+        container_c1 = 'hnode_{}_h1'.format(client1_asn)
+        container_c2 = 'hnode_{}_h1'.format(client2_asn)
+        net_pc1 = 'pc1-lan'
+        net_pc2 = 'pc2-lan'
+        dev_pc1 = 'enp0s1'
+        dev_pc2 = 'enp0s1'
+        gateway_ip1 = '172.16.0.1'
+        gateway_ip2 = '172.18.0.1'
+        ip_address_c1 = '172.16.0.10'
+        ip_address_c2 = '172.18.0.10'
+
+        add_macvlan_docker_compose(container_c1, net_pc1, gateway_ip1, ip_address_c1, dev_pc1)
+        add_macvlan_docker_compose(container_c2, net_pc2, gateway_ip2, ip_address_c2, dev_pc2)

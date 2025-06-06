@@ -28,7 +28,7 @@ EOF
 cat << EOF | socat - UNIX-CONNECT:"$UAPI_SOCKET"
 set=1
 public_key=$SERVER_PUBLIC_KEY_HEX
-allowed_ip=10.78.0.0/24
+allowed_ip=10.78.0.1/32
 scion_endpoint=$SCION_ENDPOINT
 persistent_keepalive_interval=25
 EOF

@@ -3,3 +3,7 @@
 paths.json
 helper_scripts/*
 config.yaml
+stk_server/
+stk-assets/
+topo/paths*.json
+server/stkservers.db
