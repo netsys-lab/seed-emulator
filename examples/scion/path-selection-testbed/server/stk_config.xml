@@ -8,13 +8,13 @@
     <server-port value="2759" />
 
     <!-- Game mode in server, 0 is normal race (grand prix), 1 is time trial (grand prix), 3 is normal race, 4 time trial, 6 is soccer, 7 is free-for-all and 8 is capture the flag. Notice: grand prix server doesn't allow for players to join and wait for ongoing game. -->
-    <server-mode value="7" />
+    <server-mode value="3" />
 
     <!-- Difficulty in server, 0 is beginner, 1 is intermediate, 2 is expert and 3 is supertux (the most difficult). -->
     <server-difficulty value="0" />
 
     <!-- Number of grand prix tracks per game (If grand prix enabled). -->
-    <gp-track-count value="3" />
+    <gp-track-count value="1" />
 
     <!-- Use goal target in soccer. -->
     <soccer-goal-target value="false" />
@@ -113,10 +113,10 @@
     <auto-game-time-ratio value="-1" />
 
     <!-- Maximum ping allowed for a player (in ms), it's recommended to use default value if live-spectate is on. -->
-    <max-ping value="300" />
+    <max-ping value="500" />
 
     <!-- Tolerance of jitter in network allowed (in ms), it's recommended to use default value if live-spectate is on. -->
-    <jitter-tolerance value="100" />
+    <jitter-tolerance value="200" />
 
     <!-- Kick players whose ping is above max-ping. -->
     <kick-high-ping-players value="false" />

@@ -237,8 +237,8 @@ app.layout = dbc.Container(
                                     'selector': 'edge',
                                     'style': {
                                         'label': 'data(label)',
-                                        'width': 'mapData(bandwidth, 2000, 7000000, 1, 10)',
-                                        'line-color': 'mapData(bandwidth, 2000, 7000000, blue, red)',
+                                        'width': 'mapData(bandwidth, 2000, 140000, 1, 10)',
+                                        'line-color': 'mapData(bandwidth, 2000, 140000, blue, red)',
                                         'text-outline-color': '#FFFFFF',
                                         'text-outline-width': '2px',
                                         'text-background-color': '#FFFFFF',

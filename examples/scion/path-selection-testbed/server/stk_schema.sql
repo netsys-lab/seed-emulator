@@ -1,6 +1,6 @@
 -- stk_config.sql
 
-CREATE TABLE IF NOT EXISTS v6_stk_config_stats
+CREATE TABLE IF NOT EXISTS v1_stk_config_stats
 (
     host_id INTEGER UNSIGNED NOT NULL PRIMARY KEY, -- Unique host id in STKHost of each connection session for a STKPeer
     ip INTEGER UNSIGNED NOT NULL, -- IP decimal of host
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS v6_stk_config_stats
     ping INTEGER UNSIGNED NOT NULL DEFAULT 0 -- Ping of the host
 ) WITHOUT ROWID;
 
-CREATE TABLE IF NOT EXISTS v6_countries
+CREATE TABLE IF NOT EXISTS v1_countries
 (
     country_code TEXT NOT NULL PRIMARY KEY UNIQUE, -- Unique 2-letter country code
     country_flag TEXT NOT NULL, -- Unicode country flag representation of 2-letter country code

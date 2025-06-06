@@ -84,7 +84,7 @@ class Config:
             fader_hysteresis=2,
             fader_settle_time=0.5,
             link_api_url="http://localhost:8050/set_link",
-            topo_file="topo.json",
+            topo_file="topo/topo.json",
             parameter_ranges={
                 ControlMode.LATENCY: (5, 500),
                 ControlMode.BANDWIDTH: (5, 50),

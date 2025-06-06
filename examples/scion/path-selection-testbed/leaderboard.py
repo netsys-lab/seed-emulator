@@ -13,7 +13,7 @@ import json
 app = Flask(__name__)
 
 # Configuration
-DB_PATH = 'stkservers.db'  # Path to your database file
+DB_PATH = 'server/stkservers.db'  # Path to your database file
 REFRESH_INTERVAL = 5  # Seconds between auto-refresh
 
 def get_db_connection():
