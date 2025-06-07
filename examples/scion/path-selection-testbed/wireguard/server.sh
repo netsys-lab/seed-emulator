@@ -41,3 +41,5 @@ EOF
 
 ip route add 172.16.0.0/24 via 10.78.0.2 dev wg0
 ip route add 172.18.0.0/24 via 10.78.0.3 dev wg0
+iperf3 -s -p 4601 -D
+iperf3 -s -p 4602 -D

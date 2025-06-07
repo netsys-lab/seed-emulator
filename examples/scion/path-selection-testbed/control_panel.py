@@ -1,4 +1,3 @@
-
 # The device uses ESP8266 and the serial to usb chip used, CH340G, needs the right driver installed
 # https://learn.sparkfun.com/tutorials/how-to-install-ch340-drivers/all
 
@@ -12,7 +11,6 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, Any
 from enum import Enum
 from contextlib import contextmanager
-from pathlib import Path
 
 
 # Configure logging
@@ -26,7 +24,7 @@ logger = logging.getLogger(__name__)
 class ControlMode(Enum):
     """Network parameter control modes"""
     LATENCY = "latency"
-    BANDWIDTH = "bandwidth"
+    BANDWIDTH = "bw"
     JITTER = "jitter"
     LOSS = "loss"
 
@@ -42,12 +40,14 @@ class Config:
     """Application configuration"""
     serial_port: str
     baudrate: int
-    fader_hysteresis: int
-    fader_settle_time: float
     link_api_url: str
     topo_file: str
     parameter_ranges: Dict[ControlMode, Tuple[int, int]]
     client_ports: Dict[str, int]
+    num_faders: int
+    fader_change_threshold: int
+    link_set_rate_limit: float
+
     
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> 'Config':
@@ -81,8 +81,6 @@ class Config:
         return cls(
             serial_port='/dev/ttyUSB0',
             baudrate=115200,
-            fader_hysteresis=2,
-            fader_settle_time=0.5,
             link_api_url="http://localhost:8050/set_link",
             topo_file="topo/topo.json",
             parameter_ranges={
@@ -94,9 +92,18 @@ class Config:
             client_ports={
                 "client1": 28016,
                 "client2": 28017
-            }
+            },
+            num_faders=6,
+            fader_change_threshold=2,
+            link_set_rate_limit=1.0
         )
 
+@dataclass
+class LinkMetrics:
+    """Link data"""
+    bw: int
+    latency: int
+    jitter: int
 
 class NetworkTopology:
     """Manages network topology data"""
@@ -113,8 +120,9 @@ class NetworkTopology:
             with open(self.topo_file) as f:
                 topo = json.load(f)
             
-            self.links = [f"ix{link['id']}" for link in topo.get("links", [])]
-            self.links = self.links[:min(6, len(self.links))]
+            topo_links = topo.get("links", [])
+            topo_links = topo_links[:min(Config.get_default().num_faders, len(topo_links))]
+            self.links = [f"ix{link['id']}" for link in topo_links]
             server_asn = topo.get("server_asn")
             server_isd = 0
             for _as in topo.get("ASes", []):
@@ -127,6 +135,7 @@ class NetworkTopology:
             self.server_ia = f"{server_isd}-{server_asn}"
             
             logger.info(f"Loaded {len(self.links)} links from topology")
+            logger.info(f"Links: {self.links}")
         except FileNotFoundError:
             logger.error(f"Topology file {self.topo_file} not found")
             raise
@@ -143,28 +152,40 @@ class NetworkTopology:
 class SerialController:
     """Handles serial communication with hardware controller"""
     
-    def __init__(self, port: str, baudrate: int, timeout: float = 1.0):
+    def __init__(self, port: str, baudrate: int, timeout: float = 1.0, max_retries: int = 3, retry_delay: float = 2.0):
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
         self.serial_conn: Optional[serial.Serial] = None
     
     @contextmanager
     def connection(self):
-        """Context manager for serial connection"""
-        try:
-            self.serial_conn = serial.Serial(
-                self.port, self.baudrate, timeout=self.timeout
-            )
-            logger.info(f"Connected to serial port {self.port}")
-            yield self
-        except serial.SerialException as e:
-            logger.error(f"Failed to connect to serial port: {e}")
-            raise
-        finally:
-            if self.serial_conn and self.serial_conn.is_open:
-                self.serial_conn.close()
-                logger.info("Serial connection closed")
+        """Context manager for serial connection with reconnection logic"""
+        retries = 0
+        while retries <= self.max_retries:
+            try:
+                if self.serial_conn and self.serial_conn.is_open:
+                    self.serial_conn.close()
+                self.serial_conn = serial.Serial(
+                    self.port, self.baudrate, timeout=self.timeout
+                )
+                logger.info(f"Connected to serial port {self.port}")
+                yield self
+                break
+            except serial.SerialException as e:
+                retries += 1
+                if retries <= self.max_retries:
+                    logger.warning(f"Failed to connect to serial port (attempt {retries}/{self.max_retries}): {e}")
+                    time.sleep(self.retry_delay)
+                else:
+                    logger.error(f"Failed to connect to serial port after {self.max_retries} attempts: {e}")
+                    raise
+            finally:
+                if self.serial_conn and self.serial_conn.is_open:
+                    self.serial_conn.close()
+                    logger.info("Serial connection closed")
     
     def read_data(self) -> Optional[Dict[str, Any]]:
         """Read and parse data from serial port"""
@@ -241,21 +262,16 @@ class LinkController:
         self.config = config
         self.topology = topology
         self.api = api
-        
-        # State tracking
-        self.last_values: Dict[ControlMode, List[Optional[int]]] = {
-            mode: [None] * topology.num_links for mode in ControlMode
-        }
+    
         # Track last fader positions for each mode
-        self.last_fader_positions: Dict[ControlMode, List[Optional[int]]] = {
-            mode: [None] * topology.num_links for mode in ControlMode
-        }
-        self.fader_dirty = [False] * topology.num_links
-        self.fader_last_time = [0.0] * topology.num_links
+        self.last_fader_positions: List[int] = [100] * topology.num_links
         
         self.last_mode: Optional[ControlMode] = None
         self.last_rotary: Optional[int] = None
         self.last_path_target: Optional[PathTarget] = None
+        self.link_set_last_times: Dict[str, float] = {
+            link: time.time() for link in topology.links
+        }
     
     def determine_mode(self, button0: bool, button1: bool) -> ControlMode:
         """Determine control mode from button states"""
@@ -286,6 +302,19 @@ class LinkController:
         buttons = [data.get(f"button{i+1}", 0) for i in range(4)]
         faders = [data.get(f"fader{i+1}", 0) for i in range(self.topology.num_links)]
         rotary = data.get("rotary", 0)
+
+        # Validate inputs
+        if not all(isinstance(b, (int, bool)) for b in buttons):
+            logger.warning("Invalid button values received")
+            return
+            
+        if not all(isinstance(f, int) and 0 <= f <= 100 for f in faders):
+            logger.warning("Invalid fader values received")
+            return
+            
+        if not isinstance(rotary, int) or rotary < 0:
+            logger.warning("Invalid rotary value received")
+            return
         
         # Determine mode and target
         mode = self.determine_mode(bool(buttons[0]), bool(buttons[1]))
@@ -305,49 +334,28 @@ class LinkController:
         
         # Handle fader updates
         if mode != self.last_mode:
-            # Reset fader state on mode change
-            self.fader_dirty = [False] * self.topology.num_links
-            self.fader_last_time = [0.0] * self.topology.num_links
             self.last_mode = mode
             logger.info(f"Switched to {mode.value.upper()} mode")
         
         self._process_faders(faders, mode, now)
     
-    def _process_faders(self, faders: List[int], mode: ControlMode, now: float) -> None:
-        """Process fader values with hysteresis and settling time"""
+    def _process_faders(self, faders: List[int], mode: ControlMode) -> None:
+        """Process fader values"""
         for i, raw in enumerate(faders):
             if i >= len(self.topology.links):
                 break
                 
             link = self.topology.links[i]
             value = self.fader_to_value(raw, mode)
-            
-            # Check if this is the first time we see this fader position for this mode
-            if self.last_fader_positions[mode][i] is None:
-                # Just store the fader position, don't send any update
-                self.last_fader_positions[mode][i] = raw
-                self.last_values[mode][i] = value
-                logger.debug(f"Initialized {link} {mode.value} fader position to {raw} (value: {value})")
-                continue
-            
-            # Only process if fader actually moved from its last known position in this mode
-            if abs(raw - self.last_fader_positions[mode][i]) <= 1:  # Allow 1 unit tolerance
-                continue
-            
-            # Fader has moved - check if it moved significantly in terms of actual value
-            if self.last_values[mode][i] is not None:
-                if abs(value - self.last_values[mode][i]) > self.config.fader_hysteresis:
-                    self.fader_dirty[i] = True
-                    self.fader_last_time[i] = now
-            
-            # Send update if fader has settled
-            if (self.fader_dirty[i] and 
-                (now - self.fader_last_time[i]) > self.config.fader_settle_time):
-                self.fader_dirty[i] = False
-                self.last_values[mode][i] = value
-                self.last_fader_positions[mode][i] = raw
-                self.api.update_link(link, mode.value, value)
+            last_raw = self.last_fader_positions[i]
+            last_time = self.link_set_last_times[link]
 
+            if (abs(raw - last_raw) > self.config.fader_change_threshold and 
+                (time.time() - last_time) > self.config.link_set_rate_limit):
+                logger.debug(f"Fader moved {link} {last_raw} to {raw}")
+                self.last_fader_positions[i] = raw
+                self.link_set_last_times[link] = time.time()
+                self.api.update_link(link, mode.value, value)                    
 
 def main():
     """Main application entry point"""
