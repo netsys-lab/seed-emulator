@@ -24,65 +24,58 @@ def get_db_connection():
 
 def get_leaderboard_data():
     """
-    Fetch leaderboard data from the database
-    Note: You may need to adjust the SQL queries based on your actual database schema
+    Fetch leaderboard data from the race_results table
     """
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # First, let's try to understand the database structure
-        # Get all tables
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = cursor.fetchall()
-        print("Available tables:", [table['name'] for table in tables])
-        
-        # Try common table names for player stats
-        # Adjust this query based on your actual database schema
+        # Query the race_results table
         leaderboard_data = []
         
         try:
-            # This is a common structure - adjust based on your actual schema
+            # Get player statistics from race_results table
             cursor.execute("""
                 SELECT 
                     player_name,
-                    SUM(score) as total_score,
                     COUNT(*) as races_played,
-                    MIN(time) as best_time,
-                    AVG(time) as avg_time
-                FROM (
-                    SELECT * FROM player_stats
-                    UNION ALL
-                    SELECT * FROM race_results
-                ) 
+                    MIN(lap_time) as best_time,
+                    AVG(lap_time) as avg_time,
+                    track_name as favorite_track
+                FROM race_results
                 GROUP BY player_name
-                ORDER BY total_score DESC
+                ORDER BY best_time ASC
                 LIMIT 50
             """)
-            leaderboard_data = cursor.fetchall()
-        except sqlite3.Error:
-            # If the above doesn't work, try a simpler query
-            # You'll need to adjust this based on your actual table structure
-            try:
-                cursor.execute("""
-                    SELECT DISTINCT player_name, score, time 
-                    FROM players 
-                    ORDER BY score DESC 
-                    LIMIT 50
-                """)
-                leaderboard_data = cursor.fetchall()
-            except:
-                # Fallback - get table info to help debug
-                for table in tables:
-                    print(f"\nTable: {table['name']}")
-                    cursor.execute(f"PRAGMA table_info({table['name']})")
-                    columns = cursor.fetchall()
-                    print("Columns:", [col['name'] for col in columns])
+            results = cursor.fetchall()
+            
+            # Convert to proper format for leaderboard display
+            for i, row in enumerate(results):
+                leaderboard_data.append({
+                    'player_name': row['player_name'],
+                    'total_score': (len(results) - i) * 100,  # Score based on ranking
+                    'races_played': row['races_played'],
+                    'best_time': row['best_time'],
+                    'avg_time': row['avg_time']
+                })
+                
+        except sqlite3.Error as e:
+            print(f"SQL Error: {e}")
+            # Fallback - get table info to help debug
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            tables = cursor.fetchall()
+            print("Available tables:", [table['name'] for table in tables])
+            
+            for table in tables:
+                print(f"\nTable: {table['name']}")
+                cursor.execute(f"PRAGMA table_info({table['name']})")
+                columns = cursor.fetchall()
+                print("Columns:", [col['name'] for col in columns])
         
         conn.close()
         
         # Convert to list of dicts
-        return [dict(row) for row in leaderboard_data]
+        return leaderboard_data
         
     except Exception as e:
         print(f"Database error: {e}")
@@ -152,7 +145,6 @@ HTML_TEMPLATE = '''
         .header {
             text-align: center;
             margin-bottom: 40px;
-            animation: slideDown 0.6s ease-out;
         }
         
         .header h1 {
@@ -183,7 +175,6 @@ HTML_TEMPLATE = '''
             border-radius: 20px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.3);
             overflow: hidden;
-            animation: fadeIn 0.8s ease-out;
         }
         
         .leaderboard-header {
@@ -201,6 +192,7 @@ HTML_TEMPLATE = '''
         .leaderboard-body {
             max-height: 600px;
             overflow-y: auto;
+            position: relative;
         }
         
         .leaderboard-row {
@@ -225,6 +217,50 @@ HTML_TEMPLATE = '''
             background: #f9f9f9;
         }
         
+        .leaderboard-row.new-entry {
+            animation: slideIn 0.5s ease-out;
+        }
+        
+        .leaderboard-row.position-changed {
+            animation: positionChange 0.3s ease-out;
+        }
+        
+        .leaderboard-row.updating {
+            animation: pulse 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes positionChange {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.02);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+        
+        @keyframes pulse {
+            0% {
+                background-color: #fff3cd;
+            }
+            100% {
+                background-color: transparent;
+            }
+        }
+        
         .position {
             font-family: 'Fredoka One', cursive;
             font-size: 1.5rem;
@@ -237,6 +273,7 @@ HTML_TEMPLATE = '''
             border-radius: 50%;
             background: #e0e0e0;
             color: #666;
+            transition: all 0.3s ease;
         }
         
         .position.gold {
@@ -266,36 +303,29 @@ HTML_TEMPLATE = '''
         .stat {
             text-align: center;
             font-weight: 600;
+            transition: all 0.3s ease;
         }
         
         .stat-value {
             color: #3498db;
         }
         
-        .time {
-            color: #e74c3c;
+        .stat.changed {
+            animation: valueChange 0.5s ease-out;
         }
         
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-30px);
+        @keyframes valueChange {
+            0% {
+                transform: scale(1.2);
+                color: #e74c3c;
             }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: scale(0.95);
-            }
-            to {
-                opacity: 1;
+            100% {
                 transform: scale(1);
             }
+        }
+        
+        .time {
+            color: #e74c3c;
         }
         
         .loading {
@@ -370,11 +400,79 @@ HTML_TEMPLATE = '''
     </div>
     
     <script>
+        // Store current leaderboard data
+        let currentData = new Map();
+        
         function formatTime(seconds) {
             if (!seconds) return '--:--';
             const minutes = Math.floor(seconds / 60);
             const secs = (seconds % 60).toFixed(2);
             return `${minutes.toString().padStart(2, '0')}:${secs.padStart(5, '0')}`;
+        }
+        
+        function createRow(player, position) {
+            const row = document.createElement('div');
+            row.className = 'leaderboard-row';
+            row.dataset.playerName = player.player_name;
+            
+            let positionClass = 'position';
+            if (position === 1) positionClass += ' gold';
+            else if (position === 2) positionClass += ' silver';
+            else if (position === 3) positionClass += ' bronze';
+            
+            row.innerHTML = `
+                <div class="${positionClass}">${position}</div>
+                <div class="player-name">${player.player_name || 'Unknown'}</div>
+                <div class="stat stat-value" data-field="score">${player.total_score || 0}</div>
+                <div class="stat" data-field="races">${player.races_played || 0}</div>
+                <div class="stat time" data-field="best">${formatTime(player.best_time)}</div>
+                <div class="stat time" data-field="avg">${formatTime(player.avg_time)}</div>
+            `;
+            
+            return row;
+        }
+        
+        function updateRow(row, player, newPosition, oldData) {
+            const positionDiv = row.querySelector('.position');
+            const currentPosition = parseInt(positionDiv.textContent);
+            
+            // Update position if changed
+            if (currentPosition !== newPosition) {
+                positionDiv.textContent = newPosition;
+                positionDiv.className = 'position';
+                if (newPosition === 1) positionDiv.className += ' gold';
+                else if (newPosition === 2) positionDiv.className += ' silver';
+                else if (newPosition === 3) positionDiv.className += ' bronze';
+                
+                row.classList.add('position-changed');
+                setTimeout(() => row.classList.remove('position-changed'), 300);
+            }
+            
+            // Update stats with change detection
+            const fields = [
+                { selector: '[data-field="score"]', value: player.total_score || 0, oldValue: oldData?.total_score },
+                { selector: '[data-field="races"]', value: player.races_played || 0, oldValue: oldData?.races_played },
+                { selector: '[data-field="best"]', value: formatTime(player.best_time), oldValue: formatTime(oldData?.best_time) },
+                { selector: '[data-field="avg"]', value: formatTime(player.avg_time), oldValue: formatTime(oldData?.avg_time) }
+            ];
+            
+            let hasChanges = false;
+            fields.forEach(field => {
+                const elem = row.querySelector(field.selector);
+                if (elem.textContent !== field.value.toString()) {
+                    elem.textContent = field.value;
+                    if (field.oldValue !== undefined && field.oldValue !== field.value) {
+                        elem.classList.add('changed');
+                        setTimeout(() => elem.classList.remove('changed'), 500);
+                        hasChanges = true;
+                    }
+                }
+            });
+            
+            if (hasChanges && currentPosition === newPosition) {
+                row.classList.add('updating');
+                setTimeout(() => row.classList.remove('updating'), 300);
+            }
         }
         
         async function updateLeaderboard() {
@@ -383,39 +481,84 @@ HTML_TEMPLATE = '''
                 const data = await response.json();
                 
                 const leaderboardBody = document.getElementById('leaderboardBody');
-                leaderboardBody.innerHTML = '';
                 
-                data.forEach((player, index) => {
-                    const row = document.createElement('div');
-                    row.className = 'leaderboard-row';
-                    row.style.animationDelay = `${index * 0.05}s`;
-                    row.style.animation = 'fadeIn 0.5s ease-out forwards';
+                // First time loading
+                if (leaderboardBody.querySelector('.loading')) {
+                    leaderboardBody.innerHTML = '';
+                    data.forEach((player, index) => {
+                        const row = createRow(player, index + 1);
+                        leaderboardBody.appendChild(row);
+                        currentData.set(player.player_name, player);
+                    });
+                } else {
+                    // Subsequent updates - smart refresh
+                    const newData = new Map();
+                    const existingRows = new Map();
                     
-                    const position = index + 1;
-                    let positionClass = 'position';
-                    if (position === 1) positionClass += ' gold';
-                    else if (position === 2) positionClass += ' silver';
-                    else if (position === 3) positionClass += ' bronze';
+                    // Map existing rows
+                    leaderboardBody.querySelectorAll('.leaderboard-row').forEach(row => {
+                        const playerName = row.dataset.playerName;
+                        existingRows.set(playerName, row);
+                    });
                     
-                    row.innerHTML = `
-                        <div class="${positionClass}">${position}</div>
-                        <div class="player-name">${player.player_name || 'Unknown'}</div>
-                        <div class="stat stat-value">${player.total_score || 0}</div>
-                        <div class="stat">${player.races_played || 0}</div>
-                        <div class="stat time">${formatTime(player.best_time)}</div>
-                        <div class="stat time">${formatTime(player.avg_time)}</div>
-                    `;
+                    // Process new data
+                    data.forEach((player, index) => {
+                        const position = index + 1;
+                        const playerName = player.player_name;
+                        newData.set(playerName, player);
+                        
+                        if (existingRows.has(playerName)) {
+                            // Update existing row
+                            const row = existingRows.get(playerName);
+                            const oldData = currentData.get(playerName);
+                            updateRow(row, player, position, oldData);
+                            
+                            // Move row to correct position if needed
+                            const currentIndex = Array.from(leaderboardBody.children).indexOf(row);
+                            if (currentIndex !== index) {
+                                if (index === 0) {
+                                    leaderboardBody.insertBefore(row, leaderboardBody.firstChild);
+                                } else {
+                                    leaderboardBody.insertBefore(row, leaderboardBody.children[index]);
+                                }
+                            }
+                        } else {
+                            // Add new row
+                            const row = createRow(player, position);
+                            row.classList.add('new-entry');
+                            
+                            if (index >= leaderboardBody.children.length) {
+                                leaderboardBody.appendChild(row);
+                            } else {
+                                leaderboardBody.insertBefore(row, leaderboardBody.children[index]);
+                            }
+                        }
+                    });
                     
-                    leaderboardBody.appendChild(row);
-                });
+                    // Remove players no longer in the data
+                    existingRows.forEach((row, playerName) => {
+                        if (!newData.has(playerName)) {
+                            row.style.transition = 'opacity 0.3s, transform 0.3s';
+                            row.style.opacity = '0';
+                            row.style.transform = 'translateX(100%)';
+                            setTimeout(() => row.remove(), 300);
+                        }
+                    });
+                    
+                    // Update current data
+                    currentData = newData;
+                }
                 
                 // Update timestamp
                 document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
                 
             } catch (error) {
                 console.error('Error updating leaderboard:', error);
-                document.getElementById('leaderboardBody').innerHTML = 
-                    '<div class="loading">Error loading leaderboard. Please check the server.</div>';
+                const leaderboardBody = document.getElementById('leaderboardBody');
+                if (leaderboardBody.querySelector('.loading') || leaderboardBody.children.length === 0) {
+                    leaderboardBody.innerHTML = 
+                        '<div class="loading">Error loading leaderboard. Please check the server.</div>';
+                }
             }
         }
         

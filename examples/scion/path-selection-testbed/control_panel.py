@@ -337,7 +337,7 @@ class LinkController:
             self.last_mode = mode
             logger.info(f"Switched to {mode.value.upper()} mode")
         
-        self._process_faders(faders, mode, now)
+        self._process_faders(faders, mode)
     
     def _process_faders(self, faders: List[int], mode: ControlMode) -> None:
         """Process fader values"""
