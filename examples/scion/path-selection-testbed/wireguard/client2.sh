@@ -11,7 +11,7 @@ PRIVATE_KEY_HEX=$(base64 -d client2.key | xxd -p -c 256)
 SERVER_PUBLIC_KEY_HEX=$(base64 -d server.pub | xxd -p -c 256)
 
 # Start wireguard-go
-USE_SCION=1 USE_BATCH=0 ./wireguard-go $INTERFACE
+USE_SCION=1 USE_BATCH=1 ./wireguard-go $INTERFACE
 
 # Configure interface
 ip address add "$ADDRESS" dev "$INTERFACE"
@@ -32,3 +32,7 @@ allowed_ip=10.78.0.1/32
 scion_endpoint=$SCION_ENDPOINT
 persistent_keepalive_interval=25
 EOF
+
+sleep 1
+
+iperf3 -c 10.78.0.1 -p 4602 -t 0 -b 2M 2>&1 > /dev/null &

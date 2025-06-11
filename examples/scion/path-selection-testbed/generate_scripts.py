@@ -186,7 +186,7 @@ def generate_scripts(topo):
         f.write(bash_script)
 
     bash_script = '''#!/bin/bash
-    docker exec -d {} /bin/zsh -c "supertuxkart --server-config=/server/stk_config.xml --lan-server=scion_supertuxkart --track=olivermath > /dev/null 2>&1 &"
+    docker exec -d {} /bin/zsh -c "./src/stk-code/cmake_build/bin/supertuxkart --server-config=/server/stk_config.xml --lan-server=scion_supertuxkart --network-demo-mode --track=scotland > /dev/null 2>&1 &"
     '''.format(server_cont)
     # Write the bash script to a file
     with open('helper_scripts/start_stk_server.sh', 'w') as f:

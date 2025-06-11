@@ -11,7 +11,7 @@ CLIENT1_PUBLIC_KEY_HEX=$(base64 -d client1.pub | xxd -p -c 256)
 CLIENT2_PUBLIC_KEY_HEX=$(base64 -d client2.pub | xxd -p -c 256)
 
 # Start wireguard-go
-USE_SCION=1 USE_BATCH=0 ./wireguard-go $INTERFACE
+# USE_SCION=1 USE_BATCH=1 ./wireguard-go $INTERFACE
 
 # Configure interface
 ip address add "$ADDRESS" dev "$INTERFACE"
@@ -43,3 +43,4 @@ ip route add 172.16.0.0/24 via 10.78.0.2 dev wg0
 ip route add 172.18.0.0/24 via 10.78.0.3 dev wg0
 iperf3 -s -p 4601 -D
 iperf3 -s -p 4602 -D
+
