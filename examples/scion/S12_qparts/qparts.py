@@ -1,98 +1,160 @@
 #!/usr/bin/env python3
+# encoding: utf-8
+
+
+from seedemu.services import GolangDevService, AccessMode
+from seedemu.core import Emulator, Binding, Filter
 
 from seedemu.compiler import Docker
-from seedemu.core import Emulator, Binding, Filter
-from seedemu.layers import ScionBase, ScionRouting, ScionIsd, Scion
+from seedemu.core import Emulator, OptionRegistry
+from seedemu.layers import ScionBase, ScionRouting, ScionIsd, Scion, CheckoutSpecification, SetupSpecification
 from seedemu.layers.Scion import LinkType as ScLinkType
-from seedemu.services import ScionBwtestService, ScionBwtestClientService
 
-# Initialize
-emu = Emulator()
-base = ScionBase()
-routing = ScionRouting()
-scion_isd = ScionIsd()
-scion = Scion()
-bwtest = ScionBwtestService()
-bwtestclient = ScionBwtestClientService()
+from seedemu.compiler import Docker, Platform
+import os, sys
 
-# SCION ISDs
-base.createIsolationDomain(1)
+def run(dumpfile = None):
+    ###############################################################################
+    # Set the platform information
+    if dumpfile is None:
+        script_name = os.path.basename(__file__)
 
-# AS-150q
-as150 = base.createAutonomousSystem(150)
-scion_isd.addIsdAs(1, 150, is_core=True)
-as150.createNetwork('net0')
-as150.createControlService('cs1').joinNetwork('net0')
-as150_router = as150.createRouter('br0').joinNetwork('net0')
-as150_router.crossConnect(151, 'br0', '10.50.0.10/29', latency=10, bandwidth=1000000, packetDrop=0.01)
-as150_router.crossConnect(152, 'br0', '10.50.0.18/29')
-as150_router.crossConnect(153, 'br0', '10.50.0.3/29')
+        if len(sys.argv) == 1:
+            platform = Platform.AMD64
+        elif len(sys.argv) == 2:
+            if sys.argv[1].lower() == 'amd':
+                platform = Platform.AMD64
+            elif sys.argv[1].lower() == 'arm':
+                platform = Platform.ARM64
+            else:
+                print(f"Usage:  {script_name} amd|arm")
+                sys.exit(1)
+        else:
+            print(f"Usage:  {script_name} amd|arm")
+            sys.exit(1)
 
-# Create a host running the bandwidth test server
-as150.createHost('bwtest').joinNetwork('net0', address='10.150.0.30')
-bwtest.install('bwtest150').setPort(40002) # Setting the port is optional (40002 is the default)
-emu.addBinding(Binding('bwtest150', filter=Filter(nodeName='bwtest', asn=150)))
+    # Initialize
+    emu = Emulator()
+    base = ScionBase()
+    spec = SetupSpecification.LOCAL_BUILD(
+            CheckoutSpecification(
+                mode = "build",
+                git_repo_url = "https://github.com/scionproto/scion.git",
+                checkout = "v0.12.0" # could be tag, branch or commit-hash
+            ))
+    routing = ScionRouting(setup_spec=OptionRegistry().scion_setup_spec(spec))
+    scion_isd = ScionIsd()
+    scion = Scion()
 
-# AS-151
-as151 = base.createAutonomousSystem(151)
-scion_isd.addIsdAs(1, 151, is_core=True)
-as151.createNetwork('net0')
-as151.createControlService('cs1').joinNetwork('net0')
-as151_br0 = as151.createRouter('br0').joinNetwork('net0').addSoftware("iperf3")
-as151_br0.crossConnect(150, 'br0', '10.50.0.11/29', latency=10, bandwidth=1000000, packetDrop=0.01)
-as151_br0.crossConnect(152, 'br0', '10.50.0.26/29')
+    devsvc = GolangDevService('jane.doe', 'jane.doe@example.com')
+    repo_url = 'https://github.com/scionproto/scion.git'
+    repo_branch = 'v0.12.0'
+    repo_path = '/home/root/repos/scion'
+    qparts_repo_url = 'https://github.com/netsys-lab/qparts.git'
+    qparts_repo_branch = 'main'
+    qparts_repo_path = '/home/root/repos/qparts'
 
-as151.createHost('bwtest').joinNetwork('net0', address='10.151.0.30')
-bwtest.install('bwtest151')
-emu.addBinding(Binding('bwtest151', filter=Filter(nodeName='bwtest', asn=151)))
 
-# AS-152
-as152 = base.createAutonomousSystem(152)
-scion_isd.addIsdAs(1, 152, is_core=True)
-as152.createNetwork('net0')
-as152.createControlService('cs1').joinNetwork('net0')
-as152_br0 = as152.createRouter('br0').joinNetwork('net0')
-as152_br0.crossConnect(150, 'br0', '10.50.0.19/29')
-as152_br0.crossConnect(151, 'br0', '10.50.0.27/29')
+    # SCION ISDs
+    base.createIsolationDomain(1)
 
-as152.createHost('bwtest').joinNetwork('net0', address='10.152.0.30')
-bwtest.install('bwtest152')
-emu.addBinding(Binding('bwtest152', filter=Filter(nodeName='bwtest', asn=152)))
+    # Internet Exchange
+    base.createInternetExchange(100, create_rs=False)
 
-# AS-153
-as153 = base.createAutonomousSystem(153)
-scion_isd.addIsdAs(1, 153, is_core=False)
-scion_isd.setCertIssuer((1, 153), issuer=150)
-as153.createNetwork('net0')
-as153.createControlService('cs1').joinNetwork('net0')
-as153_router = as153.createRouter('br0')
-as153_router.joinNetwork('net0')
-as153_router.crossConnect(150, 'br0', '10.50.0.4/29')
+    # AS-150
+    as150 = base.createAutonomousSystem(150)
+    scion_isd.addIsdAs(1, 150, is_core=True)
+    as150.createNetwork('net0')
+    as150_cs1 = as150.createControlService('cs1').joinNetwork('net0')
+    as150_router = as150.createRealWorldRouter('br0', prefixes=['0.0.0.0/1', '128.0.0.0/1'])
+    # expectation: hosts from within AS150 can ping outside world i.e. 8.8.8.8
+    #   Hosts in the other ASes can't!!
+    as150_router.joinNetwork('net0').joinNetwork('ix100')
+    as150_router.crossConnect(153, 'br0', '10.50.0.2/29')
+    #host150 = as150.createHost('qparts_').joinNetwork('net0', address='10.150.0.40')
+    #emu.addBinding(Binding(f'qparts_150', filter=Filter(nodeName=as150_cs1.getName(), asn=150)))
+    #svc = devsvc.install(f'qparts_150')
+    #svc.checkoutRepo(qparts_repo_url, qparts_repo_path, qparts_repo_branch, AccessMode.shared)
+    
 
-as153.createHost('bwtestserver').joinNetwork('net0', address='10.153.0.30')
-bwtest.install('bwtest153')
-emu.addBinding(Binding('bwtest153', filter=Filter(nodeName='bwtestserver', asn=153)))
+    # AS-151
+    as151 = base.createAutonomousSystem(151)
+    scion_isd.addIsdAs(1, 151, is_core=True)
+    as151.createNetwork('net0')
+    as151.createControlService('cs1').joinNetwork('net0')
+    as151.createRouter('br0').joinNetwork('net0').joinNetwork('ix100')
 
-# AS-153 bwtestclient
-as153.createHost('bwtestclient').joinNetwork('net0', address='10.153.0.31').addSharedFolder("/var/log", "/absolute/path/to/logs/on/host") # make logs of bwtestclient available on host
-bwtestclient.install('bwtestclient153').setServerAddr('1-151,10.151.0.30').setWaitTime(20) # set the server address and time to wait before starting the test
-emu.addBinding(Binding('bwtestclient153', filter=Filter(nodeName='bwtestclient', asn=153)))
+    # AS-152
+    as152 = base.createAutonomousSystem(152)
+    scion_isd.addIsdAs(1, 152, is_core=True)
+    as152.createNetwork('net0')
+    as152_cs1 = as152.createControlService('cs1').joinNetwork('net0')
+    as152_router = as152.createRealWorldRouter('br0', prefixes=['0.0.0.0/1', '128.0.0.0/1'])
+    as152_router.joinNetwork('net0').joinNetwork('ix100')
 
-# Inter-AS routing
-scion.addXcLink((1, 150), (1, 151), ScLinkType.Core)
-scion.addXcLink((1, 150), (1, 152), ScLinkType.Core)
-scion.addXcLink((1, 151), (1, 152), ScLinkType.Core)
-scion.addXcLink((1, 150), (1, 153), ScLinkType.Transit)
+    # AS-153
+    as153 = base.createAutonomousSystem(153)
+    scion_isd.addIsdAs(1, 153, is_core=False)
+    scion_isd.setCertIssuer((1, 153), issuer=150)
+    as153.createNetwork('net0')
+    as153_cs1 = as153.createControlService('cs1').joinNetwork('net0')
 
-# Rendering
-emu.addLayer(base)
-emu.addLayer(routing)
-emu.addLayer(scion_isd)
-emu.addLayer(scion)
-emu.addLayer(bwtest)
-emu.addLayer(bwtestclient)
+    as153_router = as153.createRouter('br0')
+    as153_router.joinNetwork('net0')
+    as153_router.crossConnect(150, 'br0', '10.50.0.3/29')
 
-emu.render()
+    # Inter-AS routing
+    scion.addIxLink(100, (1, 150), (1, 151), ScLinkType.Core)
+    scion.addIxLink(100, (1, 151), (1, 152), ScLinkType.Core)
+    scion.addIxLink(100, (1, 152), (1, 150), ScLinkType.Core)
+    scion.addXcLink((1, 150), (1, 153), ScLinkType.Transit)
 
-# Compilation
-emu.compile(Docker(internetMapEnabled=True), './output')
+    # BUG: As soon as AS152 gets a real world router, this makes the emulation fail
+    #Traceback (most recent call last):
+    #    File "/home/marten/sapex-f/seed-emulator/examples/scion/S12_qparts/qparts.py", line 140, in <module>
+    #        run()
+    #    File "/home/marten/sapex-f/seed-emulator/examples/scion/S12_qparts/qparts.py", line 132, in run
+    #        emu.render()
+    #    File "/home/marten/sapex-f/seed-emulator/seedemu/core/Emulator.py", line 402, in render
+    #        self.__render(layerName, False, False)
+    #    File "/home/marten/sapex-f/seed-emulator/seedemu/core/Emulator.py", line 163, in __render
+    #        layer.render(self)
+    #    File "/home/marten/sapex-f/seed-emulator/seedemu/layers/ScionRouting.py", line 463, in render
+    #        super().render(emulator)
+    #    File "/home/marten/sapex-f/seed-emulator/seedemu/layers/Routing.py", line 173, in render
+    #        r = promote_to_real_world_router(r, False)
+    #    File "/home/marten/sapex-f/seed-emulator/seedemu/core/Node.py", line 1345, in promote_to_real_world_router
+    #        extn.initRealWorld(hideHops)
+    #    File "/home/marten/sapex-f/seed-emulator/seedemu/core/Node.py", line 1240, in initRealWorld
+    #        self.get_node().addSoftware('iptables')
+    #    AttributeError: 'NoneType' object has no attribute 'addSoftware'
+
+    svc = devsvc.install(f'dev_152_cs1')
+    emu.addBinding(Binding(f'dev_152_cs1', filter=Filter(nodeName=as152_cs1.getName(), asn=152)))
+    svc.checkoutRepo(repo_url, repo_path, repo_branch, AccessMode.shared)
+    # svc.checkoutRepo(qparts_repo_url, qparts_repo_path, qparts_repo_branch, AccessMode.shared)
+
+    svc3 = devsvc.install(f'dev_153_cs1')
+    svc3.checkoutRepo(repo_url, repo_path, repo_branch, AccessMode.shared)
+    emu.addBinding(Binding(f'dev_153_cs1', filter=Filter(nodeName=as153_cs1.getName(), asn=153)))
+
+    # Rendering
+    emu.addLayer(base)
+    emu.addLayer(routing)
+    emu.addLayer(scion_isd)
+    emu.addLayer(scion)
+    emu.addLayer(devsvc)
+
+
+    if dumpfile is not None:
+        emu.dump(dumpfile)
+    else:
+        emu.render()
+
+        ###############################################################################
+        # Compilation
+
+        emu.compile(Docker(platform=platform), './output', override=True)
+
+if __name__ == "__main__":
+    run()
