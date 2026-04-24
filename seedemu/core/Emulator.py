@@ -107,7 +107,7 @@ class Emulator:
         self.__registry = Registry()
         self.__layers = LayerDatabase()
         self.__bindings = BindingDatabase()
-
+        self.__externalComponents = {}
         self.__registry.register('seedemu', 'dict', 'layersdb', self.__layers)
         self.__registry.register('seedemu', 'list', 'bindingdb', self.__bindings)
 
@@ -406,18 +406,20 @@ class Emulator:
         return self
 
     def compile(self, compiler: core.Compiler, output: str, override: bool = False) -> Emulator:
-        """!
-        @brief Compile the simulation.
-
-        @param compiler to use.
-        @param output output directory path.
-        @param override (optional) override the output folder if it already
-        exist. False by default.
-
-        @returns self, for chaining API calls.
-        """
         compiler.compile(self, output, override)
 
+        from seedemu.core.ExternalEmulatorManager import ExternalEmulatorManager
+        if not hasattr(self, "_externalManager"):
+             self._externalManager = ExternalEmulatorManager()
+
+        manager = self._externalManager
+        externals = list(self.getExternalComponents().values())
+
+        if externals:
+            manager.generate_all (
+                externals=externals,
+                export_base_dir=output
+            )
         return self
 
     def updateOutputDirectory(self, compiler: core.Compiler, callbacks: list) -> Emulator:
@@ -593,3 +595,10 @@ class Emulator:
         assert self.__rendered, 'emulator is not rendered.'
         base:Base = self.getLayer('Base')
         return base.getAutonomousSystem(asn).getNetwork(network).hasDHCPService()
+    
+    def registerExternalComponents(self, component):
+        self.__externalComponents[component.name] = component
+    
+    def getExternalComponents(self):
+        return self.__externalComponents
+    

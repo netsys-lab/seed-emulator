@@ -1,0 +1,9 @@
+{
+    "AS": 1,
+    "BorderRouters": [
+        "br1"
+    ],
+    "Interfaces": [
+        "if1"
+    ]
+}

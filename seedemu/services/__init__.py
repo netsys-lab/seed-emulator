@@ -8,7 +8,7 @@ from .CymruIpOrigin import CymruIpOriginService, CymruIpOriginServer
 from .ReverseDomainNameService import ReverseDomainNameService, ReverseDomainNameServer
 from .BgpLookingGlassService import BgpLookingGlassServer, BgpLookingGlassService
 from .DHCPService import DHCPServer, DHCPService
-from .EthereumService import *
+#from .EthereumService import *
 from .MoneroService import *
 from .ScionBwtestService import ScionBwtestService
 from .ScionBwtestClientService import ScionBwtestClientService

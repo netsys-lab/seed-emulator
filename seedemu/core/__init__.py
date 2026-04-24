@@ -26,3 +26,4 @@ from .Scope import *
 from .Option import BaseOption, OptionMode, Option, BaseComponent, BaseOptionGroup, AutoRegister, OptionGroupMeta
 from .OptionRegistry import OptionRegistry
 from .Volume import BaseVolume, ServiceLvlVolume, TopLvlVolume
+from .ExternalRouter import ExternalRouter
