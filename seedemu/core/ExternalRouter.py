@@ -28,3 +28,16 @@ class ExternalRouter():
 
     def getExportDir(self, base_dir):
         return f"{base_dir}/external_{self.name}"
+
+#        externals = emulator.getExternalComponents()
+#        for ext in externals:
+#            if ext.asn == asn:
+#                topology["border_routers"][ext.name] = {
+#                "interfaces": {
+#                    iface["name"]: {
+#                        "underlay": iface["ip"],
+#                        "mac": iface["mac"],
+#                        }
+#                        for iface in ext.interfaces
+#                    }
+#                }

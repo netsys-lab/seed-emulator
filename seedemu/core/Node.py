@@ -315,7 +315,6 @@ class Node(Printable, Registrable, Configurable, Vertex, Customizable):
 
         self.__configured = True
         reg = emulator.getRegistry()
-        print(f"-->  configure {self.__name} : {self.__pending_nets}")
 
         for (netname, address) in self.__pending_nets:
 
@@ -561,7 +560,6 @@ class Node(Printable, Registrable, Configurable, Vertex, Customizable):
 
         self.__pending_nets.append((netname, address))
 
-        print(f"-->  configure {self.__name} : {self.__pending_nets}")
         return self
 
     def updateNetwork(self, netname:str, address: str= "auto") -> Node:

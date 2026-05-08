@@ -80,7 +80,7 @@ if __name__ == "__main__":
     as150.createControlService('cs1').joinNetwork('net0')
     as150_router = as150.createRouter('br0')
     as150_router.joinNetwork('net0')
-    as150_router.crossConnect(153, 'br0', '10.50.0.2/29')
+    as150_router.crossConnect(153, 'EXT_BR153', '10.50.0.2/29')
 
     # AS-153
     as153 = base.createAutonomousSystem(153)
@@ -89,13 +89,13 @@ if __name__ == "__main__":
     as153.createNetwork('net0')
     as153.createControlService('cs1').joinNetwork('net0')
     as153_router = as153.createRouter('br0')
-    as153_router.joinNetwork('net0', )
-    as153_router.crossConnect(150, 'br0', '10.50.0.3/29')
+    as153_router.joinNetwork('net0')
+#    as153_router.crossConnect(150, 'br0', '10.50.0.3/29')
 
     # Create external
     ext = ExternalRouter("EXT_BR153", as153)
-    ext.joinNetwork('net0', '10.50.0.5', mac="00:11:22:33:44:54")
-#    ext.crossConnect(150, 'br0', '10.50.0.4/29', mac="00:11:22:33:44:55")
+    ext.joinNetwork('net0', '10.50.1.4', mac="00:11:22:33:44:54")
+    ext.crossConnect(150, 'br0', '10.50.0.3/29', mac="00:11:22:33:44:55")
 
     # Inter-AS routing
     scion.addXcLink((1, 150), (1, 153), ScLinkType.Transit)
