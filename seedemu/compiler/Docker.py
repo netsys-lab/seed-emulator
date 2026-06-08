@@ -1,4 +1,5 @@
 from __future__ import annotations
+from platform import node
 from seedemu.core.Emulator import Emulator
 from seedemu.core import Node, Network, Compiler, BaseSystem, BaseOption, Scope, ScopeType, ScopeTier, OptionHandling, BaseVolume, OptionMode
 from seedemu.core.enums import NodeRole, NetworkType
@@ -1029,8 +1030,23 @@ class Docker(Compiler):
 
         for file in node.getFiles():
             (path, content) = file.get()
-            dockerfile += self._addFile(path, content)
+            
+            #  If external router → keep original filename
+            if node.isExternal():
+                import os
+                filename = os.path.basename(path)
 
+                # write file directly (no hashing)
+                #dockerfile += f'COPY {filename} {path}\n'
+
+                # ensure file exists in build context
+                with open(filename, "w") as f:
+                    f.write(content)
+            else:
+                 # normal internal node → hashed filename
+                 dockerfile += self._addFile(path, content)
+
+                
         for (cpath, hpath) in node.getImportedFiles().items():
             dockerfile += self._importFile(cpath, hpath)
 
@@ -1093,26 +1109,29 @@ class Docker(Compiler):
 
         mkdir(real_nodename)
         chdir(real_nodename)
-
+        
         image,_ = self._selectImageFor(node)
         dockerfile = self._computeDockerfile(node)
-        print(dockerfile, file=open('Dockerfile', 'w'))
+        if not node.isExternal():
+            print(dockerfile, file=open('Dockerfile', 'w'))
 
         chdir('..')
-
-        name = self._getComposeNodeName(node)
-        return DockerCompilerFileTemplates['compose_service'].format(
-            nodeId = real_nodename,
-            nodeName = name,
-            dependsOn = md5(image.getName().encode('utf-8')).hexdigest(),
-            networks = node_nets,
-            sysctls = self._getNodeSysctls(node),
-            # privileged = 'true' if node.isPrivileged() else 'false',
-            ports = self._getComposeServicePortList(node),
-            labelList = self._getNodeMeta(node),
-            volumes = self._getComposeNodeVolumes(node),
-            environment= "    - CONTAINER_NAME={}\n            ".format(name) + self._computeNodeEnvironment(node)
-        )
+        if not node.isExternal():
+            name = self._getComposeNodeName(node)
+            return DockerCompilerFileTemplates['compose_service'].format(
+                nodeId = real_nodename,
+                nodeName = name,
+                dependsOn = md5(image.getName().encode('utf-8')).hexdigest(),
+                networks = node_nets,
+                sysctls = self._getNodeSysctls(node),
+                # privileged = 'true' if node.isPrivileged() else 'false',
+                ports = self._getComposeServicePortList(node),
+                labelList = self._getNodeMeta(node),
+                volumes = self._getComposeNodeVolumes(node),
+                environment= "    - CONTAINER_NAME={}\n            ".format(name) + self._computeNodeEnvironment(node)
+                )
+        else: 
+            return ""
 
     def _getNodeSysctls(self, node: Node) -> str:
         """!@brief compute the 'sysctl:' section of the node's service

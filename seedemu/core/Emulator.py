@@ -407,7 +407,11 @@ class Emulator:
 
     def compile(self, compiler: core.Compiler, output: str, override: bool = False) -> Emulator:
         compiler.compile(self, output, override)
-
+        # 🔹 Export clean SCION config for external routers
+        for ext in self.getExternalComponents().values():
+            if hasattr(ext, "exportScionConfig"):
+                ext.exportScionConfig(output)
+                
         from seedemu.core.ExternalEmulatorManager import ExternalEmulatorManager
         if not hasattr(self, "_externalManager"):
              self._externalManager = ExternalEmulatorManager()

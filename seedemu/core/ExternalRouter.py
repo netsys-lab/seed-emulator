@@ -1,5 +1,6 @@
 from .enums import NodeRole
 from .Node import Router
+import os
 
 class ExternalRouter():
     def __init__(self, name, autonomous_system, interfaces=None):
@@ -41,3 +42,31 @@ class ExternalRouter():
 #                        for iface in ext.interfaces
 #                    }
 #                }
+def exportScionConfig(self, output_dir):
+    import os
+
+    folder = os.path.join(
+        output_dir,
+        f"external_as{self.autonomous_system.getAsn()}_{self.name}"
+    )
+
+    os.makedirs(folder, exist_ok=True)
+
+    # IMPORTANT: files are stored in self.router, not self
+    for file in self.router.getFiles():
+        path, content = file.get()
+
+        if "topology" in path or "crypto" in path:
+            filename = os.path.basename(path)
+
+            if "crypto" in path:
+                crypto_dir = os.path.join(folder, "crypto")
+                os.makedirs(crypto_dir, exist_ok=True)
+                target_path = os.path.join(crypto_dir, filename)
+            else:
+                target_path = os.path.join(folder, filename)
+
+            with open(target_path, "w") as f:
+                f.write(content)
+
+    return folder
