@@ -270,6 +270,7 @@ class Node(Printable, Registrable, Configurable, Vertex, Customizable):
         self.__privileged = False
         self.__base_system = BaseSystem.DEFAULT
         self.__isExternal = False
+        self.__external_interface = None
         self.__pending_nets = []
         self.__xcs = {}
         self.__configured = False
@@ -288,9 +289,13 @@ class Node(Printable, Registrable, Configurable, Vertex, Customizable):
     def isExternal(self) -> bool:
         return self.__isExternal
     
-    def setExternal(self, is_external: bool = True):
+    def setExternal(self, is_external: bool = True, external_interface: str = None):
         self.__isExternal = is_external
+        self.__external_interface = external_interface
 
+    def getExternalInterface(self) -> Optional[str]:
+        return self.__external_interface
+        
     def scope(self)-> Scope:
         return Scope(ScopeTier.Node,
                      node_type=ScopeType.from_node(self),

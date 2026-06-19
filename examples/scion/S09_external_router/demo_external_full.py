@@ -91,9 +91,9 @@ if __name__ == "__main__":
     as153_router = as153.createRouter('EXT_BR153')
     as153_router.joinNetwork('net0')
     as153_router.crossConnect(150, 'br0', '10.50.0.3/29')
-    as153_router.setExternal(True)# 
-
-    # Create external
+    as153_router.setExternal(True, external_interface="eth1")  # Mark as external with interface eth1
+    #as153_router.installExtension("external_host_interface", "eth1")
+    #Create external
     #ext = ExternalRouter("EXT_BR153", as153)
     #ext.joinNetwork('net0', '10.50.1.4', mac="00:11:22:33:44:54")
     #ext.crossConnect(150, 'br0', '10.50.0.3/29', mac="00:11:22:33:44:55")

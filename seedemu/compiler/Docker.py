@@ -1,5 +1,6 @@
 from __future__ import annotations
 from platform import node
+#from eth_abi.registry import registry
 from seedemu.core.Emulator import Emulator
 from seedemu.core import Node, Network, Compiler, BaseSystem, BaseOption, Scope, ScopeType, ScopeTier, OptionHandling, BaseVolume, OptionMode
 from seedemu.core.enums import NodeRole, NetworkType
@@ -179,6 +180,18 @@ DockerCompilerFileTemplates['compose_network'] = """\
     {netId}:
         driver_opts:
             com.docker.network.driver.mtu: {mtu}
+        ipam:
+            config:
+                - subnet: {prefix}
+        labels:
+{labelList}
+"""
+
+DockerCompilerFileTemplates['compose_network_macvlan'] = """\
+    {netId}:
+        driver: macvlan
+        driver_opts:
+            parent: {parent}
         ipam:
             config:
                 - subnet: {prefix}
@@ -1257,6 +1270,16 @@ class Docker(Compiler):
 
         @returns docker-compose network string.
         """
+        parent_iface = net.getAttribute("external_host_interface", None)
+
+        if parent_iface is not None:
+            return DockerCompilerFileTemplates['compose_network_macvlan'].format(
+                netId=self._getRealNetName(net),
+                parent=parent_iface,
+                prefix=net.getAttribute('dummy_prefix') if self.__self_managed_network and net.getType() != NetworkType.Bridge else net.getPrefix(),
+                labelList=self._getNetMeta(net)
+            )
+    
         if self.__self_managed_network and net.getType() != NetworkType.Bridge:
             pfx = next(self.__dummy_network_pool)
             net.setAttribute('dummy_prefix', pfx)
@@ -1335,7 +1358,24 @@ class Docker(Compiler):
         registry = emulator.getRegistry()
 
         self._groupSoftware(emulator)
+        # Mark all networks connected to external routers with the host interface
+        for ((scope, type, name), obj) in registry.getAll().items():
+            if type in ['rnode', 'brdnode']:
+                if hasattr(obj, "isExternal") and obj.isExternal():
+                    parent_iface = obj.getExternalInterface()
 
+                    if parent_iface is not None:
+                        for iface in obj.getInterfaces():
+                            net = iface.getNet()
+                            net.setAttribute("external_host_interface", parent_iface)
+                            self._log(
+                                'exposing network {} via host interface {} for external router {}'.format(
+                                    net.getName(),
+                                    parent_iface,
+                                    obj.getName()
+                                )
+                            )
+                            
         for ((scope, type, name), obj) in registry.getAll().items():
 
             if type == 'net':
