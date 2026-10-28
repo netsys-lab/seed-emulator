@@ -269,7 +269,8 @@ class Node(Printable, Registrable, Configurable, Vertex, Customizable):
         self.__ports = []
         self.__privileged = False
         self.__base_system = BaseSystem.DEFAULT
-
+        self.__isExternal = False
+        self.__external_interface = None
         self.__pending_nets = []
         self.__xcs = {}
         self.__configured = False
@@ -285,12 +286,22 @@ class Node(Printable, Registrable, Configurable, Vertex, Customizable):
         self.__geo = None
         self.__note = None
 
+    def isExternal(self) -> bool:
+        return self.__isExternal
+    
+    def setExternal(self, is_external: bool = True, external_interface: str = None):
+        self.__isExternal = is_external
+        self.__external_interface = external_interface
 
+    def getExternalInterface(self) -> Optional[str]:
+        return self.__external_interface
+        
     def scope(self)-> Scope:
         return Scope(ScopeTier.Node,
                      node_type=ScopeType.from_node(self),
                      node_id=self.getName(),
                      as_id=self.getAsn())
+    
 
     def handDown(self, other: Customizable):
         """!@brief nodes are atomic (not further decomposable)"""
@@ -1141,7 +1152,10 @@ class Router(Node):
         self.__is_border_router = False
         self.__loopback_address = None
         self.__extensions = {}
+    
         super().__init__( name,role,asn,scope)
+
+
 
     def hasExtension(self, name: str) -> bool:
         return name in self.__extensions

@@ -28,7 +28,7 @@ client/backend/bin
 *.bin
 output*
 project-words.txt
-.venv
+*venv*
 **/.obsidian/**
 test_result.txt
 
