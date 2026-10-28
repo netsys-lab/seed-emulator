@@ -6,7 +6,16 @@ from seedemu.layers import ScionBase, ScionRouting, ScionIsd, Scion
 from seedemu.layers.Scion import LinkType as ScLinkType
 from seedemu.core.ExternalRouter import ExternalRouter
 
-
+#   Create veths:
+# sudo ip link add veth1 type veth peer name veth2
+# sudo ip link set veth1 up
+# sudo ip link set veth2 up
+#
+#   Get interface name:
+# sudo nsenter -t $(docker inspect --format '{{.State.Pid}}' <container_name>) -n ip a
+#
+#   Install ARP on interface
+# sudo nsenter -t $(docker inspect --format '{{.State.Pid}}' <container_name>) -n arp -s 10.50.0.3 12:1f:73:79:ed:10 -i <interface>
 
 
 # ---- Plugin Example ----
@@ -80,7 +89,7 @@ if __name__ == "__main__":
     as150.createControlService('cs1').joinNetwork('net0')
     as150_router = as150.createRouter('br0')
     as150_router.joinNetwork('net0')
-    as150_router.crossConnect(153, 'EXT_BR153', '10.50.0.2/29')
+    as150_router.crossConnect(153, 'ext_br153', '10.50.0.2/29')
 
     # AS-153
     as153 = base.createAutonomousSystem(153)
@@ -88,25 +97,12 @@ if __name__ == "__main__":
     scion_isd.setCertIssuer((1, 153), issuer=150)
     as153.createNetwork('net0')
     as153.createControlService('cs1').joinNetwork('net0')
-    as153_router = as153.createRouter('EXT_BR153')
+    as153_router = as153.createRouter('ext_br153')
     as153_router.joinNetwork('net0')
     as153_router.crossConnect(150, 'br0', '10.50.0.3/29')
-    as153_router.setExternal(True, external_interface="eth1")  # Mark as external with interface eth1
-    #as153_router.installExtension("external_host_interface", "eth1")
-    #Create external
-    #ext = ExternalRouter("EXT_BR153", as153)
-    #ext.joinNetwork('net0', '10.50.1.4', mac="00:11:22:33:44:54")
-    #ext.crossConnect(150, 'br0', '10.50.0.3/29', mac="00:11:22:33:44:55")
-
+    as153_router.setExternal(True, external_interface="veth1")  # Mark as external with interface eth1
     # Inter-AS routing
     scion.addXcLink((1, 150), (1, 153), ScLinkType.Transit)
-
-    # Register external into SEED
-    #emu.registerExternalComponents(ext)
-
-    # Register plugin into manager
-    #emu._externalManager = ExternalEmulatorManager()  # ensure manager exists
-    #emu._externalManager.register(DummyPlugin())
 
     # Rendering
     emu.addLayer(base)
